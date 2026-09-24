@@ -1,5 +1,6 @@
 <?php
 
+use App\Hooks\HooksServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Schema\SchemaServiceProvider;
@@ -10,4 +11,5 @@ return [
     FortifyServiceProvider::class,
     StarDustServiceProvider::class,
     SchemaServiceProvider::class,
+    HooksServiceProvider::class,
 ];
