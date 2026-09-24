@@ -1,5 +1,6 @@
 <?php
 
+use App\Files\FilesServiceProvider;
 use App\Hooks\HooksServiceProvider;
 use App\Modules\ModulesServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -14,4 +15,5 @@ return [
     SchemaServiceProvider::class,
     HooksServiceProvider::class,
     ModulesServiceProvider::class,
+    FilesServiceProvider::class,
 ];
