@@ -23,9 +23,10 @@ use Throwable;
  * 1. Over FTP or the host's file manager, create an empty file named
  *    `safe-mode` in the storage/ folder. The site comes back without
  *    modules.
- * 2. Switch off the module that broke things: delete its folder from
- *    modules/ (an enabled module whose files are gone is switched off on
- *    the next request), or run
+ * 2. Log in, open Modules in the admin, and disable or uninstall the
+ *    module that broke things. Without the admin, delete the module's
+ *    folder from modules/ (an enabled module whose files are gone is
+ *    switched off on the next request), or run
  *    `UPDATE ss_modules SET enabled = 0 WHERE slug = '…'` in phpMyAdmin.
  * 3. Delete storage/safe-mode.
  */

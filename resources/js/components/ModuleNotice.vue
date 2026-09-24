@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { AlertTriangle } from '@lucide/vue';
 import { computed } from 'vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { index } from '@/routes/admin/modules';
 
 type ModuleNotices = {
     safeMode: 'env' | 'file' | null;
@@ -57,6 +58,9 @@ const notices = computed(
                         {{ module.error }}
                     </li>
                 </ul>
+                <Link :href="index()" class="underline underline-offset-4">
+                    Review modules
+                </Link>
             </AlertDescription>
         </Alert>
     </div>

@@ -35,13 +35,29 @@ return [
     | breaks the site in a way that can't be caught, turn on safe mode and no
     | module loads: set STARSYSTEM_SAFE_MODE=true, or, without a shell,
     | upload an empty file named `safe-mode` into the storage folder. Then
-    | switch the module off (see App\Modules\SafeMode for the ways) and
-    | delete the file again.
+    | disable the module under Modules in the admin (App\Modules\SafeMode
+    | lists other ways) and delete the file again.
     |
     */
 
     'safe_mode' => (bool) env('STARSYSTEM_SAFE_MODE', false),
 
     'safe_mode_file' => storage_path('safe-mode'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Zip uploads
+    |--------------------------------------------------------------------------
+    |
+    | Limits for modules uploaded as zips in the admin. The upload is also
+    | capped by PHP's upload_max_filesize and post_max_size.
+    |
+    */
+
+    'upload_max_kb' => 20 * 1024,
+
+    'max_files' => 5000,
+
+    'max_unpacked_mb' => 100,
 
 ];

@@ -5,6 +5,7 @@ namespace App\Modules;
 use App\Models\Module;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Support\Facades\File;
 use Throwable;
 
 /**
@@ -108,6 +109,8 @@ class ModuleManager
      */
     public function enable(string $slug): Module
     {
+        $this->refuseInSafeMode();
+
         $manifest = $this->find($slug);
 
         if (! $this->isCompatible($manifest)) {
@@ -148,6 +151,131 @@ class ModuleManager
     }
 
     /**
+     * Brings an enabled module's database up to its files after an upgrade,
+     * whether uploaded as a zip or copied in over FTP. A module that isn't
+     * enabled catches up when it is.
+     *
+     * @throws ModuleException
+     */
+    public function applyUpdate(string $slug): void
+    {
+        $module = Module::query()->where('slug', $slug)->where('enabled', true)->first();
+
+        if ($module === null) {
+            return;
+        }
+
+        $this->refuseInSafeMode();
+
+        $manifest = $this->find($slug);
+
+        try {
+            $this->migrate($manifest);
+        } catch (ModuleException $e) {
+            $module->update(['enabled' => false, 'last_error' => $e->getMessage(), 'last_error_at' => now()]);
+
+            throw new ModuleException($e->getMessage().' The module was switched off.', previous: $e);
+        }
+
+        $module->update(['name' => $manifest->name, 'version' => $manifest->version]);
+    }
+
+    /**
+     * Removes a module's files and its row. With $deleteData, first rolls
+     * back its migrations, which drops its tables.
+     *
+     * @throws ModuleException
+     */
+    public function uninstall(string $slug, bool $deleteData): void
+    {
+        try {
+            $manifest = $this->find($slug);
+        } catch (ModuleException) {
+            // Its folder is already gone; only the row is left to remove.
+            Module::query()->where('slug', $slug)->delete();
+
+            return;
+        }
+
+        if ($deleteData && is_dir($manifest->migrationsPath())) {
+            // Rolling back runs the module's own migration code.
+            $this->refuseInSafeMode();
+
+            try {
+                $this->migrator()->reset([$manifest->migrationsPath()]);
+            } catch (Throwable $e) {
+                throw new ModuleException("{$manifest->name}'s data couldn't be removed, so it's still installed: {$e->getMessage()}", previous: $e);
+            }
+        }
+
+        Module::query()->where('slug', $slug)->delete();
+
+        $this->autoloader->remove($manifest->namespace);
+
+        // deleteDirectory() doesn't follow symlinks, so a link inside the
+        // module can't take files outside it along.
+        if (! File::deleteDirectory($manifest->path)) {
+            throw new ModuleException("{$manifest->name} was switched off, but its folder couldn't be deleted. Delete modules/{$manifest->name} over FTP.");
+        }
+    }
+
+    public function dismissError(string $slug): void
+    {
+        Module::query()->where('slug', $slug)->update(['last_error' => null, 'last_error_at' => null]);
+    }
+
+    /**
+     * Everything the admin's module list shows: every folder in modules/,
+     * and every module the database knows whose folder is gone.
+     *
+     * @return list<array{slug: string|null, name: string, version: string|null, installedVersion: string|null, description: string, author: string, requires: string|null, enabled: bool, updatePending: bool, problem: string|null, lastError: string|null, lastErrorAt: string|null}>
+     */
+    public function overview(): array
+    {
+        $rows = Module::query()->get()->keyBy('slug');
+        $list = [];
+
+        foreach ($this->discover() as $folder => $manifest) {
+            if ($manifest instanceof InvalidManifest) {
+                $list[] = $this->entry(null, $folder, null, $manifest->getMessage());
+
+                continue;
+            }
+
+            $row = $rows->pull($manifest->slug);
+
+            $list[] = $this->entry($manifest, $manifest->name, $row, $this->isCompatible($manifest) ? null : $this->incompatibility($manifest));
+        }
+
+        foreach ($rows as $row) {
+            $list[] = $this->entry(null, $row->name, $row, "Its folder, modules/{$row->name}, is missing.");
+        }
+
+        return $list;
+    }
+
+    /**
+     * @return array{slug: string|null, name: string, version: string|null, installedVersion: string|null, description: string, author: string, requires: string|null, enabled: bool, updatePending: bool, problem: string|null, lastError: string|null, lastErrorAt: string|null}
+     */
+    private function entry(?Manifest $manifest, string $name, ?Module $row, ?string $problem): array
+    {
+        return [
+            'slug' => $manifest->slug ?? $row?->slug,
+            'name' => $name,
+            'version' => $manifest?->version,
+            'installedVersion' => $row?->version,
+            'description' => $manifest->description ?? '',
+            'author' => $manifest->author ?? '',
+            'requires' => $manifest?->requires,
+            'enabled' => (bool) $row?->enabled,
+            'updatePending' => $manifest !== null && $row !== null && $row->enabled && $row->version !== $manifest->version,
+            'problem' => $problem,
+            'lastError' => $row?->last_error,
+            'lastErrorAt' => $row?->last_error_at?->toIso8601String(),
+        ];
+    }
+
+    /**
      * Runs the module's migrations that haven't run yet.
      *
      * @throws ModuleException
@@ -168,6 +296,19 @@ class ModuleManager
             $migrator->run([$manifest->migrationsPath()]);
         } catch (Throwable $e) {
             throw new ModuleException("{$manifest->name}'s migrations failed: {$e->getMessage()}", previous: $e);
+        }
+    }
+
+    /**
+     * Enabling or updating runs the module's code (its provider loads, its
+     * migrations run), which manual safe mode promises not to do.
+     *
+     * @throws ModuleException
+     */
+    private function refuseInSafeMode(): void
+    {
+        if ($this->container->make(SafeMode::class)->isOn()) {
+            throw new ModuleException('Safe mode is on, so no module code may run. Turn safe mode off first.');
         }
     }
 

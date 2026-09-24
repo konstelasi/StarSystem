@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { Activity, LayoutGrid } from '@lucide/vue';
+import { Activity, LayoutGrid, Puzzle } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { health } from '@/routes/admin';
+import { index as modules } from '@/routes/admin/modules';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -27,6 +28,11 @@ const mainNavItems: NavItem[] = [
         title: 'Health',
         href: health(),
         icon: Activity,
+    },
+    {
+        title: 'Modules',
+        href: modules(),
+        icon: Puzzle,
     },
 ];
 </script>
