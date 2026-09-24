@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool removeFilter(string $name, callable $callback, ?int $priority = null)
  * @method static bool hasAction(string $name)
  * @method static bool hasFilter(string $name)
+ * @method static list<array{component: string, props: array<mixed>, src: string|null}> viewSlot(string $name, array<string, mixed> $context = [])
+ * @method static void addToSlot(string $name, string $component, array<string, mixed>|\Closure $props = [], int $priority = 10, ?string $src = null)
  *
  * @see HookRegistry
  */

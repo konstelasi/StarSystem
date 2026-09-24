@@ -9,6 +9,7 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Events\Dispatcher as EventDispatcher;
 use ReflectionFunction;
+use UnexpectedValueException;
 
 /**
  * StarSystem's hooks, kept from HyperCMS: actions notify, filters transform.
@@ -37,7 +38,7 @@ use ReflectionFunction;
  * - a trailing `:data` marks a filter over the props a controller hands
  *   to its page, e.g. `backend.controller:entries:edit:data`.
  * - `<area>.view:<page>[:<place>]` names a view slot, e.g.
- *   `backend.view:entries:edit`.
+ *   `backend.view:entries:edit`. See viewSlot().
  * - Registries that modules extend are filters over a keyed array, e.g.
  *   `schema.field_types`.
  *
@@ -136,6 +137,65 @@ class HookRegistry
     public function hasFilter(string $name): bool
     {
         return ! empty($this->filters[$name]);
+    }
+
+    /**
+     * The components modules add to a place on an admin page, for the
+     * page's `<HookSlot name="…">` to render. A view slot is a filter over
+     * a list of `{component, props, src}` descriptors, so modules add to it
+     * with addToSlot() or addFilter(), and it gets the page's $context.
+     *
+     * Controllers pass the result as the `hookSlots` prop, keyed by slot
+     * name. `component` is a name the front end's hook component registry
+     * knows, or `slug::Export` for a module component loaded from `src`.
+     *
+     * @param  array<string, mixed>  $context
+     * @return list<array{component: string, props: array<mixed>, src: string|null}>
+     */
+    public function viewSlot(string $name, array $context = []): array
+    {
+        $items = $this->applyFilters($name, [], $context);
+
+        if (! is_array($items)) {
+            throw new UnexpectedValueException("View slot [{$name}] must be a list of components, a filter returned ".get_debug_type($items).'.');
+        }
+
+        return array_map(fn (mixed $item) => $this->slotItem($name, $item), array_values($items));
+    }
+
+    /**
+     * Adds a component to a view slot. $props can be a closure taking the
+     * slot's context and the site; returning null leaves the component out,
+     * e.g. for pages the module doesn't apply to.
+     *
+     * @param  array<string, mixed>|(Closure(array<string, mixed>, Site|null): (array<string, mixed>|null))  $props
+     */
+    public function addToSlot(string $name, string $component, array|Closure $props = [], int $priority = 10, ?string $src = null): void
+    {
+        $this->addFilter($name, function (array $items, array $context, ?Site $site) use ($component, $props, $src) {
+            $props = $props instanceof Closure ? $props($context, $site) : $props;
+
+            return $props === null ? $items : [...$items, ['component' => $component, 'props' => $props, 'src' => $src]];
+        }, $priority);
+    }
+
+    /**
+     * @return array{component: string, props: array<mixed>, src: string|null}
+     */
+    private function slotItem(string $slot, mixed $item): array
+    {
+        if (! is_array($item) || ! is_string($item['component'] ?? null) || $item['component'] === '') {
+            throw new UnexpectedValueException("View slot [{$slot}] got an item without a component name.");
+        }
+
+        $props = $item['props'] ?? [];
+        $src = $item['src'] ?? null;
+
+        if (! is_array($props) || ($src !== null && ! is_string($src))) {
+            throw new UnexpectedValueException("View slot [{$slot}] got bad props or src for [{$item['component']}].");
+        }
+
+        return ['component' => $item['component'], 'props' => $props, 'src' => $src];
     }
 
     /**
