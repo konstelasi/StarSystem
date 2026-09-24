@@ -12,7 +12,7 @@ Options -Indexes
 
     # Never serve dotfiles (.env, .git, .htaccess) or project internals.
     RewriteRule (^|/)\. - [F,L]
-    RewriteRule ^(app|bootstrap|config|database|docker|lang|node_modules|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule ^(app|bootstrap|config|database|docker|lang|modules|node_modules|resources|routes|storage|tests|vendor)(/|$) - [F,L]
     RewriteRule ^(artisan|composer\.(json|lock)|package(-lock)?\.json|pnpm-workspace\.yaml|phpunit\.xml|phpstan\.neon|pint\.json|vite\.config\.ts|tsconfig\.json|components\.json|docker-compose\.yml|README\.md)$ - [F,L]
 
     # Everything else is served from public/, which has its own front

@@ -1,0 +1,12 @@
+{
+    "name": "Example",
+    "slug": "example",
+    "version": "1.0.0",
+    "description": "Shows how a module uses an action, a filter and a view slot.",
+    "author": "StarSystem",
+    "requires": {
+        "starsystem": "^0.1"
+    },
+    "provider": "Modules\\Example\\ExampleServiceProvider",
+    "assets": "dist"
+}
