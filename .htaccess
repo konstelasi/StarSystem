@@ -1,0 +1,29 @@
+# Docroot fallback for hosts where the domain points at the StarSystem
+# folder instead of its public/ folder. The best setup is still to point the
+# domain at public/; these rules make the other setup safe.
+#
+# An exposed .env is the most common way these installs get compromised, so
+# the deny rules come first, before anything is forwarded.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never serve dotfiles (.env, .git, .htaccess) or project internals.
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule ^(app|bootstrap|config|database|docker|lang|node_modules|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule ^(artisan|composer\.(json|lock)|package(-lock)?\.json|pnpm-workspace\.yaml|phpunit\.xml|phpstan\.neon|pint\.json|vite\.config\.ts|tsconfig\.json|components\.json|docker-compose\.yml|README\.md)$ - [F,L]
+
+    # Everything else is served from public/, which has its own front
+    # controller rules.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Without mod_rewrite, still refuse the files that matter most.
+<IfModule !mod_rewrite.c>
+    <FilesMatch "^(\.|artisan$|composer\.)">
+        Require all denied
+    </FilesMatch>
+</IfModule>

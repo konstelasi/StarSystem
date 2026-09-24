@@ -1,0 +1,65 @@
+# Development and test databases only. Production targets shared hosting,
+# which provides its own MySQL 8.0.13+ or MariaDB 10.11+ server.
+services:
+    mariadb:
+        image: mariadb:10.11
+        environment:
+            MARIADB_ROOT_PASSWORD: root
+            MARIADB_DATABASE: starsystem
+            MARIADB_USER: starsystem
+            MARIADB_PASSWORD: secret
+        ports:
+            - '33110:3306'
+        volumes:
+            - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+        healthcheck:
+            test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+            interval: 5s
+            retries: 20
+
+    mysql:
+        image: mysql:8.0
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: starsystem
+            MYSQL_USER: starsystem
+            MYSQL_PASSWORD: secret
+        ports:
+            - '33080:3306'
+        volumes:
+            - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+        healthcheck:
+            test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-proot']
+            interval: 5s
+            retries: 20
+
+    # `docker compose --profile hosting up -d`: a shared-hosting stand-in on
+    # http://localhost:8090, with the project root as the docroot and a
+    # once-a-minute schedule:run loop in place of the host's cron.
+    web:
+        profiles: [hosting]
+        build: ./docker/apache
+        ports:
+            - '8090:80'
+        volumes:
+            - .:/var/www/html
+        environment: &hosting-env
+            APP_URL: http://localhost:8090
+            DB_HOST: mariadb
+            DB_PORT: 3306
+        depends_on:
+            mariadb:
+                condition: service_healthy
+
+    cron:
+        profiles: [hosting]
+        build: ./docker/apache
+        volumes:
+            - .:/var/www/html
+        environment: *hosting-env
+        working_dir: /var/www/html
+        user: www-data
+        command: sh -c 'while true; do php artisan schedule:run; sleep 60; done'
+        depends_on:
+            mariadb:
+                condition: service_healthy
