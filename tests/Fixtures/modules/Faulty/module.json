@@ -1,0 +1,11 @@
+{
+    "name": "Faulty",
+    "slug": "faulty",
+    "version": "1.0.0",
+    "description": "Throws from its provider, for the safe mode tests.",
+    "author": "StarSystem",
+    "requires": {
+        "starsystem": "^0.1"
+    },
+    "provider": "Modules\\Faulty\\FaultyServiceProvider"
+}

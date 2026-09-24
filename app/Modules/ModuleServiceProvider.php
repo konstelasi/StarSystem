@@ -13,7 +13,8 @@ use Illuminate\Support\ServiceProvider;
  * front-end components to view slots.
  *
  * Add hooks in register() or boot(); the loader attributes them to the
- * module. Module providers can't be deferred.
+ * module, and if either throws, switches the module off and drops its
+ * hooks (see SafeMode). Module providers can't be deferred.
  */
 abstract class ModuleServiceProvider extends ServiceProvider
 {

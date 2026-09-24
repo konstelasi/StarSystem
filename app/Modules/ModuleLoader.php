@@ -5,7 +5,6 @@ namespace App\Modules;
 use App\Hooks\HookRegistry;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use stdClass;
 use Throwable;
@@ -14,8 +13,9 @@ use Throwable;
  * Registers and boots enabled modules' providers on every request.
  *
  * The loader registers and boots each provider itself rather than through
- * Application::register(), so each step runs inside the module's hook
- * ownership and one place controls what happens when a module misbehaves.
+ * Application::register(), so it can catch what a provider throws while
+ * booting too; Laravel would boot it outside any try/catch of ours. A
+ * module that throws is switched off (see SafeMode) and the app carries on.
  */
 class ModuleLoader
 {
@@ -27,10 +27,15 @@ class ModuleLoader
         private readonly ModuleManager $modules,
         private readonly ModuleAutoloader $autoloader,
         private readonly HookRegistry $hooks,
+        private readonly SafeMode $safeMode,
     ) {}
 
     public function registerEnabled(): void
     {
+        if ($this->safeMode->isOn()) {
+            return;
+        }
+
         foreach ($this->enabled() as $row) {
             $manifest = $this->manifestFor($row->slug, $row->name);
 
@@ -38,10 +43,16 @@ class ModuleLoader
                 continue;
             }
 
-            $this->autoloader->add($manifest->namespace, $manifest->sourcePath());
+            try {
+                $this->autoloader->add($manifest->namespace, $manifest->sourcePath());
 
-            $provider = $this->makeProvider($manifest);
-            $this->hooks->asOwner($manifest->slug, fn () => $this->register($provider));
+                $provider = $this->makeProvider($manifest);
+                $this->hooks->asOwner($manifest->slug, fn () => $this->register($provider));
+            } catch (Throwable $e) {
+                $this->fail($manifest, 'Its provider failed while registering: '.SafeMode::describe($e), $e);
+
+                continue;
+            }
 
             $this->loaded[$manifest->slug] = ['manifest' => $manifest, 'provider' => $provider];
         }
@@ -49,8 +60,12 @@ class ModuleLoader
 
     public function bootLoaded(): void
     {
-        foreach ($this->loaded as $slug => ['provider' => $provider]) {
-            $this->hooks->asOwner($slug, fn () => $this->boot($provider));
+        foreach ($this->loaded as $slug => ['manifest' => $manifest, 'provider' => $provider]) {
+            try {
+                $this->hooks->asOwner($slug, fn () => $this->boot($provider));
+            } catch (Throwable $e) {
+                $this->fail($manifest, 'Its provider failed while booting: '.SafeMode::describe($e), $e);
+            }
         }
     }
 
@@ -87,25 +102,39 @@ class ModuleLoader
         try {
             $manifest = $this->modules->read($name);
         } catch (InvalidManifest $e) {
-            Log::warning("Module {$name} is enabled but can't load: {$e->getMessage()}");
+            $this->safeMode->switchOff($slug, "Its files can't be loaded: {$e->getMessage()}");
 
             return null;
         }
 
         if ($manifest->slug !== $slug) {
-            Log::warning("Module folder {$name} now holds {$manifest->slug}, not {$slug}.");
+            $this->safeMode->switchOff($slug, "The {$name} folder now holds a different module, {$manifest->slug}.");
 
             return null;
         }
 
         // A StarSystem upgrade can leave an enabled module behind.
         if (! $this->modules->isCompatible($manifest)) {
-            Log::warning($this->modules->incompatibility($manifest));
+            $this->safeMode->switchOff($slug, $this->modules->incompatibility($manifest));
 
             return null;
         }
 
         return $manifest;
+    }
+
+    /**
+     * Takes back what a failing module added, as far as that's possible:
+     * its hooks and its classes. Container bindings and routes it already
+     * added stay for this request; from the next one it isn't loaded.
+     */
+    private function fail(Manifest $manifest, string $why, Throwable $e): void
+    {
+        $this->hooks->removeOwnedBy($manifest->slug);
+        $this->autoloader->remove($manifest->namespace);
+        unset($this->loaded[$manifest->slug]);
+
+        $this->safeMode->switchOff($manifest->slug, $why, $e);
     }
 
     private function makeProvider(Manifest $manifest): ServiceProvider
