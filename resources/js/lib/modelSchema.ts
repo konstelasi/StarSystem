@@ -1,7 +1,9 @@
 import type {
+    FieldSpecJson,
     FieldState,
     FieldTypeDescriptor,
     LayoutBlock,
+    ModelSchemaJson,
 } from '@/types/schema';
 
 /** Busy state per field uuid. Fields that aren't listed are ready. */
@@ -204,4 +206,93 @@ export function slotChoices(layout: LayoutBlock[]): SlotChoice[] {
     }
 
     return choices;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isFieldSpec(value: unknown): value is FieldSpecJson {
+    if (!isPlainObject(value)) {
+        return false;
+    }
+
+    return (
+        typeof value.uuid === 'string' &&
+        typeof value.key === 'string' &&
+        typeof value.label === 'string' &&
+        typeof value.type === 'string' &&
+        typeof value.required === 'boolean' &&
+        typeof value.filterable === 'boolean' &&
+        (value.layout_slot === null || typeof value.layout_slot === 'string') &&
+        isPlainObject(value.settings)
+    );
+}
+
+function isLayoutBlock(value: unknown): value is LayoutBlock {
+    if (!isPlainObject(value)) {
+        return false;
+    }
+
+    return (
+        typeof value.id === 'string' &&
+        (value.kind === 'section' ||
+            value.kind === 'tabs' ||
+            value.kind === 'columns') &&
+        Array.isArray(value.slots) &&
+        value.slots.every(
+            (slot) => isPlainObject(slot) && typeof slot.id === 'string',
+        )
+    );
+}
+
+export type SchemaJsonResult =
+    | { ok: true; value: ModelSchemaJson }
+    | { ok: false; error: string };
+
+/**
+ * Parses the JSON tab's text back into a schema, for the builder to apply.
+ * Checks the shape, not every business rule (e.g. duplicate keys) — those
+ * surface in the inspector once the schema is applied.
+ */
+export function parseSchemaJson(text: string): SchemaJsonResult {
+    let parsed: unknown;
+
+    try {
+        parsed = JSON.parse(text);
+    } catch (error) {
+        return {
+            ok: false,
+            error: error instanceof Error ? error.message : 'Invalid JSON.',
+        };
+    }
+
+    if (!isPlainObject(parsed)) {
+        return { ok: false, error: 'The schema must be a JSON object.' };
+    }
+
+    if (parsed.version !== 1) {
+        return { ok: false, error: '"version" must be 1.' };
+    }
+
+    if (
+        !isPlainObject(parsed.model) ||
+        typeof parsed.model.slug !== 'string' ||
+        typeof parsed.model.label !== 'string'
+    ) {
+        return { ok: false, error: '"model" needs a "slug" and a "label".' };
+    }
+
+    if (!Array.isArray(parsed.layout) || !parsed.layout.every(isLayoutBlock)) {
+        return {
+            ok: false,
+            error: '"layout" must be an array of layout blocks.',
+        };
+    }
+
+    if (!Array.isArray(parsed.fields) || !parsed.fields.every(isFieldSpec)) {
+        return { ok: false, error: '"fields" must be an array of fields.' };
+    }
+
+    return { ok: true, value: parsed as ModelSchemaJson };
 }

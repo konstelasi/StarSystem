@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Eye, Hammer } from '@lucide/vue';
+import { Braces, Eye, Hammer } from '@lucide/vue';
 import { nextTick, ref } from 'vue';
 import BlockInspector from '@/components/builder/BlockInspector.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
@@ -8,6 +8,7 @@ import BuilderPalette from '@/components/builder/BuilderPalette.vue';
 import { provideBuilder } from '@/components/builder/context';
 import FieldInspector from '@/components/builder/FieldInspector.vue';
 import FormPreview from '@/components/builder/FormPreview.vue';
+import JsonEditor from '@/components/builder/JsonEditor.vue';
 import ModelInspector from '@/components/builder/ModelInspector.vue';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -77,6 +78,9 @@ const tab = ref('build');
                 <TabsTrigger value="preview" class="px-3">
                     <Eye /> Preview
                 </TabsTrigger>
+                <TabsTrigger value="json" class="px-3">
+                    <Braces /> JSON
+                </TabsTrigger>
             </TabsList>
 
             <TabsContent value="build">
@@ -119,6 +123,12 @@ const tab = ref('build');
             <TabsContent value="preview">
                 <div class="@container rounded-xl border bg-card p-4 @xl:p-6">
                     <FormPreview :schema="builder.schema.value" />
+                </div>
+            </TabsContent>
+
+            <TabsContent value="json">
+                <div class="rounded-xl border bg-card p-4">
+                    <JsonEditor />
                 </div>
             </TabsContent>
         </Tabs>

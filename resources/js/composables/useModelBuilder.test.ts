@@ -1,6 +1,11 @@
 import { expect, test } from 'vite-plus/test';
 import { useModelBuilder } from '@/composables/useModelBuilder';
-import { keyFromLabel, uniqueKey, uuid } from '@/lib/modelSchema';
+import {
+    keyFromLabel,
+    parseSchemaJson,
+    uniqueKey,
+    uuid,
+} from '@/lib/modelSchema';
 import type { FieldTypeDescriptor, ModelSchemaJson } from '@/types/schema';
 
 const types: FieldTypeDescriptor[] = [
@@ -165,4 +170,28 @@ test('duplicate and blocks', () => {
     expect(b.moveBlockBy(t.id, 1)).toEqual({ index: 1, total: 2 });
     b.markSaved(b.schema.value);
     expect(b.isDirty.value).toBe(false);
+});
+
+test('parseSchemaJson', () => {
+    expect(parseSchemaJson('not json').ok).toBe(false);
+    expect(parseSchemaJson('[]').ok).toBe(false);
+    expect(parseSchemaJson(JSON.stringify({ ...base, version: 2 })).ok).toBe(
+        false,
+    );
+    expect(
+        parseSchemaJson(JSON.stringify({ ...base, model: { slug: 'a' } })).ok,
+    ).toBe(false);
+    expect(
+        parseSchemaJson(JSON.stringify({ ...base, layout: 'nope' })).ok,
+    ).toBe(false);
+    expect(
+        parseSchemaJson(JSON.stringify({ ...base, fields: [{ uuid: 'only' }] }))
+            .ok,
+    ).toBe(false);
+
+    const result = parseSchemaJson(JSON.stringify(base));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+        expect(result.value).toEqual(base);
+    }
 });
