@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { FileIcon, FolderOpen, X } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
+import FilePicker from '@/components/files/FilePicker.vue';
 import { Button } from '@/components/ui/button';
 import FieldShell from '@/fields/parts/FieldShell.vue';
 import {
@@ -11,8 +12,11 @@ import {
 import type { FieldRendererProps } from '@/fields/support';
 
 /**
- * Stores file ids: a list when `multiple` is on, otherwise one id or null.
- * Picking is not wired up yet; the media library will plug in here.
+ * Stores file uuids: a list when `multiple` is on, otherwise one uuid or
+ * null. `accept` (extensions or MIME types) is shown as a hint, but isn't
+ * passed to <FilePicker>'s own `accept`, which filters by a coarser kind
+ * (image, video, …) rather than an exact pattern; the server still checks
+ * the picked uuids exist, regardless of what the picker showed.
  */
 const props = defineProps<FieldRendererProps>();
 const emit = defineEmits<{
@@ -22,12 +26,15 @@ const emit = defineEmits<{
 const multiple = computed(() => booleanSetting(props.field, 'multiple'));
 const accept = computed(() => stringListSetting(props.field, 'accept'));
 const files = computed(() => asStringList(props.modelValue));
-const pickerMissing = ref(false);
 
 const remove = (id: string) => {
     const rest = files.value.filter((item) => item !== id);
 
     emit('update:modelValue', multiple.value ? rest : null);
+};
+
+const picked = (uuids: string[]) => {
+    emit('update:modelValue', multiple.value ? uuids : (uuids[0] ?? null));
 };
 </script>
 
@@ -66,18 +73,25 @@ const remove = (id: string) => {
             </ul>
 
             <div class="flex flex-wrap items-center gap-3">
-                <Button
-                    :id="id"
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    :disabled="disabled"
-                    :aria-describedby="describedBy"
-                    @click="pickerMissing = true"
+                <FilePicker
+                    :multiple="multiple"
+                    :selected="files"
+                    @select="(uuids) => picked(uuids)"
                 >
-                    <FolderOpen />
-                    {{ multiple ? 'Choose files' : 'Choose a file' }}
-                </Button>
+                    <template #trigger>
+                        <Button
+                            :id="id"
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            :disabled="disabled"
+                            :aria-describedby="describedBy"
+                        >
+                            <FolderOpen />
+                            {{ multiple ? 'Choose files' : 'Choose a file' }}
+                        </Button>
+                    </template>
+                </FilePicker>
                 <span
                     v-if="accept.length > 0"
                     class="text-xs text-muted-foreground"
@@ -85,15 +99,6 @@ const remove = (id: string) => {
                     Allowed: {{ accept.join(', ') }}
                 </span>
             </div>
-
-            <p
-                v-if="pickerMissing"
-                class="mt-3 text-sm text-muted-foreground"
-                role="status"
-            >
-                The media library isn't connected to this form yet, so files
-                can't be picked here.
-            </p>
         </div>
     </FieldShell>
 </template>

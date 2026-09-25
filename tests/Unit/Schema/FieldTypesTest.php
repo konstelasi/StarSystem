@@ -176,8 +176,9 @@ class FieldTypesTest extends TestCase
             'checkboxes' => ['checkboxes', $colours, false, ['red'], true],
             'checkboxes outside options' => ['checkboxes', $colours, false, ['green'], false],
             'checkboxes need a list' => ['checkboxes', $colours, false, 'red', false],
-            'one file' => ['file', [], false, 'uploads/a.pdf', true],
-            'several files' => ['file', ['multiple' => true], false, ['uploads/a.pdf', 'uploads/b.pdf'], true],
+            // A picked file must exist for the current site, which needs a
+            // database and a resolved site: see FileFieldValidationTest,
+            // not this data provider.
             'several files need a list' => ['file', ['multiple' => true], false, 'uploads/a.pdf', false],
         ];
     }
