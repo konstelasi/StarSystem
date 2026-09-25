@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { Blocks, PlusCircle } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CreateModelDialog from '@/components/models/CreateModelDialog.vue';
+import DeleteModelDialog from '@/components/models/DeleteModelDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -115,15 +116,13 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                             </Badge>
                             <Badge v-else variant="outline">Active</Badge>
                         </td>
-                        <td class="px-4 py-2 text-right">
-                            <Button
-                                v-if="model.status !== 'deleting'"
-                                as-child
-                                variant="ghost"
-                                size="sm"
-                            >
-                                <Link :href="builder(model.id)">Open</Link>
-                            </Button>
+                        <td class="px-4 py-2 text-right whitespace-nowrap">
+                            <template v-if="model.status !== 'deleting'">
+                                <Button as-child variant="ghost" size="sm">
+                                    <Link :href="builder(model.id)">Open</Link>
+                                </Button>
+                                <DeleteModelDialog :model="model" />
+                            </template>
                         </td>
                     </tr>
                 </tbody>

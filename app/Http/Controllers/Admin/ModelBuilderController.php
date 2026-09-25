@@ -7,7 +7,9 @@ use App\Models\SchemaModel;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\InvalidSchemaException;
 use App\Schema\ModelSchema;
+use App\Schema\SchemaException;
 use App\Schema\SchemaManager;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -23,8 +25,18 @@ class ModelBuilderController extends Controller
         private readonly FieldTypeRegistry $fieldTypes,
     ) {}
 
-    public function show(SchemaModel $model): Response
+    /**
+     * A stale tab or the back button pointing at a model that has since
+     * been deleted is a normal case, not an error page.
+     */
+    public function show(SchemaModel $model): Response|RedirectResponse
     {
+        if ($model->isDeleting()) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => SchemaException::text('This model is being deleted.')]);
+
+            return to_route('admin.models.index');
+        }
+
         return Inertia::render('admin/models/Builder', [
             'model' => ['id' => $model->id],
             'fieldTypes' => $this->fieldTypes->toArray(),

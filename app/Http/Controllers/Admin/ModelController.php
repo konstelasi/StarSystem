@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\StoreModelRequest;
 use App\Models\SchemaModel;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
+use App\Schema\SchemaException;
 use App\Schema\SchemaManager;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -50,6 +51,21 @@ class ModelController extends Controller
         }
 
         return to_route('admin.models.builder', $result->model);
+    }
+
+    public function destroy(SchemaModel $model): RedirectResponse
+    {
+        try {
+            $this->schema->deleteModel($model);
+        } catch (SchemaException $e) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+
+            return to_route('admin.models.index');
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => "{$model->label} is being deleted."]);
+
+        return to_route('admin.models.index');
     }
 
     /**

@@ -10,6 +10,7 @@ Route::middleware(['auth', 'verified'])
     ->group(function () {
         Route::get('/', [ModelController::class, 'index'])->name('index');
         Route::post('/', [ModelController::class, 'store'])->name('store');
+        Route::delete('{model}', [ModelController::class, 'destroy'])->name('destroy')->whereNumber('model');
 
         // The single-model builder's old entry point, before the list existed.
         Route::redirect('builder', '/admin/models');

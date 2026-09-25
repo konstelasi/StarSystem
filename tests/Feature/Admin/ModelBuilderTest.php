@@ -101,6 +101,17 @@ class ModelBuilderTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_opening_a_model_being_deleted_redirects_to_the_models_list()
+    {
+        $model = $this->seedModel();
+        app(SchemaManager::class)->deleteModel($model);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertRedirect($this->url('admin.models.index'))
+            ->assertInertiaFlash('toast.type', 'error');
+    }
+
     public function test_guests_cannot_preview_or_save()
     {
         $model = $this->seedModel();

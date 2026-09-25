@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\SchemaModel;
+use App\Models\Site;
 use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
@@ -159,6 +160,63 @@ class ModelControllerTest extends TestCase
             ->assertSessionHasErrors('slug');
     }
 
+    public function test_guests_cannot_delete_a_model()
+    {
+        $model = $this->create('articles', 'Articles');
+
+        $this->delete($this->url('admin.models.destroy', ['model' => $model->id]))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_deleting_a_model_marks_it_deleting_until_stardust_purges_it()
+    {
+        $model = $this->create('articles', 'Articles');
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.destroy', ['model' => $model->id]))
+            ->assertRedirect($this->url('admin.models.index'))
+            ->assertInertiaFlash('toast.type', 'success');
+
+        $this->assertSame(SchemaModel::DELETING, $model->refresh()->status);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.index'))
+            ->assertInertia(fn (Assert $assert) => $assert
+                ->has('models.0', fn (Assert $row) => $row->where('status', 'deleting')->etc())
+            );
+
+        $this->drain();
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.index'))
+            ->assertInertia(fn (Assert $assert) => $assert->has('models', 0));
+    }
+
+    public function test_deleting_a_model_twice_shows_an_error_toast()
+    {
+        $model = $this->create('articles', 'Articles');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->delete($this->url('admin.models.destroy', ['model' => $model->id]));
+
+        $this->actingAs($user)
+            ->delete($this->url('admin.models.destroy', ['model' => $model->id]))
+            ->assertRedirect($this->url('admin.models.index'))
+            ->assertInertiaFlash('toast.type', 'error');
+    }
+
+    public function test_another_sites_model_cannot_be_deleted()
+    {
+        $model = $this->create('articles', 'Articles');
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.destroy', ['model' => $model->id], $other))
+            ->assertNotFound();
+
+        $this->assertSame(SchemaModel::ACTIVE, $model->refresh()->status);
+    }
+
     private function create(string $slug, string $label): SchemaModel
     {
         $result = $this->manager()->createModel(new ModelSchema($slug, $label, fields: [
@@ -179,8 +237,8 @@ class ModelControllerTest extends TestCase
     /**
      * @param  array<string, mixed>  $parameters
      */
-    private function url(string $route, array $parameters = []): string
+    private function url(string $route, array $parameters = [], ?Site $site = null): string
     {
-        return 'http://'.$this->site->domains[0].route($route, $parameters, absolute: false);
+        return 'http://'.($site ?? $this->site)->domains[0].route($route, $parameters, absolute: false);
     }
 }
