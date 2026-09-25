@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { Blocks, PlusCircle } from '@lucide/vue';
+import { Blocks, PlusCircle, Upload } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CreateModelDialog from '@/components/models/CreateModelDialog.vue';
 import DeleteModelDialog from '@/components/models/DeleteModelDialog.vue';
+import ImportModelDialog from '@/components/models/ImportModelDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { builder, index } from '@/routes/admin/models';
+import { builder, exportMethod, index } from '@/routes/admin/models';
 
 type ModelRow = {
     id: number;
@@ -37,6 +38,7 @@ defineOptions({
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
 
 const createOpen = ref(false);
+const importOpen = ref(false);
 const existingSlugs = computed(() => props.models.map((model) => model.slug));
 </script>
 
@@ -51,10 +53,16 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                     The content models editors fill in entries for.
                 </p>
             </div>
-            <Button @click="createOpen = true">
-                <PlusCircle />
-                New model
-            </Button>
+            <div class="flex gap-2">
+                <Button variant="secondary" @click="importOpen = true">
+                    <Upload />
+                    Import
+                </Button>
+                <Button @click="createOpen = true">
+                    <PlusCircle />
+                    New model
+                </Button>
+            </div>
         </div>
 
         <Card v-if="models.length === 0">
@@ -121,6 +129,11 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                 <Button as-child variant="ghost" size="sm">
                                     <Link :href="builder(model.id)">Open</Link>
                                 </Button>
+                                <Button as-child variant="ghost" size="sm">
+                                    <a :href="exportMethod(model.id).url"
+                                        >Export</a
+                                    >
+                                </Button>
                                 <DeleteModelDialog :model="model" />
                             </template>
                         </td>
@@ -133,5 +146,6 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
             v-model:open="createOpen"
             :existing-slugs="existingSlugs"
         />
+        <ImportModelDialog v-model:open="importOpen" />
     </div>
 </template>
