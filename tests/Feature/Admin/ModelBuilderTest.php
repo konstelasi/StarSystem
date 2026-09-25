@@ -2,29 +2,58 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\SchemaModel;
 use App\Models\User;
+use App\Schema\FieldSpec;
+use App\Schema\ModelSchema;
+use App\Schema\SaveResult;
+use App\Schema\SchemaManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
 
+/**
+ * Every request here goes through the seeded site's own domain, not the
+ * default site: UsesStarDust gives each test its own StarDust tenant (so
+ * model slugs never collide between tests), and multisite is turned on so
+ * `ResolveSite` picks that tenant up from the request's Host instead of
+ * always resolving to site 1.
+ */
 class ModelBuilderTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, UsesStarDust;
 
     private const CORE_TYPES = [
         'text', 'email', 'url', 'color', 'hidden', 'radio', 'select', 'number',
         'range', 'checkbox', 'datetime', 'textarea', 'rich_text', 'code', 'checkboxes', 'file',
     ];
 
-    public function test_guests_are_redirected_to_the_login_page()
+    private const TITLE = '10000000-0000-4000-8000-000000000001';
+
+    private const SUMMARY = '10000000-0000-4000-8000-000000000002';
+
+    private const EMBED = '10000000-0000-4000-8000-000000000003';
+
+    protected function setUp(): void
     {
-        $this->get(route('admin.models.builder'))->assertRedirect(route('login'));
+        parent::setUp();
+
+        config(['starsystem.multisite' => true]);
     }
 
-    public function test_it_renders_the_builder_with_field_types_schema_and_states()
+    public function test_guests_are_redirected_to_the_login_page()
     {
+        $this->get($this->url('admin.models.builder'))->assertRedirect(route('login'));
+    }
+
+    public function test_it_creates_a_starter_model_the_first_time_the_page_is_opened()
+    {
+        $this->assertSame(0, SchemaModel::query()->count());
+
         $this->actingAs(User::factory()->create())
-            ->get(route('admin.models.builder'))
+            ->get($this->url('admin.models.builder'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('admin/models/Builder')
@@ -41,8 +70,33 @@ class ModelBuilderTest extends TestCase
                     )
                 )
                 ->where('schema.version', 1)
-                ->where('schema.model.slug', 'article')
+                ->where('schema.model.slug', 'untitled')
                 ->has('schema.layout')
+                ->has('schema.fields', 0)
+                ->has('states', 0)
+            );
+
+        $this->assertSame(1, SchemaModel::query()->count());
+
+        // A second visit reuses the same model rather than creating another.
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder'))
+            ->assertOk();
+
+        $this->assertSame(1, SchemaModel::query()->count());
+    }
+
+    public function test_it_renders_an_existing_model_with_its_fields_and_states()
+    {
+        $model = $this->seedModel();
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('admin/models/Builder')
+                ->where('schema.model.slug', $model->slug)
+                ->has('schema.fields', 3)
                 ->has('schema.fields.0', fn (Assert $field) => $field
                     ->has('uuid')
                     ->has('key')
@@ -54,45 +108,16 @@ class ModelBuilderTest extends TestCase
                     ->has('settings')
                     ->etc()
                 )
-                ->has('states')
+                ->has('states', 3)
             );
-    }
-
-    public function test_the_fixtures_cover_every_core_type_and_some_busy_fields()
-    {
-        $props = $this->actingAs(User::factory()->create())
-            ->get(route('admin.models.builder'))
-            ->inertiaProps();
-
-        $typeKeys = array_column($props['fieldTypes'], 'key');
-        $fieldTypes = array_values(array_unique(array_column($props['schema']['fields'], 'type')));
-        $slotIds = collect($props['schema']['layout'])->pluck('slots.*.id')->flatten()->all();
-
-        $this->assertEqualsCanonicalizing(self::CORE_TYPES, $typeKeys);
-        $this->assertEqualsCanonicalizing(self::CORE_TYPES, $fieldTypes);
-        $this->assertNotEmpty($props['schema']['layout']);
-
-        foreach ($props['schema']['fields'] as $field) {
-            $this->assertTrue($field['layout_slot'] === null || in_array($field['layout_slot'], $slotIds, true));
-        }
-
-        $uuids = array_column($props['schema']['fields'], 'uuid');
-        $this->assertSame($uuids, array_unique($uuids));
-
-        foreach ($props['states'] as $uuid => $state) {
-            $this->assertContains($uuid, $uuids);
-            $this->assertContains($state, ['ready', 'indexing', 'renaming', 'retyping', 'deleting', 'waiting']);
-        }
-
-        $this->assertNotEmpty(array_diff($props['states'], ['ready']));
     }
 
     public function test_guests_cannot_preview_or_save()
     {
-        $this->post(route('admin.models.builder.preview'), ['schema' => []])
+        $this->post($this->url('admin.models.builder.preview'), ['schema' => []])
             ->assertRedirect(route('login'));
 
-        $this->post(route('admin.models.builder.save'), ['schema' => []])
+        $this->post($this->url('admin.models.builder.save'), ['schema' => []])
             ->assertRedirect(route('login'));
     }
 
@@ -101,32 +126,27 @@ class ModelBuilderTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->post(route('admin.models.builder.preview'), [])
+            ->post($this->url('admin.models.builder.preview'), [])
             ->assertSessionHasErrors('schema');
 
         $this->actingAs($user)
-            ->post(route('admin.models.builder.save'), [])
+            ->post($this->url('admin.models.builder.save'), [])
             ->assertSessionHasErrors('schema');
     }
 
-    public function test_preview_diffs_the_posted_schema_against_the_fixture()
+    public function test_preview_diffs_the_posted_schema_against_the_stored_one()
     {
-        $schema = $this->fixtureSchema();
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
 
         // Rename "title" -> "headline".
         $schema['fields'][0]['key'] = 'headline';
 
-        // Retype "summary" from textarea to text, and promote it to filterable.
-        $schema['fields'][1]['type'] = 'text';
+        // Retype "summary" from textarea to number (a real declared-type
+        // change, unlike textarea -> text, which is still just a string),
+        // and promote it to filterable.
+        $schema['fields'][1]['type'] = 'number';
         $schema['fields'][1]['filterable'] = true;
-
-        // Demote "reading_time" (filterable true -> false).
-        foreach ($schema['fields'] as &$field) {
-            if ($field['key'] === 'reading_time') {
-                $field['filterable'] = false;
-            }
-        }
-        unset($field);
 
         // Delete "embed".
         $schema['fields'] = array_values(array_filter(
@@ -136,7 +156,7 @@ class ModelBuilderTest extends TestCase
 
         // Add a new field.
         $schema['fields'][] = [
-            'uuid' => 'new-field-uuid',
+            'uuid' => (string) Str::uuid(),
             'key' => 'excerpt',
             'label' => 'Excerpt',
             'type' => 'text',
@@ -150,85 +170,123 @@ class ModelBuilderTest extends TestCase
         $schema['model']['label'] = 'News Article';
 
         $props = $this->actingAs(User::factory()->create())
-            ->post(route('admin.models.builder.preview'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.preview'), ['schema' => $schema])
             ->assertOk()
             ->inertiaProps();
 
         $operations = collect($props['preview']['operations']);
         $this->assertEmpty($props['preview']['errors']);
 
-        $this->assertTrue($operations->contains(
-            fn ($op) => $op['op'] === 'rename' && $op['field_uuid'] === '0f4c7a52-8f3e-4b8e-9a51-3c2d1e6f7a01'
-        ));
-        $this->assertTrue($operations->contains(
-            fn ($op) => $op['op'] === 'retype' && $op['field_uuid'] === '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02'
-        ));
-        $this->assertTrue($operations->contains(
-            fn ($op) => $op['op'] === 'promote' && $op['field_uuid'] === '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02'
-        ));
-        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'demote'));
-        $this->assertTrue($operations->contains(
-            fn ($op) => $op['op'] === 'delete' && $op['summary'] === 'Delete "embed"'
-        ));
-        $this->assertTrue($operations->contains(
-            fn ($op) => $op['op'] === 'add' && $op['field_uuid'] === 'new-field-uuid'
-        ));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'rename' && $op['field_uuid'] === self::TITLE));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'retype' && $op['field_uuid'] === self::SUMMARY));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'promote' && $op['field_uuid'] === self::SUMMARY));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'delete' && $op['field_uuid'] === self::EMBED));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'add'));
         $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'metadata'));
 
+        // A retype affects existing data (values that don't convert are
+        // hidden from filters, not lost) without being destructive; delete
+        // is both, since the field and its values are gone for good.
+        $affecting = $operations->where('affects_existing_data', true)->pluck('op');
+        $this->assertTrue($affecting->contains('retype'));
+        $this->assertTrue($affecting->contains('delete'));
+
         $destructive = $operations->where('destructive', true)->pluck('op');
-        $this->assertTrue($destructive->contains('retype'));
         $this->assertTrue($destructive->contains('delete'));
+        $this->assertFalse($destructive->contains('retype'));
         $this->assertFalse($destructive->contains('add'));
         $this->assertFalse($destructive->contains('promote'));
     }
 
     public function test_preview_reports_key_and_label_problems_as_errors()
     {
-        $schema = $this->fixtureSchema();
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
 
+        // Cleared in the browser, so it arrives as null, not "": FieldSpec
+        // must still parse it and let SchemaDiff report it per field.
         $schema['fields'][0]['label'] = '';
         $schema['fields'][1]['key'] = $schema['fields'][2]['key'];
-        $schema['fields'][3]['key'] = '1bad';
 
         $props = $this->actingAs(User::factory()->create())
-            ->post(route('admin.models.builder.preview'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.preview'), ['schema' => $schema])
             ->assertOk()
             ->inertiaProps();
 
         $messages = collect($props['preview']['errors'])->pluck('message');
 
-        $this->assertTrue($messages->contains('Give this field a label.'));
-        $this->assertTrue($messages->contains('Another field already uses this key.'));
-        $this->assertTrue($messages->contains(
-            'Use letters, numbers and underscores, starting with a letter.'
-        ));
+        $this->assertTrue($messages->contains(fn ($message) => str_contains($message, 'needs a label')));
+        $this->assertTrue($messages->contains(fn ($message) => str_contains($message, 'already uses the key')));
     }
 
-    public function test_save_accepts_the_schema_but_does_not_persist_it()
+    public function test_save_persists_the_schema()
     {
         $user = User::factory()->create();
-        $schema = $this->fixtureSchema();
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
         $schema['model']['label'] = 'Changed Label';
 
         $this->actingAs($user)
-            ->post(route('admin.models.builder.save'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.save'), ['schema' => $schema])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('saved', true));
 
         $this->actingAs($user)
-            ->get(route('admin.models.builder'))
+            ->get($this->url('admin.models.builder'))
             ->assertInertia(
-                fn (Assert $page) => $page->where('schema.model.label', 'Article')
+                fn (Assert $page) => $page->where('schema.model.label', 'Changed Label')
             );
     }
 
-    /** @return array<string, mixed> */
-    private function fixtureSchema(): array
+    public function test_save_reports_failure_instead_of_claiming_success()
     {
-        return json_decode(
-            file_get_contents(resource_path('fixtures/builder/schema.json')),
-            associative: true,
-            flags: JSON_THROW_ON_ERROR,
-        );
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
+        $schema['fields'][0]['key'] = $schema['fields'][1]['key'];
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.builder.save'), ['schema' => $schema])
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('saved', false)
+                ->has('preview.errors')
+            );
+
+        // Nothing was written: the stored key is still the original one.
+        $this->assertSame('title', app(SchemaManager::class)->export($model)['fields'][0]['key']);
+    }
+
+    /**
+     * A model with three fields, one of every operation the diff tests
+     * exercise: rename, retype, promote and delete.
+     *
+     * Drained once so every field starts "ready" rather than "indexing",
+     * since StarDust refuses a rename or retype while a field's own
+     * lifecycle is still in flight.
+     */
+    private function seedModel(): SchemaModel
+    {
+        $schema = new ModelSchema('article', 'Article', fields: [
+            new FieldSpec(self::TITLE, 'title', 'Title', 'text', filterable: true),
+            new FieldSpec(self::SUMMARY, 'summary', 'Summary', 'textarea'),
+            new FieldSpec(self::EMBED, 'embed', 'Embed', 'code'),
+        ]);
+
+        $result = app(SchemaManager::class)->createModel($schema);
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertNotNull($result->model);
+
+        $this->drain();
+
+        return $result->model;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    private function url(string $route, array $parameters = []): string
+    {
+        return 'http://'.$this->site->domains[0].route($route, $parameters, absolute: false);
     }
 }

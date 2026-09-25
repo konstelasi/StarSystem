@@ -59,9 +59,18 @@ final class FieldSpec
             throw InvalidSchemaException::at("{$path}.uuid", 'must be a UUID');
         }
 
-        foreach (['key', 'label', 'type'] as $name) {
-            if (! is_string($json[$name] ?? null)) {
-                throw InvalidSchemaException::at("{$path}.{$name}", 'must be a string');
+        if (! is_string($json['type'] ?? null)) {
+            throw InvalidSchemaException::at("{$path}.type", 'must be a string');
+        }
+
+        // key and label tolerate a missing or null value (a browser's own
+        // "empty string becomes null" behaves the same server-side, via
+        // Laravel's ConvertEmptyStringsToNull) rather than failing the
+        // whole request: a field mid-edit with a cleared key or label is
+        // normal, and SchemaDiff's own validation reports it per field.
+        foreach (['key', 'label'] as $name) {
+            if (isset($json[$name]) && ! is_string($json[$name])) {
+                throw InvalidSchemaException::at("{$path}.{$name}", 'must be a string or null');
             }
         }
 
@@ -88,8 +97,8 @@ final class FieldSpec
         /** @var array<string, mixed> $settings */
         return new self(
             uuid: strtolower($uuid),
-            key: $json['key'],
-            label: $json['label'],
+            key: $json['key'] ?? '',
+            label: $json['label'] ?? '',
             type: $json['type'],
             settings: $settings,
             helper: isset($json['helper']) && $json['helper'] !== '' ? $json['helper'] : null,

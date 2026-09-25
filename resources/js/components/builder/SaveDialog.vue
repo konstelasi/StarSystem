@@ -95,11 +95,20 @@ function confirmSave() {
     router.post(saveRoute().url, schemaPayload(), {
         preserveState: true,
         preserveScroll: true,
-        only: ['saved'],
-        onSuccess: () => {
-            builder.markSaved(builder.schema.value);
-            announce('Saved.');
-            emit('update:open', false);
+        only: ['saved', 'preview'],
+        onSuccess: (page) => {
+            if (page.props.saved) {
+                builder.markSaved(builder.schema.value);
+                announce('Saved.');
+                emit('update:open', false);
+                return;
+            }
+
+            // A well-formed response that still didn't save: the diff
+            // picked up new errors, or the batch failed partway. Show the
+            // reason instead of the generic message below.
+            phase.value = 'review';
+            errorMessage.value = null;
         },
         onError: () => {
             phase.value = 'error';
