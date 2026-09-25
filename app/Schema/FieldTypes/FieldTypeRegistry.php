@@ -2,6 +2,7 @@
 
 namespace App\Schema\FieldTypes;
 
+use App\Hooks\Hook;
 use App\Schema\FieldTypes\Core\CheckboxesType;
 use App\Schema\FieldTypes\Core\CheckboxType;
 use App\Schema\FieldTypes\Core\CodeType;
@@ -22,7 +23,8 @@ use InvalidArgumentException;
 
 /**
  * Every field type the builder offers, in palette order. A singleton, so
- * modules can register their own types when they boot.
+ * modules can register their own types when they boot, through the
+ * `schema.field_types` filter (see HookRegistry's class doc comment).
  */
 class FieldTypeRegistry
 {
@@ -51,7 +53,40 @@ class FieldTypeRegistry
             $registry->register($type);
         }
 
+        $registry->collectModuleTypes();
+
         return $registry;
+    }
+
+    /**
+     * Lets a module add its own field types through the `schema.field_types`
+     * filter: it receives the types registered so far, keyed by key(), and
+     * returns the array with its own added.
+     *
+     * A type whose key collides with one already registered, or that uses
+     * a reserved key, is dropped rather than failing the whole request, the
+     * same way a misbehaving module is kept from taking down a page
+     * elsewhere.
+     */
+    private function collectModuleTypes(): void
+    {
+        $withModules = Hook::applyFilters('schema.field_types', $this->types);
+
+        if (! is_array($withModules)) {
+            return;
+        }
+
+        foreach ($withModules as $type) {
+            if (! $type instanceof FieldType) {
+                continue;
+            }
+
+            $key = $type->key();
+
+            if (! isset($this->types[$key]) && ! in_array($key, self::RESERVED, true)) {
+                $this->types[$key] = $type;
+            }
+        }
     }
 
     public function register(FieldType $type): void

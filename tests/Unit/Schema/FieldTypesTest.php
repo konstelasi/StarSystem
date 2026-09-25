@@ -2,6 +2,8 @@
 
 namespace Tests\Unit\Schema;
 
+use App\Hooks\Hook;
+use App\Schema\FieldTypes\Core\TextType;
 use App\Schema\FieldTypes\FieldType;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\OptionsSource;
@@ -42,6 +44,35 @@ class FieldTypesTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $registry->register($this->fakeType('rating'));
+    }
+
+    public function test_a_module_can_add_a_type_through_the_schema_field_types_filter()
+    {
+        Hook::addFilter('schema.field_types', function (array $types) {
+            $types['rating'] = $this->fakeType('rating');
+
+            return $types;
+        });
+
+        $registry = $this->registry();
+
+        $this->assertTrue($registry->has('rating'));
+        $this->assertSame('rating', $registry->get('rating')->key());
+    }
+
+    public function test_a_type_from_the_filter_is_dropped_instead_of_crashing_on_a_reserved_or_taken_key()
+    {
+        Hook::addFilter('schema.field_types', function (array $types) {
+            $types['relation'] = $this->fakeType('relation');
+            $types['text'] = $this->fakeType('text');
+
+            return $types;
+        });
+
+        $registry = $this->registry();
+
+        $this->assertFalse($registry->has('relation'));
+        $this->assertInstanceOf(TextType::class, $registry->get('text'));
     }
 
     /**
