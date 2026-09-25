@@ -3,7 +3,10 @@
 namespace Tests\Feature\StarDust;
 
 use App\Models\TickRun;
+use App\StarDust\TickPause;
+use Illuminate\Console\Events\ScheduledTaskSkipped;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class TickTest extends TestCase
@@ -15,6 +18,70 @@ class TickTest extends TestCase
         parent::setUp();
 
         $this->artisan('stardust:bootstrap')->assertSuccessful();
+    }
+
+    protected function tearDown(): void
+    {
+        app(TickPause::class)->resume();
+
+        parent::tearDown();
+    }
+
+    public function test_a_paused_tick_is_recorded_without_doing_any_work()
+    {
+        app(TickPause::class)->pause('update');
+
+        $this->artisan('stardust:tick', ['--budget' => 5])
+            ->expectsOutputToContain('paused')
+            ->assertSuccessful();
+
+        $run = TickRun::sole();
+        $this->assertSame('paused', $run->stop_reason);
+        $this->assertSame(0, $run->rounds);
+        $this->assertNull($run->error);
+        $this->assertNotNull($run->finished_at);
+    }
+
+    public function test_the_tick_url_respects_the_pause()
+    {
+        config(['stardust.tick.secret' => 'correct-horse']);
+        app(TickPause::class)->pause('update');
+
+        $this->get('/_system/tick?key=correct-horse')
+            ->assertOk()
+            ->assertJson(['ok' => true, 'paused' => true, 'stop_reason' => 'paused']);
+
+        $this->assertSame('paused', TickRun::sole()->stop_reason);
+    }
+
+    public function test_the_scheduled_tick_respects_the_pause_and_queued_jobs_wait()
+    {
+        $skipped = [];
+        Event::listen(ScheduledTaskSkipped::class, function (ScheduledTaskSkipped $event) use (&$skipped) {
+            $skipped[] = $event->task->description;
+        });
+
+        app(TickPause::class)->pause('update');
+
+        $this->artisan('schedule:run')->assertSuccessful();
+
+        $run = TickRun::sole();
+        $this->assertSame('cron', $run->trigger);
+        $this->assertSame('paused', $run->stop_reason);
+        $this->assertSame(['queue:work'], $skipped);
+    }
+
+    public function test_ticks_run_again_once_resumed()
+    {
+        $pause = app(TickPause::class);
+        $pause->pause('update');
+        $this->assertSame('update', $pause->info()['reason'] ?? null);
+
+        $pause->resume();
+
+        $this->assertNull($pause->info());
+        $this->artisan('stardust:tick', ['--budget' => 5])->assertSuccessful();
+        $this->assertSame('idle', TickRun::sole()->stop_reason);
     }
 
     public function test_the_tick_command_runs_and_records_a_tick()

@@ -30,8 +30,11 @@ class TickController extends Controller
 
         $run = $runner->run('url', (int) config('stardust.tick.url_budget'));
 
+        // A paused tick is a success: the fetch service did its job, and
+        // alerting the owner about it would only cause worry mid-update.
         return response()->json([
             'ok' => $run->error === null,
+            'paused' => $run->stop_reason === TickRunner::STOP_PAUSED,
             'rounds' => $run->rounds,
             'elapsed_seconds' => $run->elapsed_seconds,
             'stop_reason' => $run->stop_reason,

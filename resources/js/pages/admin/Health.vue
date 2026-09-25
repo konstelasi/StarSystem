@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { AlertTriangle, CheckCircle2 } from '@lucide/vue';
+import { AlertTriangle, CheckCircle2, PauseCircle } from '@lucide/vue';
 import { computed } from 'vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,7 @@ const props = defineProps<{
         stale: boolean;
         recent: TickRun[];
     };
+    paused: { reason: string; since: string | null } | null;
     server: {
         version: string;
         engine: string | null;
@@ -78,6 +79,7 @@ const stopReasonLabel: Record<string, string> = {
     budget_spent: 'Out of time, continues next run',
     shutdown: 'Stopped',
     lock_contended: 'Skipped, another run was active',
+    paused: 'Skipped, background work paused',
 };
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
@@ -87,6 +89,19 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
     <Head title="Health" />
 
     <div class="flex flex-1 flex-col gap-4 p-4">
+        <Alert v-if="paused">
+            <PauseCircle />
+            <AlertTitle>Updates in progress: background work paused</AlertTitle>
+            <AlertDescription>
+                <p>
+                    StarSystem is updating itself<template v-if="paused.since">
+                        (since {{ formatTime(paused.since) }})</template
+                    >. Indexing, imports and exports wait until the update
+                    finishes, then carry on by themselves.
+                </p>
+            </AlertDescription>
+        </Alert>
+
         <Alert v-if="cronMissing" variant="destructive">
             <AlertTriangle />
             <AlertTitle>Background work isn't running</AlertTitle>

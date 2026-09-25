@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\TickRun;
 use App\Models\User;
+use App\StarDust\TickPause;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -27,6 +28,7 @@ class HealthTest extends TestCase
                 ->where('profile', 'shared')
                 ->where('tick.stale', true)
                 ->where('tick.minutesSinceLast', null)
+                ->where('paused', null)
                 ->where('server.supported', true)
                 ->has('paths', 3)
             );
@@ -61,6 +63,26 @@ class HealthTest extends TestCase
                 ->where('tick.stale', true)
                 ->where('tick.minutesSinceLast', 30)
             );
+    }
+
+    public function test_it_says_when_background_work_is_paused_for_an_update()
+    {
+        app(TickPause::class)->pause('update');
+
+        try {
+            $this->artisan('stardust:tick', ['--trigger' => 'cron'])->assertSuccessful();
+
+            $this->actingAs(User::factory()->create())
+                ->get(route('admin.health'))
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('paused.reason', 'update')
+                    ->whereType('paused.since', 'string')
+                    ->where('tick.stale', false)
+                    ->where('tick.recent.0.stopReason', 'paused')
+                );
+        } finally {
+            app(TickPause::class)->resume();
+        }
     }
 
     public function test_stardust_folders_are_writable_and_outside_the_public_folder()

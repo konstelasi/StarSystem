@@ -28,6 +28,12 @@ class TickCommand extends Command
             return self::FAILURE;
         }
 
+        if ($run->stop_reason === TickRunner::STOP_PAUSED) {
+            $this->components->warn('Tick skipped: background work is paused while StarSystem updates.');
+
+            return self::SUCCESS;
+        }
+
         if ($run->error !== null) {
             $this->components->error("Tick failed: {$run->error}");
 

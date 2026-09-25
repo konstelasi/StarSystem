@@ -1,5 +1,6 @@
 <?php
 
+use App\StarDust\TickPause;
 use App\StarDust\TickRunner;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -13,6 +14,9 @@ use Illuminate\Support\Facades\Schedule;
 | runInBackground() would start child processes through proc_open, which
 | many shared hosts disable. The tick's budget plus the queue's max time
 | stay inside one minute.
+|
+| While the tick is paused (an update is swapping files), the tick still
+| runs so it can record the pause, and queued jobs wait.
 */
 
 if (config('stardust.profile') === 'shared') {
@@ -27,5 +31,6 @@ if (config('stardust.profile') === 'shared') {
     ]))
         ->name('queue:work')
         ->everyMinute()
+        ->skip(fn (TickPause $pause) => $pause->active())
         ->withoutOverlapping(5);
 }

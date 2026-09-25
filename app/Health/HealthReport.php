@@ -4,6 +4,7 @@ namespace App\Health;
 
 use App\Models\TickRun;
 use App\StarDust\StarDustService;
+use App\StarDust\TickPause;
 use Carbon\CarbonImmutable;
 
 /**
@@ -13,7 +14,10 @@ use Carbon\CarbonImmutable;
  */
 class HealthReport
 {
-    public function __construct(private readonly StarDustService $stardust) {}
+    public function __construct(
+        private readonly StarDustService $stardust,
+        private readonly TickPause $pause,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -23,6 +27,9 @@ class HealthReport
         return [
             'profile' => config('stardust.profile'),
             'tick' => $this->tick(),
+            // Paused ticks are still recorded, so a pause never reads as a
+            // missing cron job; this says why nothing is being processed.
+            'paused' => $this->pause->info(),
             'server' => $this->stardust->server(),
             'stardust' => $this->stardust->status(),
             'paths' => $this->paths(),

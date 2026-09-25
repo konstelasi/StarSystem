@@ -10,13 +10,19 @@ use Throwable;
 
 /**
  * Runs one budgeted StarDust tick and records it for the health panel.
- * The scheduler, the secret tick URL and `stardust:tick` all come here.
+ * The scheduler, the secret tick URL and `stardust:tick` all come here,
+ * so this is also the one place that honours the pause flag.
  */
 class TickRunner
 {
     public const TRIGGERS = ['cron', 'url', 'manual'];
 
-    public function __construct(private readonly StarDustFactory $factory) {}
+    public const STOP_PAUSED = 'paused';
+
+    public function __construct(
+        private readonly StarDustFactory $factory,
+        private readonly TickPause $pause,
+    ) {}
 
     public function run(string $trigger, ?int $budget = null, bool $advisories = false): TickRun
     {
@@ -24,6 +30,20 @@ class TickRunner
             throw new DomainException(
                 'The server profile runs the StarDust daemons, so the tick is disabled. StarDust must never run both.'
             );
+        }
+
+        // Recorded rather than skipped silently, so the health panel shows
+        // that cron is alive and only waiting.
+        if ($this->pause->active()) {
+            $now = now();
+
+            return TickRun::create([
+                'trigger' => $trigger,
+                'rounds' => 0,
+                'stop_reason' => self::STOP_PAUSED,
+                'started_at' => $now,
+                'finished_at' => $now,
+            ]);
         }
 
         $exports = (bool) config('stardust.tick.exports');

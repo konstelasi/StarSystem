@@ -22,6 +22,7 @@ class StarDustServiceProvider extends ServiceProvider
 
         $this->app->singleton(StarDustService::class);
         $this->app->singleton(TickRunner::class);
+        $this->app->singleton(TickPause::class);
     }
 
     public function boot(): void
