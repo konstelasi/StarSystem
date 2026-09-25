@@ -32,6 +32,10 @@ class FilesServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Registered before routes/web.php, so a catch-all page route there
+        // can never shadow /files.
+        $this->loadRoutesFrom(base_path('routes/files.php'));
+
         if ($this->app->runningInConsole()) {
             $this->commands([PurgeTrashCommand::class]);
 

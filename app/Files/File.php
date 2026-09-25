@@ -80,6 +80,15 @@ class File extends Model
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
+    /**
+     * The public URL. The name segment is for people and search engines;
+     * only the uuid is used to find the file.
+     */
+    public function url(): string
+    {
+        return route('files.show', ['uuid' => $this->uuid, 'name' => $this->original_name]);
+    }
+
     public function extension(): string
     {
         return strtolower(pathinfo($this->path, PATHINFO_EXTENSION));
