@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useModelBuilder } from '@/composables/useModelBuilder';
 import type { FieldStates } from '@/lib/modelSchema';
-import { builder as builderPage } from '@/routes/admin/models';
+import { builder as builderPage, index } from '@/routes/admin/models';
 import type {
     FieldTypeDescriptor,
     ModelSchemaJson,
@@ -28,13 +28,15 @@ const props = defineProps<{
     fieldTypes: FieldTypeDescriptor[];
     schema: ModelSchemaJson;
     states: FieldStates;
+    otherSlugs: string[];
     preview?: SavePreview | null;
 }>();
 
 defineOptions({
     layout: {
         breadcrumbs: [
-            { title: 'Model builder', href: builderPage(props.model) },
+            { title: 'Models', href: index() },
+            { title: props.schema.model.label, href: builderPage(props.model) },
         ],
     },
 });
@@ -55,6 +57,7 @@ provideBuilder({
     announce: (message) => void announce(message),
     states: props.states,
     modelId: props.model.id,
+    otherSlugs: props.otherSlugs,
 });
 
 const tab = ref('build');

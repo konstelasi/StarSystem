@@ -91,6 +91,38 @@ class ModelBuilderTest extends TestCase
             );
     }
 
+    public function test_other_slugs_leaves_out_the_models_own_slug()
+    {
+        $model = $this->seedModel();
+        $sibling = app(SchemaManager::class)->createModel(new ModelSchema('pages', 'Pages'))->model;
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('otherSlugs', [$sibling->slug])
+            );
+    }
+
+    public function test_saving_a_new_slug_renames_the_model_in_stardust_and_keeps_the_same_url()
+    {
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
+        $schema['model']['slug'] = 'stories';
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+
+        $this->assertSame('stories', $model->refresh()->slug);
+        $this->assertSame('stories', app(SchemaManager::class)->export($model)['model']['slug']);
+
+        // The same id keeps resolving, since the URL never used the slug.
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('schema.model.slug', 'stories'));
+    }
+
     public function test_another_sites_model_id_is_not_found()
     {
         $model = $this->seedModel();

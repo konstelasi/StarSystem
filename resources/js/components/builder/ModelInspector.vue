@@ -5,10 +5,14 @@ import { useBuilderContext } from '@/components/builder/context';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { modelSlugProblem } from '@/lib/modelSchema';
 
-const { builder } = useBuilderContext();
+const { builder, otherSlugs } = useBuilderContext();
 
 const model = computed(() => builder.schema.value.model);
+const slugProblem = computed(() =>
+    modelSlugProblem(model.value.slug, otherSlugs),
+);
 const counts = computed(() => ({
     fields: builder.schema.value.fields.length,
     required: builder.schema.value.fields.filter((field) => field.required)
@@ -58,11 +62,22 @@ const counts = computed(() => ({
                     "
                 />
             </div>
+            <div class="grid gap-1.5">
+                <Label for="inspect-model-slug">Address name</Label>
+                <Input
+                    id="inspect-model-slug"
+                    :model-value="model.slug"
+                    :aria-invalid="!!slugProblem"
+                    @update:model-value="model.slug = String($event)"
+                />
+                <p class="text-xs text-muted-foreground">
+                    Used in the content API and StarDust.
+                </p>
+                <p v-if="slugProblem" class="text-xs text-destructive">
+                    {{ slugProblem }}
+                </p>
+            </div>
             <dl class="grid grid-cols-[1fr_auto] gap-y-1 text-sm">
-                <dt class="text-muted-foreground">Address name</dt>
-                <dd>
-                    <code class="text-xs">{{ model.slug }}</code>
-                </dd>
                 <dt class="text-muted-foreground">Fields</dt>
                 <dd class="tabular-nums">{{ counts.fields }}</dd>
                 <dt class="text-muted-foreground">Required</dt>

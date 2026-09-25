@@ -42,6 +42,7 @@ class ModelBuilderController extends Controller
             'fieldTypes' => $this->fieldTypes->toArray(),
             'schema' => $this->schema->export($model),
             'states' => $this->schema->states($model),
+            'otherSlugs' => SchemaModel::query()->whereKeyNot($model->id)->pluck('slug'),
         ]);
     }
 

@@ -12,6 +12,8 @@ export type BuilderContext = {
     states: FieldStates;
     /** The model this page edits, for building preview/save URLs. */
     modelId: number;
+    /** Every other model's address name, for checking a rename is free. */
+    otherSlugs: string[];
 };
 
 const key: InjectionKey<BuilderContext> = Symbol('model-builder');
