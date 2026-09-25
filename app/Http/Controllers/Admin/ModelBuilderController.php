@@ -7,9 +7,7 @@ use App\Models\SchemaModel;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\InvalidSchemaException;
 use App\Schema\ModelSchema;
-use App\Schema\SchemaException;
 use App\Schema\SchemaManager;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -24,25 +22,6 @@ class ModelBuilderController extends Controller
         private readonly SchemaManager $schema,
         private readonly FieldTypeRegistry $fieldTypes,
     ) {}
-
-    /**
-     * The pre-models-list entry point: the first model not being deleted,
-     * or a fresh "Untitled model" created the first time it is opened on a
-     * site with none yet.
-     */
-    public function start(): RedirectResponse
-    {
-        $this->schema->forgetPurgedModels();
-
-        $model = SchemaModel::query()->where('status', '!=', SchemaModel::DELETING)->orderBy('id')->first();
-
-        if ($model === null) {
-            $result = $this->schema->createModel(new ModelSchema('untitled', 'Untitled model'));
-            $model = $result->model ?? throw new SchemaException('Could not create the starter model: '.($result->error() ?? 'unknown error.'));
-        }
-
-        return to_route('admin.models.builder', $model);
-    }
 
     public function show(SchemaModel $model): Response
     {

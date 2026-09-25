@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { files, health, updates } from '@/routes/admin';
-import { start as modelBuilder } from '@/routes/admin/models';
+import { index as models } from '@/routes/admin/models';
 import { index as modules } from '@/routes/admin/modules';
 import type { NavItem } from '@/types';
 
@@ -43,8 +43,8 @@ const mainNavItems: NavItem[] = [
         icon: Activity,
     },
     {
-        title: 'Model builder',
-        href: modelBuilder(),
+        title: 'Models',
+        href: models(),
         icon: Blocks,
     },
     {

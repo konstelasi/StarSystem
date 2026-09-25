@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { Blocks } from '@lucide/vue';
+import { Blocks, PlusCircle } from '@lucide/vue';
+import { computed, ref } from 'vue';
+import CreateModelDialog from '@/components/models/CreateModelDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,7 +23,7 @@ type ModelRow = {
     updated_at: string | null;
 };
 
-defineProps<{
+const props = defineProps<{
     models: ModelRow[];
 }>();
 
@@ -32,6 +34,9 @@ defineOptions({
 });
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
+
+const createOpen = ref(false);
+const existingSlugs = computed(() => props.models.map((model) => model.slug));
 </script>
 
 <template>
@@ -45,6 +50,10 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                     The content models editors fill in entries for.
                 </p>
             </div>
+            <Button @click="createOpen = true">
+                <PlusCircle />
+                New model
+            </Button>
         </div>
 
         <Card v-if="models.length === 0">
@@ -120,5 +129,10 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                 </tbody>
             </table>
         </div>
+
+        <CreateModelDialog
+            v-model:open="createOpen"
+            :existing-slugs="existingSlugs"
+        />
     </div>
 </template>

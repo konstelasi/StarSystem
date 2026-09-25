@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\ReportsInvalidSchema;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreModelRequest;
 use App\Models\SchemaModel;
+use App\Schema\ModelSchema;
+use App\Schema\SaveResult;
 use App\Schema\SchemaManager;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,6 +18,8 @@ use Inertia\Response;
  */
 class ModelController extends Controller
 {
+    use ReportsInvalidSchema;
+
     public function __construct(private readonly SchemaManager $schema) {}
 
     public function index(): Response
@@ -28,6 +35,21 @@ class ModelController extends Controller
         return Inertia::render('admin/models/Index', [
             'models' => $models,
         ]);
+    }
+
+    public function store(StoreModelRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $result = $this->schema->createModel(new ModelSchema($data['slug'], $data['label'], group: $data['group'] ?? null));
+
+        $this->failIfInvalid($result, 'slug');
+
+        if ($result->status === SaveResult::FAILED) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => (string) $result->error()]);
+        }
+
+        return to_route('admin.models.builder', $result->model);
     }
 
     /**

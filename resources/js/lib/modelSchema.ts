@@ -12,6 +12,9 @@ export type FieldStates = Record<string, FieldState>;
 export const KEY_MAX_LENGTH = 128;
 const KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 
+export const MODEL_SLUG_MAX_LENGTH = 128;
+export const MODEL_SLUG_PATTERN = /^[a-z][a-z0-9_-]*$/;
+
 /**
  * A random v4 uuid. `crypto.randomUUID()` only exists on HTTPS or localhost,
  * and shared hosts often serve the admin over plain HTTP, so fall back to
@@ -110,6 +113,45 @@ export function keyProblem(
     for (const other of otherKeys) {
         if (other === key) {
             return 'Another field already uses this key.';
+        }
+    }
+
+    return null;
+}
+
+/** Turns a label into an address name: "News Article" becomes "news_article". */
+export function modelSlugFromLabel(label: string): string {
+    const slug = slugify(label)
+        .slice(0, MODEL_SLUG_MAX_LENGTH)
+        .replace(/_+$/, '');
+
+    if (slug === '') {
+        return 'model';
+    }
+
+    return /^[a-z]/.test(slug) ? slug : `model_${slug}`;
+}
+
+/** A plain-language problem with an address name, or null when it's fine. */
+export function modelSlugProblem(
+    slug: string,
+    otherSlugs: Iterable<string>,
+): string | null {
+    if (slug === '') {
+        return 'Give this model an address name.';
+    }
+
+    if (!MODEL_SLUG_PATTERN.test(slug)) {
+        return 'Use lowercase letters, numbers, underscores and hyphens, starting with a letter.';
+    }
+
+    if (slug.length > MODEL_SLUG_MAX_LENGTH) {
+        return `Keep the address name under ${MODEL_SLUG_MAX_LENGTH} characters.`;
+    }
+
+    for (const other of otherSlugs) {
+        if (other === slug) {
+            return 'Another model already uses this address name.';
         }
     }
 

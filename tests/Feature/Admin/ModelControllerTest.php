@@ -90,6 +90,75 @@ class ModelControllerTest extends TestCase
         );
     }
 
+    public function test_the_old_builder_url_redirects_to_the_models_list()
+    {
+        $this->actingAs(User::factory()->create())
+            ->get('http://'.$this->site->domains[0].'/admin/models/builder')
+            ->assertRedirect($this->url('admin.models.index'));
+    }
+
+    public function test_guests_cannot_create_a_model()
+    {
+        $this->post($this->url('admin.models.store'), ['slug' => 'articles', 'label' => 'Articles'])
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_creating_a_model_redirects_to_its_builder()
+    {
+        $response = $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.store'), [
+                'slug' => 'articles',
+                'label' => 'Articles',
+                'group' => 'Content',
+            ]);
+
+        $model = SchemaModel::sole();
+        $this->assertSame('articles', $model->slug);
+        $this->assertSame('Articles', $model->label);
+        $this->assertSame('Content', $model->group);
+
+        $response->assertRedirect($this->url('admin.models.builder', ['model' => $model->id]));
+    }
+
+    public function test_slug_and_label_are_required()
+    {
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.store'), [])
+            ->assertSessionHasErrors(['slug', 'label']);
+
+        $this->assertSame(0, SchemaModel::query()->count());
+    }
+
+    public function test_an_invalid_slug_is_rejected()
+    {
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.store'), ['slug' => 'Not Valid', 'label' => 'X'])
+            ->assertSessionHasErrors('slug');
+
+        $this->assertSame(0, SchemaModel::query()->count());
+    }
+
+    public function test_a_taken_slug_is_rejected()
+    {
+        $this->create('articles', 'Articles');
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.store'), ['slug' => 'articles', 'label' => 'Again'])
+            ->assertSessionHasErrors('slug');
+
+        $this->assertSame(1, SchemaModel::query()->count());
+    }
+
+    public function test_a_slug_held_by_a_deleted_model_is_rejected()
+    {
+        $model = $this->create('articles', 'Articles');
+        $this->manager()->deleteModel($model);
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.store'), ['slug' => 'articles', 'label' => 'Again'])
+            ->assertSessionHasErrors('slug');
+    }
+
     private function create(string $slug, string $label): SchemaModel
     {
         $result = $this->manager()->createModel(new ModelSchema($slug, $label, fields: [

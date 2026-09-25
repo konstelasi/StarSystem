@@ -49,27 +49,7 @@ class ModelBuilderTest extends TestCase
     {
         $model = $this->seedModel();
 
-        $this->get($this->url('admin.models.start'))->assertRedirect(route('login'));
         $this->get($this->url('admin.models.builder', ['model' => $model->id]))->assertRedirect(route('login'));
-    }
-
-    public function test_starting_creates_a_model_and_redirects_to_its_builder()
-    {
-        $this->assertSame(0, SchemaModel::query()->count());
-
-        $this->actingAs(User::factory()->create())
-            ->get($this->url('admin.models.start'))
-            ->assertRedirect($this->url('admin.models.builder', ['model' => SchemaModel::sole()->id]));
-
-        $model = SchemaModel::sole();
-        $this->assertSame('untitled', $model->slug);
-
-        // A second visit reuses the same model rather than creating another.
-        $this->actingAs(User::factory()->create())
-            ->get($this->url('admin.models.start'))
-            ->assertRedirect($this->url('admin.models.builder', ['model' => $model->id]));
-
-        $this->assertSame(1, SchemaModel::query()->count());
     }
 
     public function test_it_renders_a_model_with_its_fields_and_states()

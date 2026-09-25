@@ -9,10 +9,10 @@ Route::middleware(['auth', 'verified'])
     ->name('admin.models.')
     ->group(function () {
         Route::get('/', [ModelController::class, 'index'])->name('index');
+        Route::post('/', [ModelController::class, 'store'])->name('store');
 
-        // The site's current single-model entry point, kept only until the
-        // models list can create and open models itself.
-        Route::get('builder', [ModelBuilderController::class, 'start'])->name('start');
+        // The single-model builder's old entry point, before the list existed.
+        Route::redirect('builder', '/admin/models');
 
         Route::get('{model}/builder', [ModelBuilderController::class, 'show'])->name('builder')->whereNumber('model');
         Route::post('{model}/builder/preview', [ModelBuilderController::class, 'preview'])->name('builder.preview')->whereNumber('model');
