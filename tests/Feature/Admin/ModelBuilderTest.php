@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\SchemaModel;
+use App\Models\Site;
 use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
@@ -11,6 +12,7 @@ use App\Schema\SchemaManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\CrossSite;
 use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
 
@@ -23,7 +25,7 @@ use Tests\TestCase;
  */
 class ModelBuilderTest extends TestCase
 {
-    use RefreshDatabase, UsesStarDust;
+    use CrossSite, RefreshDatabase, UsesStarDust;
 
     private const CORE_TYPES = [
         'text', 'email', 'url', 'color', 'hidden', 'radio', 'select', 'number',
@@ -45,18 +47,41 @@ class ModelBuilderTest extends TestCase
 
     public function test_guests_are_redirected_to_the_login_page()
     {
-        $this->get($this->url('admin.models.builder'))->assertRedirect(route('login'));
+        $model = $this->seedModel();
+
+        $this->get($this->url('admin.models.start'))->assertRedirect(route('login'));
+        $this->get($this->url('admin.models.builder', ['model' => $model->id]))->assertRedirect(route('login'));
     }
 
-    public function test_it_creates_a_starter_model_the_first_time_the_page_is_opened()
+    public function test_starting_creates_a_model_and_redirects_to_its_builder()
     {
         $this->assertSame(0, SchemaModel::query()->count());
 
         $this->actingAs(User::factory()->create())
-            ->get($this->url('admin.models.builder'))
+            ->get($this->url('admin.models.start'))
+            ->assertRedirect($this->url('admin.models.builder', ['model' => SchemaModel::sole()->id]));
+
+        $model = SchemaModel::sole();
+        $this->assertSame('untitled', $model->slug);
+
+        // A second visit reuses the same model rather than creating another.
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.start'))
+            ->assertRedirect($this->url('admin.models.builder', ['model' => $model->id]));
+
+        $this->assertSame(1, SchemaModel::query()->count());
+    }
+
+    public function test_it_renders_a_model_with_its_fields_and_states()
+    {
+        $model = $this->seedModel();
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('admin/models/Builder')
+                ->where('model.id', $model->id)
                 ->has('fieldTypes', count(self::CORE_TYPES))
                 ->has('fieldTypes.0', fn (Assert $type) => $type
                     ->has('key')
@@ -69,32 +94,6 @@ class ModelBuilderTest extends TestCase
                         ->has('canFilter')
                     )
                 )
-                ->where('schema.version', 1)
-                ->where('schema.model.slug', 'untitled')
-                ->has('schema.layout')
-                ->has('schema.fields', 0)
-                ->has('states', 0)
-            );
-
-        $this->assertSame(1, SchemaModel::query()->count());
-
-        // A second visit reuses the same model rather than creating another.
-        $this->actingAs(User::factory()->create())
-            ->get($this->url('admin.models.builder'))
-            ->assertOk();
-
-        $this->assertSame(1, SchemaModel::query()->count());
-    }
-
-    public function test_it_renders_an_existing_model_with_its_fields_and_states()
-    {
-        $model = $this->seedModel();
-
-        $this->actingAs(User::factory()->create())
-            ->get($this->url('admin.models.builder'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('admin/models/Builder')
                 ->where('schema.model.slug', $model->slug)
                 ->has('schema.fields', 3)
                 ->has('schema.fields.0', fn (Assert $field) => $field
@@ -112,25 +111,38 @@ class ModelBuilderTest extends TestCase
             );
     }
 
+    public function test_another_sites_model_id_is_not_found()
+    {
+        $model = $this->seedModel();
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder', ['model' => $model->id], $other))
+            ->assertNotFound();
+    }
+
     public function test_guests_cannot_preview_or_save()
     {
-        $this->post($this->url('admin.models.builder.preview'), ['schema' => []])
+        $model = $this->seedModel();
+
+        $this->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => []])
             ->assertRedirect(route('login'));
 
-        $this->post($this->url('admin.models.builder.save'), ['schema' => []])
+        $this->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => []])
             ->assertRedirect(route('login'));
     }
 
     public function test_preview_and_save_require_a_schema()
     {
         $user = User::factory()->create();
+        $model = $this->seedModel();
 
         $this->actingAs($user)
-            ->post($this->url('admin.models.builder.preview'), [])
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), [])
             ->assertSessionHasErrors('schema');
 
         $this->actingAs($user)
-            ->post($this->url('admin.models.builder.save'), [])
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), [])
             ->assertSessionHasErrors('schema');
     }
 
@@ -170,7 +182,7 @@ class ModelBuilderTest extends TestCase
         $schema['model']['label'] = 'News Article';
 
         $props = $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.preview'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema])
             ->assertOk()
             ->inertiaProps();
 
@@ -209,7 +221,7 @@ class ModelBuilderTest extends TestCase
         $schema['fields'][1]['key'] = $schema['fields'][2]['key'];
 
         $props = $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.preview'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema])
             ->assertOk()
             ->inertiaProps();
 
@@ -227,12 +239,12 @@ class ModelBuilderTest extends TestCase
         $schema['model']['label'] = 'Changed Label';
 
         $this->actingAs($user)
-            ->post($this->url('admin.models.builder.save'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('saved', true));
 
         $this->actingAs($user)
-            ->get($this->url('admin.models.builder'))
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
             ->assertInertia(
                 fn (Assert $page) => $page->where('schema.model.label', 'Changed Label')
             );
@@ -245,7 +257,7 @@ class ModelBuilderTest extends TestCase
         $schema['fields'][0]['key'] = $schema['fields'][1]['key'];
 
         $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.save'), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('saved', false)
@@ -285,8 +297,8 @@ class ModelBuilderTest extends TestCase
     /**
      * @param  array<string, mixed>  $parameters
      */
-    private function url(string $route, array $parameters = []): string
+    private function url(string $route, array $parameters = [], ?Site $site = null): string
     {
-        return 'http://'.$this->site->domains[0].route($route, $parameters, absolute: false);
+        return 'http://'.($site ?? $this->site)->domains[0].route($route, $parameters, absolute: false);
     }
 }

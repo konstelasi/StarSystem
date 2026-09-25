@@ -32,7 +32,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>();
 
-const { builder, announce } = useBuilderContext();
+const { builder, announce, modelId } = useBuilderContext();
 
 type Phase = 'loading' | 'review' | 'saving' | 'error';
 const phase = ref<Phase>('loading');
@@ -75,7 +75,7 @@ function requestPreview() {
     phase.value = 'loading';
     errorMessage.value = null;
 
-    router.post(previewRoute().url, schemaPayload(), {
+    router.post(previewRoute(modelId).url, schemaPayload(), {
         preserveState: true,
         preserveScroll: true,
         only: ['preview'],
@@ -92,7 +92,7 @@ function requestPreview() {
 function confirmSave() {
     phase.value = 'saving';
 
-    router.post(saveRoute().url, schemaPayload(), {
+    router.post(saveRoute(modelId).url, schemaPayload(), {
         preserveState: true,
         preserveScroll: true,
         only: ['saved', 'preview'],

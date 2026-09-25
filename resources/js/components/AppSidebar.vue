@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { files, health, updates } from '@/routes/admin';
-import { builder as modelBuilder } from '@/routes/admin/models';
+import { start as modelBuilder } from '@/routes/admin/models';
 import { index as modules } from '@/routes/admin/modules';
 import type { NavItem } from '@/types';
 

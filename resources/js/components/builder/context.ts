@@ -10,6 +10,8 @@ export type BuilderContext = {
     announce: (message: string) => void;
     /** Busy state per field uuid, for badges and disabled actions. */
     states: FieldStates;
+    /** The model this page edits, for building preview/save URLs. */
+    modelId: number;
 };
 
 const key: InjectionKey<BuilderContext> = Symbol('model-builder');

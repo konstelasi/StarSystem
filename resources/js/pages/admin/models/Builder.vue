@@ -24,6 +24,7 @@ import type {
 } from '@/types/schema';
 
 const props = defineProps<{
+    model: { id: number };
     fieldTypes: FieldTypeDescriptor[];
     schema: ModelSchemaJson;
     states: FieldStates;
@@ -32,7 +33,9 @@ const props = defineProps<{
 
 defineOptions({
     layout: {
-        breadcrumbs: [{ title: 'Model builder', href: builderPage() }],
+        breadcrumbs: [
+            { title: 'Model builder', href: builderPage(props.model) },
+        ],
     },
 });
 
@@ -51,6 +54,7 @@ provideBuilder({
     builder,
     announce: (message) => void announce(message),
     states: props.states,
+    modelId: props.model.id,
 });
 
 const tab = ref('build');

@@ -9,6 +9,7 @@ use App\Schema\InvalidSchemaException;
 use App\Schema\ModelSchema;
 use App\Schema\SchemaException;
 use App\Schema\SchemaManager;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -16,11 +17,6 @@ use Inertia\Response;
 
 /**
  * The drag-and-drop model builder, backed by the real schema layer.
- *
- * The page always edits one model: the first one not being deleted, or a
- * fresh "Untitled model" created the first time the page is opened on a
- * site with none yet. Choosing which model to edit, for a site with more
- * than one, is future work (see stream-b-improvement-ideas.md).
  */
 class ModelBuilderController extends Controller
 {
@@ -29,11 +25,29 @@ class ModelBuilderController extends Controller
         private readonly FieldTypeRegistry $fieldTypes,
     ) {}
 
-    public function show(): Response
+    /**
+     * The pre-models-list entry point: the first model not being deleted,
+     * or a fresh "Untitled model" created the first time it is opened on a
+     * site with none yet.
+     */
+    public function start(): RedirectResponse
     {
-        $model = $this->currentModel();
+        $this->schema->forgetPurgedModels();
 
+        $model = SchemaModel::query()->where('status', '!=', SchemaModel::DELETING)->orderBy('id')->first();
+
+        if ($model === null) {
+            $result = $this->schema->createModel(new ModelSchema('untitled', 'Untitled model'));
+            $model = $result->model ?? throw new SchemaException('Could not create the starter model: '.($result->error() ?? 'unknown error.'));
+        }
+
+        return to_route('admin.models.builder', $model);
+    }
+
+    public function show(SchemaModel $model): Response
+    {
         return Inertia::render('admin/models/Builder', [
+            'model' => ['id' => $model->id],
             'fieldTypes' => $this->fieldTypes->toArray(),
             'schema' => $this->schema->export($model),
             'states' => $this->schema->states($model),
@@ -46,10 +60,10 @@ class ModelBuilderController extends Controller
      * so it only touches the `preview` prop and leaves the client's
      * in-progress schema alone.
      */
-    public function preview(Request $request): Response
+    public function preview(Request $request, SchemaModel $model): Response
     {
         return Inertia::render('admin/models/Builder', [
-            'preview' => $this->schema->preview($this->currentModel(), $this->desiredSchema($request)),
+            'preview' => $this->schema->preview($model, $this->desiredSchema($request)),
         ]);
     }
 
@@ -58,9 +72,9 @@ class ModelBuilderController extends Controller
      * errors, when the diff has errors or the batch failed partway; the
      * client only treats a true `saved` as done.
      */
-    public function save(Request $request): Response
+    public function save(Request $request, SchemaModel $model): Response
     {
-        $result = $this->schema->save($this->currentModel(), $this->desiredSchema($request));
+        $result = $this->schema->save($model, $this->desiredSchema($request));
 
         return Inertia::render('admin/models/Builder', [
             'saved' => $result->succeeded(),
@@ -83,23 +97,5 @@ class ModelBuilderController extends Controller
         } catch (InvalidSchemaException $e) {
             throw ValidationException::withMessages(['schema' => $e->getMessage()]);
         }
-    }
-
-    /**
-     * The model this page edits.
-     */
-    private function currentModel(): SchemaModel
-    {
-        $this->schema->forgetPurgedModels();
-
-        $model = SchemaModel::query()->where('status', '!=', SchemaModel::DELETING)->orderBy('id')->first();
-
-        if ($model !== null) {
-            return $model;
-        }
-
-        $result = $this->schema->createModel(new ModelSchema('untitled', 'Untitled model'));
-
-        return $result->model ?? throw new SchemaException('Could not create the starter model: '.($result->error() ?? 'unknown error.'));
     }
 }
