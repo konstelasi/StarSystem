@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\Concerns\ReportsInvalidSchema;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\DuplicateModelRequest;
 use App\Http\Requests\Admin\ImportModelRequest;
 use App\Models\SchemaModel;
 use App\Schema\InvalidSchemaException;
@@ -48,6 +49,27 @@ class ModelTransferController extends Controller
         }
 
         $this->failIfInvalid($result, 'file');
+
+        if ($result->status === SaveResult::FAILED) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => (string) $result->error()]);
+        }
+
+        return to_route('admin.models.builder', $result->model);
+    }
+
+    public function duplicate(DuplicateModelRequest $request, SchemaModel $model): RedirectResponse
+    {
+        $data = $request->validated();
+
+        try {
+            $result = $this->schema->duplicate($model, $data['slug'], $data['label']);
+        } catch (SchemaException $e) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+
+            return to_route('admin.models.index');
+        }
+
+        $this->failIfInvalid($result, 'slug');
 
         if ($result->status === SaveResult::FAILED) {
             Inertia::flash('toast', ['type' => 'error', 'message' => (string) $result->error()]);

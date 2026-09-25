@@ -137,6 +137,77 @@ class ModelTransferTest extends TestCase
         $this->assertSame(1, SchemaModel::query()->count());
     }
 
+    public function test_guests_cannot_duplicate_a_model()
+    {
+        $model = $this->create('articles', 'Articles');
+
+        $this->post($this->url('admin.models.duplicate', ['model' => $model->id]), [
+            'slug' => 'articles_copy',
+            'label' => 'Articles Copy',
+        ])->assertRedirect(route('login'));
+    }
+
+    public function test_duplicating_a_model_copies_its_fields_with_new_ids()
+    {
+        $model = $this->create('articles', 'Articles');
+
+        $response = $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.duplicate', ['model' => $model->id]), [
+                'slug' => 'articles_copy',
+                'label' => 'Articles Copy',
+            ]);
+
+        $copy = SchemaModel::where('slug', 'articles_copy')->sole();
+        $this->assertSame('Articles Copy', $copy->label);
+        $this->assertSame(['title', 'body'], $copy->fields()->pluck('key')->all());
+        $this->assertNotSame($model->fields()->pluck('id')->all(), $copy->fields()->pluck('id')->all());
+
+        // The source is unaffected.
+        $this->assertSame(['title', 'body'], $model->fields()->pluck('key')->all());
+
+        $response->assertRedirect($this->url('admin.models.builder', ['model' => $copy->id]));
+    }
+
+    public function test_duplicating_a_model_being_deleted_shows_an_error_toast()
+    {
+        $model = $this->create('articles', 'Articles');
+        $this->manager()->deleteModel($model);
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.duplicate', ['model' => $model->id]), [
+                'slug' => 'articles_copy',
+                'label' => 'Articles Copy',
+            ])
+            ->assertRedirect($this->url('admin.models.index'))
+            ->assertInertiaFlash('toast.type', 'error');
+    }
+
+    public function test_duplicating_with_a_taken_slug_is_rejected()
+    {
+        $model = $this->create('articles', 'Articles');
+        $this->create('pages', 'Pages');
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.duplicate', ['model' => $model->id]), [
+                'slug' => 'pages',
+                'label' => 'Another Pages',
+            ])
+            ->assertSessionHasErrors('slug');
+    }
+
+    public function test_another_sites_model_cannot_be_duplicated()
+    {
+        $model = $this->create('articles', 'Articles');
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.duplicate', ['model' => $model->id], $other), [
+                'slug' => 'articles_copy',
+                'label' => 'Articles Copy',
+            ])
+            ->assertNotFound();
+    }
+
     private function create(string $slug, string $label): SchemaModel
     {
         $result = $this->manager()->createModel(new ModelSchema($slug, $label, fields: [

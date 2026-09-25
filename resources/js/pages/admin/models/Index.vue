@@ -4,6 +4,7 @@ import { Blocks, PlusCircle, Upload } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CreateModelDialog from '@/components/models/CreateModelDialog.vue';
 import DeleteModelDialog from '@/components/models/DeleteModelDialog.vue';
+import DuplicateModelDialog from '@/components/models/DuplicateModelDialog.vue';
 import ImportModelDialog from '@/components/models/ImportModelDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -134,6 +135,10 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                         >Export</a
                                     >
                                 </Button>
+                                <DuplicateModelDialog
+                                    :model="model"
+                                    :existing-slugs="existingSlugs"
+                                />
                                 <DeleteModelDialog :model="model" />
                             </template>
                         </td>
