@@ -20,7 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        // laravel_maintenance is the updater's maintenance bypass. It's
+        // read before the web group decrypts anything, so it stays plain;
+        // it carries its own signature.
+        $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'laravel_maintenance']);
 
         $middleware->web(prepend: [
             ResolveSite::class,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { Activity, Images, LayoutGrid, Puzzle } from '@lucide/vue';
+import { Activity, Download, Images, LayoutGrid, Puzzle } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -14,7 +14,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { files, health } from '@/routes/admin';
+import { files, health, updates } from '@/routes/admin';
 import { index as modules } from '@/routes/admin/modules';
 import type { NavItem } from '@/types';
 
@@ -38,6 +38,11 @@ const mainNavItems: NavItem[] = [
         title: 'Modules',
         href: modules(),
         icon: Puzzle,
+    },
+    {
+        title: 'Updates',
+        href: updates(),
+        icon: Download,
     },
 ];
 </script>
