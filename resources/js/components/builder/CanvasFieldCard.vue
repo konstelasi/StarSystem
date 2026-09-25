@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+    AlarmClockCheck,
     ArrowDown,
     ArrowUp,
     Copy,
@@ -10,7 +11,12 @@ import {
     Trash2,
 } from '@lucide/vue';
 import { computed, nextTick } from 'vue';
-import { positionText, useBuilderContext } from '@/components/builder/context';
+import {
+    FIELD_STATE_LABELS,
+    positionText,
+    stateOf,
+    useBuilderContext,
+} from '@/components/builder/context';
 import FieldTypeIcon from '@/components/builder/FieldTypeIcon.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,13 +32,19 @@ import type { FieldSpecJson } from '@/types/schema';
 
 const props = defineProps<{ field: FieldSpecJson }>();
 
-const { builder, announce } = useBuilderContext();
+const context = useBuilderContext();
+const { builder, announce } = context;
 
 const type = computed(() => builder.typeOf(props.field.type));
 const selected = computed(
     () =>
         builder.selection.value?.kind === 'field' &&
         builder.selection.value.uuid === props.field.uuid,
+);
+const state = computed(() => stateOf(context, props.field.uuid));
+const busy = computed(() => state.value !== 'ready');
+const busyLabel = computed(() =>
+    state.value === 'ready' ? null : FIELD_STATE_LABELS[state.value],
 );
 const position = computed(() => builder.positionOf(props.field.uuid));
 const isFirst = computed(() => position.value?.index === 0);
@@ -47,6 +59,10 @@ function select() {
 }
 
 async function move(delta: number) {
+    if (busy.value) {
+        return;
+    }
+
     const next = builder.moveFieldBy(props.field.uuid, delta);
 
     if (next === null) {
@@ -70,6 +86,10 @@ function onHandleKey(event: KeyboardEvent) {
 }
 
 function duplicate() {
+    if (busy.value) {
+        return;
+    }
+
     const copy = builder.duplicateField(props.field.uuid);
 
     if (copy) {
@@ -78,6 +98,10 @@ function duplicate() {
 }
 
 function remove() {
+    if (busy.value) {
+        return;
+    }
+
     const label = props.field.label;
     builder.removeField(props.field.uuid);
     announce(`Removed ${label}.`);
@@ -103,7 +127,8 @@ function remove() {
             <button
                 type="button"
                 :data-field-handle="field.uuid"
-                class="flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing"
+                :disabled="busy"
+                class="flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
                 :aria-label="`Move ${field.label}. Use the up and down arrow keys, or drag.`"
                 @keydown="onHandleKey"
                 @click.stop="select"
@@ -137,6 +162,14 @@ function remove() {
             </button>
 
             <span
+                v-if="busyLabel"
+                class="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-600/30 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
+            >
+                <AlarmClockCheck class="size-3" aria-hidden="true" />
+                {{ busyLabel }}
+            </span>
+
+            <span
                 v-if="field.filterable"
                 class="hidden shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] text-muted-foreground @md:inline-flex"
                 title="Filterable"
@@ -158,17 +191,27 @@ function remove() {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-44">
-                    <DropdownMenuItem :disabled="isFirst" @select="move(-1)">
+                    <DropdownMenuItem
+                        :disabled="isFirst || busy"
+                        @select="move(-1)"
+                    >
                         <ArrowUp /> Move up
                     </DropdownMenuItem>
-                    <DropdownMenuItem :disabled="isLast" @select="move(1)">
+                    <DropdownMenuItem
+                        :disabled="isLast || busy"
+                        @select="move(1)"
+                    >
                         <ArrowDown /> Move down
                     </DropdownMenuItem>
-                    <DropdownMenuItem @select="duplicate">
+                    <DropdownMenuItem :disabled="busy" @select="duplicate">
                         <Copy /> Duplicate
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem variant="destructive" @select="remove">
+                    <DropdownMenuItem
+                        variant="destructive"
+                        :disabled="busy"
+                        @select="remove"
+                    >
                         <Trash2 /> Remove
                     </DropdownMenuItem>
                 </DropdownMenuContent>

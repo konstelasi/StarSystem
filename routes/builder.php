@@ -5,4 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('admin/models/builder', [ModelBuilderController::class, 'show'])->name('admin.models.builder');
+    Route::post('admin/models/builder/preview', [ModelBuilderController::class, 'preview'])->name('admin.models.builder.preview');
+    Route::post('admin/models/builder/save', [ModelBuilderController::class, 'save'])->name('admin.models.builder.save');
 });

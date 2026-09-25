@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Braces, Eye, Hammer } from '@lucide/vue';
+import { Braces, Eye, Hammer, Save } from '@lucide/vue';
 import { nextTick, ref } from 'vue';
 import BlockInspector from '@/components/builder/BlockInspector.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
@@ -10,17 +10,24 @@ import FieldInspector from '@/components/builder/FieldInspector.vue';
 import FormPreview from '@/components/builder/FormPreview.vue';
 import JsonEditor from '@/components/builder/JsonEditor.vue';
 import ModelInspector from '@/components/builder/ModelInspector.vue';
+import SaveDialog from '@/components/builder/SaveDialog.vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useModelBuilder } from '@/composables/useModelBuilder';
 import type { FieldStates } from '@/lib/modelSchema';
 import { builder as builderPage } from '@/routes/admin/models';
-import type { FieldTypeDescriptor, ModelSchemaJson } from '@/types/schema';
+import type {
+    FieldTypeDescriptor,
+    ModelSchemaJson,
+    SavePreview,
+} from '@/types/schema';
 
 const props = defineProps<{
     fieldTypes: FieldTypeDescriptor[];
     schema: ModelSchemaJson;
     states: FieldStates;
+    preview?: SavePreview | null;
 }>();
 
 defineOptions({
@@ -40,9 +47,14 @@ async function announce(message: string) {
     announcement.value = message;
 }
 
-provideBuilder({ builder, announce: (message) => void announce(message) });
+provideBuilder({
+    builder,
+    announce: (message) => void announce(message),
+    states: props.states,
+});
 
 const tab = ref('build');
+const saveDialogOpen = ref(false);
 </script>
 
 <template>
@@ -68,6 +80,12 @@ const tab = ref('build');
                     Build the form editors fill in for each entry.
                 </p>
             </div>
+            <Button
+                :disabled="!builder.isDirty.value"
+                @click="saveDialogOpen = true"
+            >
+                <Save /> Save changes
+            </Button>
         </header>
 
         <Tabs v-model="tab" class="gap-4">
@@ -132,6 +150,8 @@ const tab = ref('build');
                 </div>
             </TabsContent>
         </Tabs>
+
+        <SaveDialog v-model:open="saveDialogOpen" :preview="preview" />
 
         <div aria-live="polite" aria-atomic="true" class="sr-only">
             {{ announcement }}

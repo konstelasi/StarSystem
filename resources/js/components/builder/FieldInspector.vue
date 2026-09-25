@@ -1,7 +1,19 @@
 <script setup lang="ts">
-import { ArrowDown, ArrowUp, Copy, Trash2, X } from '@lucide/vue';
+import {
+    AlarmClockCheck,
+    ArrowDown,
+    ArrowUp,
+    Copy,
+    Trash2,
+    X,
+} from '@lucide/vue';
 import { computed } from 'vue';
-import { positionText, useBuilderContext } from '@/components/builder/context';
+import {
+    FIELD_STATE_LABELS,
+    positionText,
+    stateOf,
+    useBuilderContext,
+} from '@/components/builder/context';
 import FieldTypeIcon from '@/components/builder/FieldTypeIcon.vue';
 import SettingInput from '@/components/builder/SettingInput.vue';
 import { Button } from '@/components/ui/button';
@@ -25,12 +37,18 @@ const props = defineProps<{
     fieldTypes: FieldTypeDescriptor[];
 }>();
 
-const { builder, announce } = useBuilderContext();
+const context = useBuilderContext();
+const { builder, announce } = context;
 
 const id = computed(() => `inspect-${props.field.uuid}`);
 const type = computed(() => builder.typeOf(props.field.type));
 const isNew = computed(() => builder.isNew(props.field.uuid));
 const position = computed(() => builder.positionOf(props.field.uuid));
+const state = computed(() => stateOf(context, props.field.uuid));
+const busy = computed(() => state.value !== 'ready');
+const busyLabel = computed(() =>
+    state.value === 'ready' ? null : FIELD_STATE_LABELS[state.value],
+);
 
 const keyError = computed(() =>
     keyProblem(props.field.key, builder.otherKeys(props.field.uuid)),
@@ -98,6 +116,13 @@ function remove() {
                     {{ type?.label ?? field.type }} field
                     <template v-if="isNew">· not saved yet</template>
                 </p>
+                <span
+                    v-if="busyLabel"
+                    class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-600/30 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
+                >
+                    <AlarmClockCheck class="size-3" aria-hidden="true" />
+                    {{ busyLabel }}
+                </span>
             </div>
             <Button
                 variant="ghost"
@@ -126,6 +151,7 @@ function remove() {
                 class="font-mono"
                 spellcheck="false"
                 autocapitalize="off"
+                :disabled="busy"
                 :model-value="field.key"
                 :aria-invalid="keyError ? true : undefined"
                 :aria-describedby="`${id}-key-help`"
@@ -136,7 +162,10 @@ function remove() {
                 class="text-xs"
                 :class="keyError ? 'text-destructive' : 'text-muted-foreground'"
             >
-                <template v-if="keyError">{{ keyError }}</template>
+                <template v-if="busyLabel">
+                    {{ busyLabel }} Editing is disabled until this finishes.
+                </template>
+                <template v-else-if="keyError">{{ keyError }}</template>
                 <template v-else-if="isNew">
                     Filled in from the label. Used in exports and templates.
                 </template>
@@ -162,7 +191,11 @@ function remove() {
 
         <div class="grid gap-1.5">
             <Label :for="`${id}-type`">Type</Label>
-            <Select :model-value="field.type" @update:model-value="setType">
+            <Select
+                :model-value="field.type"
+                :disabled="busy"
+                @update:model-value="setType"
+            >
                 <SelectTrigger
                     :id="`${id}-type`"
                     class="w-full"
@@ -269,7 +302,7 @@ function remove() {
             <Button
                 variant="outline"
                 size="sm"
-                :disabled="position?.index === 0"
+                :disabled="busy || position?.index === 0"
                 @click="move(-1)"
             >
                 <ArrowUp /> Up
@@ -278,19 +311,27 @@ function remove() {
                 variant="outline"
                 size="sm"
                 :disabled="
-                    position === null || position.index === position.total - 1
+                    busy ||
+                    position === null ||
+                    position.index === position.total - 1
                 "
                 @click="move(1)"
             >
                 <ArrowDown /> Down
             </Button>
-            <Button variant="outline" size="sm" @click="duplicate">
+            <Button
+                variant="outline"
+                size="sm"
+                :disabled="busy"
+                @click="duplicate"
+            >
                 <Copy /> Duplicate
             </Button>
             <Button
                 variant="outline"
                 size="sm"
                 class="text-destructive hover:text-destructive"
+                :disabled="busy"
                 @click="remove"
             >
                 <Trash2 /> Remove

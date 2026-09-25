@@ -86,4 +86,149 @@ class ModelBuilderTest extends TestCase
 
         $this->assertNotEmpty(array_diff($props['states'], ['ready']));
     }
+
+    public function test_guests_cannot_preview_or_save()
+    {
+        $this->post(route('admin.models.builder.preview'), ['schema' => []])
+            ->assertRedirect(route('login'));
+
+        $this->post(route('admin.models.builder.save'), ['schema' => []])
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_preview_and_save_require_a_schema()
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('admin.models.builder.preview'), [])
+            ->assertSessionHasErrors('schema');
+
+        $this->actingAs($user)
+            ->post(route('admin.models.builder.save'), [])
+            ->assertSessionHasErrors('schema');
+    }
+
+    public function test_preview_diffs_the_posted_schema_against_the_fixture()
+    {
+        $schema = $this->fixtureSchema();
+
+        // Rename "title" -> "headline".
+        $schema['fields'][0]['key'] = 'headline';
+
+        // Retype "summary" from textarea to text, and promote it to filterable.
+        $schema['fields'][1]['type'] = 'text';
+        $schema['fields'][1]['filterable'] = true;
+
+        // Demote "reading_time" (filterable true -> false).
+        foreach ($schema['fields'] as &$field) {
+            if ($field['key'] === 'reading_time') {
+                $field['filterable'] = false;
+            }
+        }
+        unset($field);
+
+        // Delete "embed".
+        $schema['fields'] = array_values(array_filter(
+            $schema['fields'],
+            fn ($field) => $field['key'] !== 'embed',
+        ));
+
+        // Add a new field.
+        $schema['fields'][] = [
+            'uuid' => 'new-field-uuid',
+            'key' => 'excerpt',
+            'label' => 'Excerpt',
+            'type' => 'text',
+            'required' => false,
+            'filterable' => false,
+            'layout_slot' => null,
+            'settings' => [],
+        ];
+
+        // Change model metadata.
+        $schema['model']['label'] = 'News Article';
+
+        $props = $this->actingAs(User::factory()->create())
+            ->post(route('admin.models.builder.preview'), ['schema' => $schema])
+            ->assertOk()
+            ->inertiaProps();
+
+        $operations = collect($props['preview']['operations']);
+        $this->assertEmpty($props['preview']['errors']);
+
+        $this->assertTrue($operations->contains(
+            fn ($op) => $op['op'] === 'rename' && $op['field_uuid'] === '0f4c7a52-8f3e-4b8e-9a51-3c2d1e6f7a01'
+        ));
+        $this->assertTrue($operations->contains(
+            fn ($op) => $op['op'] === 'retype' && $op['field_uuid'] === '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02'
+        ));
+        $this->assertTrue($operations->contains(
+            fn ($op) => $op['op'] === 'promote' && $op['field_uuid'] === '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02'
+        ));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'demote'));
+        $this->assertTrue($operations->contains(
+            fn ($op) => $op['op'] === 'delete' && $op['summary'] === 'Delete "embed"'
+        ));
+        $this->assertTrue($operations->contains(
+            fn ($op) => $op['op'] === 'add' && $op['field_uuid'] === 'new-field-uuid'
+        ));
+        $this->assertTrue($operations->contains(fn ($op) => $op['op'] === 'metadata'));
+
+        $destructive = $operations->where('destructive', true)->pluck('op');
+        $this->assertTrue($destructive->contains('retype'));
+        $this->assertTrue($destructive->contains('delete'));
+        $this->assertFalse($destructive->contains('add'));
+        $this->assertFalse($destructive->contains('promote'));
+    }
+
+    public function test_preview_reports_key_and_label_problems_as_errors()
+    {
+        $schema = $this->fixtureSchema();
+
+        $schema['fields'][0]['label'] = '';
+        $schema['fields'][1]['key'] = $schema['fields'][2]['key'];
+        $schema['fields'][3]['key'] = '1bad';
+
+        $props = $this->actingAs(User::factory()->create())
+            ->post(route('admin.models.builder.preview'), ['schema' => $schema])
+            ->assertOk()
+            ->inertiaProps();
+
+        $messages = collect($props['preview']['errors'])->pluck('message');
+
+        $this->assertTrue($messages->contains('Give this field a label.'));
+        $this->assertTrue($messages->contains('Another field already uses this key.'));
+        $this->assertTrue($messages->contains(
+            'Use letters, numbers and underscores, starting with a letter.'
+        ));
+    }
+
+    public function test_save_accepts_the_schema_but_does_not_persist_it()
+    {
+        $user = User::factory()->create();
+        $schema = $this->fixtureSchema();
+        $schema['model']['label'] = 'Changed Label';
+
+        $this->actingAs($user)
+            ->post(route('admin.models.builder.save'), ['schema' => $schema])
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+
+        $this->actingAs($user)
+            ->get(route('admin.models.builder'))
+            ->assertInertia(
+                fn (Assert $page) => $page->where('schema.model.label', 'Article')
+            );
+    }
+
+    /** @return array<string, mixed> */
+    private function fixtureSchema(): array
+    {
+        return json_decode(
+            file_get_contents(resource_path('fixtures/builder/schema.json')),
+            associative: true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+    }
 }
