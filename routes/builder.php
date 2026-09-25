@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\Admin\ModelBuilderController;
+use App\Http\Controllers\Admin\ModelController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])
     ->prefix('admin/models')
     ->name('admin.models.')
     ->group(function () {
+        Route::get('/', [ModelController::class, 'index'])->name('index');
+
         // The site's current single-model entry point, kept only until the
         // models list can create and open models itself.
         Route::get('builder', [ModelBuilderController::class, 'start'])->name('start');
