@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    # Publishing the release needs write access; nothing else does.
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The zip is named after VERSION, so a tag that disagrees with it
+      # would publish one version under another's name.
+      - name: Check the tag matches VERSION
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} doesn't match VERSION ${version}." >&2
+            exit 1
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      # The full install here is only for building; the zip gets its own
+      # vendor/ without development packages.
+      - name: Build the front-end
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          npm ci
+          npm run build
+
+      - name: Build the release zip
+        run: >-
+          php build/release.php HEAD --out=dist
+          --download-base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/"
+
+      # Not marked as a pre-release even for versions like 0.2.0-beta.1:
+      # installs find updates through releases/latest/download/release.json,
+      # and GitHub leaves pre-releases out of "latest". A tag is a release.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+            dist/starsystem-*.zip dist/starsystem-*.zip.sha256 dist/release.json \
+            --title "StarSystem ${VERSION}" --generate-notes
