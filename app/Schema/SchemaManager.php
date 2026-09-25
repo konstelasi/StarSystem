@@ -36,7 +36,7 @@ class SchemaManager
         $empty = new ModelSchema($schema->slug, $schema->label, $schema->icon, $schema->group, $schema->layout);
         $plan = $this->diff->diff($empty, $schema);
 
-        if (($taken = $this->slugTaken($schema->slug)) !== null) {
+        if (($taken = $this->slugProblem($schema->slug)) !== null) {
             $plan = $plan->withError(null, $taken);
         }
 
@@ -164,6 +164,10 @@ class SchemaManager
      */
     public function deleteModel(SchemaModel $model): void
     {
+        if ($model->isDeleting()) {
+            throw new SchemaException(SchemaException::text('This model is already being deleted.'));
+        }
+
         try {
             $this->stardust->deleteModel($model->stardust_model_id);
         } catch (Throwable $e) {
@@ -205,11 +209,30 @@ class SchemaManager
      *
      * @throws InvalidSchemaException
      */
-    public function import(array|string $json, ?string $slug = null): SaveResult
+    public function import(array|string $json, ?string $slug = null, ?string $label = null): SaveResult
     {
         $schema = ModelSchema::fromJson($json)->withFreshUuids();
+        $schema = $slug === null ? $schema : $schema->withSlug($slug);
+        $schema = $label === null ? $schema : $schema->withLabel($label);
 
-        return $this->createModel($slug === null ? $schema : $schema->withSlug($slug));
+        return $this->createModel($schema);
+    }
+
+    /**
+     * Copies a model's fields into a new model under a new slug and label.
+     * Fields get new UUIDs, the same as import().
+     *
+     * @throws SchemaException when the source model is being deleted
+     */
+    public function duplicate(SchemaModel $source, string $slug, string $label): SaveResult
+    {
+        if ($source->isDeleting()) {
+            throw new SchemaException(SchemaException::text('This model is being deleted.'));
+        }
+
+        $schema = ModelSchema::fromModel($source)->withFreshUuids()->withSlug($slug)->withLabel($label);
+
+        return $this->createModel($schema);
     }
 
     private function plan(SchemaModel $model, ModelSchema $desired): DiffResult
@@ -249,14 +272,14 @@ class SchemaManager
             $heldKeys,
         );
 
-        if ($desired->slug !== $model->slug && ($taken = $this->slugTaken($desired->slug)) !== null) {
+        if ($desired->slug !== $model->slug && ($taken = $this->slugProblem($desired->slug)) !== null) {
             $plan = $plan->withError(null, $taken);
         }
 
         return $plan;
     }
 
-    private function slugTaken(string $slug): ?string
+    public function slugProblem(string $slug): ?string
     {
         $existing = SchemaModel::query()->where('slug', $slug)->first();
 

@@ -182,6 +182,11 @@ final class ModelSchema
         return new self($slug, $this->label, $this->icon, $this->group, $this->layout, $this->fields);
     }
 
+    public function withLabel(string $label): self
+    {
+        return new self($this->slug, $label, $this->icon, $this->group, $this->layout, $this->fields);
+    }
+
     /**
      * The same schema with new field UUIDs. Field ids are global, so a
      * schema copied to another model or site must not reuse them.

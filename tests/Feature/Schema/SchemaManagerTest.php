@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
+use App\Schema\SchemaException;
 use App\Schema\SchemaManager;
 use App\Sites\CurrentSite;
 use App\StarDust\StarDustService;
@@ -290,6 +291,71 @@ class SchemaManagerTest extends TestCase
 
         $this->assertSame(SaveResult::INVALID, $result->status);
         $this->assertStringContainsString('already uses the slug', (string) $result->error());
+    }
+
+    public function test_import_can_override_the_label_as_well_as_the_slug()
+    {
+        $model = $this->create();
+
+        $copy = $this->manager()->import($this->manager()->export($model), 'articles_copy', 'Articles Copy');
+
+        $this->assertSame(SaveResult::DONE, $copy->status, (string) $copy->error());
+        $this->assertSame('articles_copy', $copy->model?->slug);
+        $this->assertSame('Articles Copy', $copy->model?->label);
+    }
+
+    public function test_duplicate_copies_fields_with_fresh_ids_and_leaves_the_source_untouched()
+    {
+        $model = $this->create();
+
+        $copy = $this->manager()->duplicate($model, 'articles_copy', 'Articles Copy');
+
+        $this->assertSame(SaveResult::DONE, $copy->status, (string) $copy->error());
+        $this->assertNotNull($copy->model);
+        $this->assertSame('articles_copy', $copy->model->slug);
+        $this->assertSame('Articles Copy', $copy->model->label);
+        $this->assertSame(['title', 'body', 'count'], $copy->model->fields()->pluck('key')->all());
+        $this->assertNotContains(self::TITLE, $copy->model->fields()->pluck('id')->all());
+        $this->assertNotSame($model->stardust_model_id, $copy->model->stardust_model_id);
+
+        // The source is unaffected.
+        $model->refresh();
+        $this->assertSame('articles', $model->slug);
+        $this->assertSame(['title', 'body', 'count'], $model->fields()->pluck('key')->all());
+    }
+
+    public function test_duplicating_a_model_being_deleted_is_refused()
+    {
+        $model = $this->create();
+        $this->manager()->deleteModel($model);
+
+        $this->expectException(SchemaException::class);
+        $this->expectExceptionMessage('being deleted');
+
+        $this->manager()->duplicate($model, 'articles_copy', 'Articles Copy');
+    }
+
+    public function test_deleting_a_model_twice_is_refused()
+    {
+        $model = $this->create();
+        $this->manager()->deleteModel($model);
+
+        $this->expectException(SchemaException::class);
+        $this->expectExceptionMessage('already being deleted');
+
+        $this->manager()->deleteModel($model);
+    }
+
+    public function test_slug_problem_reports_a_taken_slug_and_a_slug_held_by_a_deleted_model()
+    {
+        $model = $this->create();
+
+        $this->assertNull($this->manager()->slugProblem('unused'));
+        $this->assertStringContainsString('already uses the slug', (string) $this->manager()->slugProblem('articles'));
+
+        $this->manager()->deleteModel($model);
+
+        $this->assertStringContainsString('still holds the slug', (string) $this->manager()->slugProblem('articles'));
     }
 
     public function test_a_deleted_model_holds_its_slug_until_stardust_has_purged_it()
