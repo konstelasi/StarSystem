@@ -4,6 +4,7 @@ use App\Files\FilesServiceProvider;
 use App\Hooks\HooksServiceProvider;
 use App\Modules\ModulesServiceProvider;
 use App\Providers\AppServiceProvider;
+use App\Providers\BuilderServiceProvider;
 use App\Providers\DistributionServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Schema\SchemaServiceProvider;
@@ -18,4 +19,5 @@ return [
     ModulesServiceProvider::class,
     FilesServiceProvider::class,
     DistributionServiceProvider::class,
+    BuilderServiceProvider::class,
 ];
