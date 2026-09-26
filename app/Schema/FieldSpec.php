@@ -26,6 +26,7 @@ final class FieldSpec
         public readonly ?string $helper = null,
         public readonly bool $required = false,
         public readonly bool $filterable = false,
+        public readonly bool $shownInList = false,
         public readonly ?string $layoutSlot = null,
     ) {}
 
@@ -40,6 +41,7 @@ final class FieldSpec
             helper: $field->helper,
             required: $field->required,
             filterable: $field->filterable,
+            shownInList: $field->shown_in_list,
             layoutSlot: $field->layout_slot,
         );
     }
@@ -88,7 +90,7 @@ final class FieldSpec
             }
         }
 
-        foreach (['required', 'filterable'] as $name) {
+        foreach (['required', 'filterable', 'shown_in_list'] as $name) {
             if (isset($json[$name]) && ! is_bool($json[$name])) {
                 throw InvalidSchemaException::at("{$path}.{$name}", 'must be true or false');
             }
@@ -104,6 +106,7 @@ final class FieldSpec
             helper: isset($json['helper']) && $json['helper'] !== '' ? $json['helper'] : null,
             required: $json['required'] ?? false,
             filterable: $json['filterable'] ?? false,
+            shownInList: $json['shown_in_list'] ?? false,
             layoutSlot: $json['layout_slot'] ?? null,
         );
     }
@@ -131,6 +134,7 @@ final class FieldSpec
             ...$json,
             'required' => $this->required,
             'filterable' => $this->filterable,
+            'shown_in_list' => $this->shownInList,
             'layout_slot' => $this->layoutSlot,
             'settings' => $this->settings === [] ? new stdClass : $this->settings,
         ];

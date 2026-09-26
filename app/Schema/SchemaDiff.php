@@ -359,6 +359,7 @@ final class SchemaDiff
             'label' => $field->label,
             'helper' => $field->helper,
             'required' => $field->required,
+            'shown_in_list' => $field->shownInList,
             'position' => $position,
             'layout_slot' => $field->layoutSlot,
         ];

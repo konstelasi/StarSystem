@@ -106,9 +106,10 @@ class BuilderContractTest extends TestCase
         }
 
         foreach ($json['fields'] as $field) {
-            $this->assertKeys(['uuid', 'key', 'label', 'type', 'required', 'filterable', 'layout_slot', 'settings'], ['helper'], $field);
+            $this->assertKeys(['uuid', 'key', 'label', 'type', 'required', 'filterable', 'shown_in_list', 'layout_slot', 'settings'], ['helper'], $field);
             $this->assertIsBool($field['required']);
             $this->assertIsBool($field['filterable']);
+            $this->assertIsBool($field['shown_in_list']);
             $this->assertTrue($field['layout_slot'] === null || is_string($field['layout_slot']));
         }
 
@@ -123,7 +124,7 @@ class BuilderContractTest extends TestCase
         $encoded = json_encode($this->schema()->toJson());
 
         $this->assertIsString($encoded);
-        $this->assertStringContainsString('"type":"rich_text","required":false,"filterable":false,"layout_slot":null,"settings":{}', $encoded);
+        $this->assertStringContainsString('"type":"rich_text","required":false,"filterable":false,"shown_in_list":false,"layout_slot":null,"settings":{}', $encoded);
     }
 
     public function test_the_json_round_trips()
@@ -199,7 +200,7 @@ class BuilderContractTest extends TestCase
                 ['id' => 'extra', 'kind' => 'tabs', 'slots' => [['id' => 'seo', 'label' => 'SEO'], ['id' => 'media', 'label' => 'Media']]],
             ],
             fields: [
-                new FieldSpec('0b4a3d4e-7f1b-4c47-9f6e-1c2d3e4f5a6b', 'title', 'Title', 'text', ['max_length' => 120], 'Shown under the field.', true, true, 'main'),
+                new FieldSpec('0b4a3d4e-7f1b-4c47-9f6e-1c2d3e4f5a6b', 'title', 'Title', 'text', ['max_length' => 120], helper: 'Shown under the field.', required: true, filterable: true, layoutSlot: 'main'),
                 new FieldSpec('1c5b4e5f-8a2c-4d58-8a7f-2d3e4f5a6b7c', 'body', 'Body', 'rich_text'),
                 new FieldSpec('2d6c5f6a-9b3d-4e69-9b8a-3e4f5a6b7c8d', 'tags', 'Tags', 'checkboxes', ['options' => OptionsSource::static([['value' => 'news', 'label' => 'News']])], layoutSlot: 'seo'),
             ],

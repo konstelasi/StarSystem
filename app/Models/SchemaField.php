@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<string, mixed>|null $settings
  * @property bool $filterable
  * @property bool $required
+ * @property bool $shown_in_list
  * @property int $position
  * @property string|null $layout_slot
  * @property CarbonImmutable|null $created_at
@@ -49,6 +50,7 @@ class SchemaField extends Model
         'settings',
         'filterable',
         'required',
+        'shown_in_list',
         'position',
         'layout_slot',
     ];
@@ -61,6 +63,7 @@ class SchemaField extends Model
             'settings' => 'array',
             'filterable' => 'boolean',
             'required' => 'boolean',
+            'shown_in_list' => 'boolean',
             'position' => 'integer',
         ];
     }
