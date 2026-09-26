@@ -3,22 +3,20 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\SchemaModel;
-use App\Models\Site;
 use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
-use App\Schema\SaveResult;
-use App\Schema\SchemaManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Tests\Concerns\CrossSite;
+use Tests\Concerns\ManagesTestModels;
 use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
 
 class ModelTransferTest extends TestCase
 {
-    use CrossSite, RefreshDatabase, UsesStarDust;
+    use CrossSite, ManagesTestModels, RefreshDatabase, UsesStarDust;
 
     protected function setUp(): void
     {
@@ -208,18 +206,6 @@ class ModelTransferTest extends TestCase
             ->assertNotFound();
     }
 
-    private function create(string $slug, string $label): SchemaModel
-    {
-        $result = $this->manager()->createModel(new ModelSchema($slug, $label, fields: [
-            new FieldSpec((string) Str::uuid(), 'title', 'Title', 'text'),
-            new FieldSpec((string) Str::uuid(), 'body', 'Body', 'textarea'),
-        ]));
-
-        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
-
-        return $result->model;
-    }
-
     private function schemaFile(string $slug, string $label): UploadedFile
     {
         $schema = (new ModelSchema($slug, $label, fields: [
@@ -227,18 +213,5 @@ class ModelTransferTest extends TestCase
         ]))->toJson();
 
         return UploadedFile::fake()->createWithContent('schema.json', (string) json_encode($schema));
-    }
-
-    private function manager(): SchemaManager
-    {
-        return app(SchemaManager::class);
-    }
-
-    /**
-     * @param  array<string, mixed>  $parameters
-     */
-    private function url(string $route, array $parameters = [], ?Site $site = null): string
-    {
-        return 'http://'.($site ?? $this->site)->domains[0].route($route, $parameters, absolute: false);
     }
 }

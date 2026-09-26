@@ -3,7 +3,6 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\SchemaModel;
-use App\Models\Site;
 use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
@@ -13,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CrossSite;
+use Tests\Concerns\ManagesTestModels;
 use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
 
@@ -25,7 +25,7 @@ use Tests\TestCase;
  */
 class ModelBuilderTest extends TestCase
 {
-    use CrossSite, RefreshDatabase, UsesStarDust;
+    use CrossSite, ManagesTestModels, RefreshDatabase, UsesStarDust;
 
     private const CORE_TYPES = [
         'text', 'email', 'url', 'color', 'hidden', 'radio', 'select', 'number',
@@ -315,13 +315,5 @@ class ModelBuilderTest extends TestCase
         $this->drain();
 
         return $result->model;
-    }
-
-    /**
-     * @param  array<string, mixed>  $parameters
-     */
-    private function url(string $route, array $parameters = [], ?Site $site = null): string
-    {
-        return 'http://'.($site ?? $this->site)->domains[0].route($route, $parameters, absolute: false);
     }
 }
