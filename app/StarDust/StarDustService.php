@@ -358,6 +358,26 @@ class StarDustService
     }
 
     /**
+     * The reserved field StarSystem uses to mark a trashed entry: get- or
+     * create it, and make sure it is filterable so the entries list can
+     * exclude trashed entries by default. Idempotent, safe to call often.
+     *
+     * A new field always registers non-filterable first and is promoted as
+     * a second step — see SchemaApplier::add()'s docblock for why. This
+     * never touches ss_fields, so the field stays invisible to the
+     * builder, the same reason SchemaDiff refuses a builder-entered key
+     * starting with "_".
+     */
+    public function ensureTrashField(int $modelId): void
+    {
+        $described = $this->defineField($modelId, '_trashed', 'int', false);
+
+        if (! $described->isFilterable) {
+            $this->promoteField($modelId, $described->fieldId);
+        }
+    }
+
+    /**
      * The ownership check every schema call makes: the model must be one of
      * this site's ss_models and StarDust must report it for this tenant.
      * Either alone can be fooled, by an ss_models row pointing at another
