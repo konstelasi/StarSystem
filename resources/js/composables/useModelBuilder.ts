@@ -190,6 +190,7 @@ export function useModelBuilder(
             type: type.key,
             required: false,
             filterable: false,
+            shown_in_list: false,
             layout_slot: slotId,
             settings: settingDefaults(type),
         };

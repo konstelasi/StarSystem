@@ -60,6 +60,7 @@ export type FieldSpecJson = {
     helper?: string;
     required: boolean;
     filterable: boolean;
+    shown_in_list: boolean;
     layout_slot: string | null; // LayoutBlock slot id, or null = top level
     settings: Record<string, unknown>;
 };

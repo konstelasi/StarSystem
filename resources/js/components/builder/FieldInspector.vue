@@ -253,6 +253,20 @@ function remove() {
             />
         </div>
 
+        <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-1">
+                <Label :for="`${id}-shown-in-list`">Show in list</Label>
+                <p class="text-xs text-muted-foreground">
+                    Shows this field as a column on the entries list.
+                </p>
+            </div>
+            <Switch
+                :id="`${id}-shown-in-list`"
+                :model-value="field.shown_in_list"
+                @update:model-value="update({ shown_in_list: $event === true })"
+            />
+        </div>
+
         <div
             v-if="type?.storage.canFilter"
             class="flex items-start justify-between gap-3"
