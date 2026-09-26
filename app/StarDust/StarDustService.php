@@ -8,6 +8,10 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use PDO;
+use StarDust\Exception\EntryNotFoundException;
+use StarDust\Read\Entry;
+use StarDust\Read\EntryPage;
+use StarDust\Read\EntryQuery;
 use StarDust\Rename\RenameCheckpointRepository;
 use StarDust\Retype\RetypeCheckpointRepository;
 use StarDust\Schema\FieldDescription;
@@ -15,6 +19,8 @@ use StarDust\Schema\ModelDescription;
 use StarDust\StarDust;
 use StarDust\Support\ServerEngine;
 use StarDust\Support\ServerEngineDetector;
+use StarDust\Write\EntryPayload;
+use StarDust\Write\EntryWriteResult;
 use Throwable;
 
 /**
@@ -283,6 +289,72 @@ class StarDustService
         }
 
         return $states;
+    }
+
+    /**
+     * Registers a new entry under the current site and returns its id.
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    public function writeEntry(int $modelId, array $fields): int
+    {
+        $this->owned($modelId);
+
+        return $this->engine()->write(new EntryPayload($this->site->tenantId(), $modelId, $fields))->entryId;
+    }
+
+    /**
+     * A point read by id, or null if it doesn't exist, belongs to another
+     * site, is soft-deleted, or belongs to a different model than asked.
+     * StarDust's own get() checks only the tenant, not the model, because
+     * an entry id isn't scoped to one model.
+     */
+    public function getEntry(int $modelId, int $entryId): ?Entry
+    {
+        $this->owned($modelId);
+
+        $entry = $this->engine()->get($this->site->tenantId(), $entryId);
+
+        return $entry !== null && $entry->modelId === $modelId ? $entry : null;
+    }
+
+    /**
+     * A full replace: any field left out of $fields is cleared from the
+     * entry. The caller is responsible for carrying forward whatever it
+     * doesn't mean to change.
+     *
+     * @param  array<string, mixed>  $fields
+     *
+     * @throws EntryNotFoundException when the entry
+     *                                doesn't exist, belongs to another site, or is already deleted
+     */
+    public function updateEntry(int $modelId, int $entryId, array $fields): EntryWriteResult
+    {
+        $this->owned($modelId);
+
+        return $this->engine()->updateEntry($this->site->tenantId(), $entryId, $fields);
+    }
+
+    /**
+     * Soft-deletes an entry for good: StarDust has no restore. False when
+     * the entry is already gone, so a retry is harmless.
+     */
+    public function deleteEntry(int $modelId, int $entryId): bool
+    {
+        $this->owned($modelId);
+
+        return $this->engine()->deleteEntry($this->site->tenantId(), $entryId);
+    }
+
+    /**
+     * A cursor-paginated, optionally filtered and sorted read of a model's
+     * entries.
+     */
+    public function listEntries(EntryQuery $query): EntryPage
+    {
+        $this->owned($query->modelId);
+
+        return $this->engine()->read($query);
     }
 
     /**

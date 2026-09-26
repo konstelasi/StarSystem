@@ -5,6 +5,7 @@ namespace App\Schema;
 use App\StarDust\FieldConflictException;
 use App\StarDust\NotOwnedException;
 use RuntimeException;
+use StarDust\Exception\EntryNotFoundException;
 use StarDust\Exception\FieldDeletionInProgressException;
 use StarDust\Exception\FieldNameConflictException;
 use StarDust\Exception\FieldNotFoundException;
@@ -39,6 +40,7 @@ class SchemaException extends RuntimeException
             $e instanceof ModelDeletionInProgressException => self::text('The model is being deleted.'),
             $e instanceof ModelNameConflictException => self::text('Another model already uses that slug.'),
             $e instanceof FieldNotFoundException, $e instanceof ModelNotFoundException => self::text('StarDust no longer has this field or model. Reload the builder.'),
+            $e instanceof EntryNotFoundException => self::text('This entry no longer exists.'),
             $e instanceof FieldConflictException => self::text('StarDust already has a field named :key with a different type. Choose another key.', ['key' => $e->fieldName]),
             $e instanceof NotOwnedException => self::text('This model does not belong to the current site.'),
             default => self::text('The change could not be applied: :message', ['message' => $e->getMessage()]),
