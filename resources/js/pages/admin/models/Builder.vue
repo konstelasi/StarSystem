@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, setLayoutProps } from '@inertiajs/vue3';
 import { Braces, Eye, Hammer, Save } from '@lucide/vue';
-import { nextTick, ref } from 'vue';
+import { nextTick, ref, watchEffect } from 'vue';
 import BlockInspector from '@/components/builder/BlockInspector.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import BuilderPalette from '@/components/builder/BuilderPalette.vue';
@@ -32,16 +32,19 @@ const props = defineProps<{
     preview?: SavePreview | null;
 }>();
 
-defineOptions({
-    layout: {
+const builder = useModelBuilder(props.schema, () => props.fieldTypes);
+
+watchEffect(() => {
+    setLayoutProps({
         breadcrumbs: [
             { title: 'Models', href: index() },
-            { title: props.schema.model.label, href: builderPage(props.model) },
+            {
+                title: builder.schema.value.model.label,
+                href: builderPage(props.model),
+            },
         ],
-    },
+    });
 });
-
-const builder = useModelBuilder(props.schema, () => props.fieldTypes);
 
 const announcement = ref('');
 
