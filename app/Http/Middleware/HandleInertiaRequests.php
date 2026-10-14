@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Health\TickStatus;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,6 +43,24 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'backgroundWork' => fn () => $this->backgroundWork($request),
         ];
+    }
+
+    /**
+     * Set when StarDust's background work is late, for the banner on every
+     * admin page. Null for guests, so public pages never query for it.
+     *
+     * @return array{minutesSinceLast: int|null}|null
+     */
+    private function backgroundWork(Request $request): ?array
+    {
+        if ($request->user() === null) {
+            return null;
+        }
+
+        $ticks = app(TickStatus::class);
+
+        return $ticks->late() ? ['minutesSinceLast' => $ticks->minutesSinceLast()] : null;
     }
 }

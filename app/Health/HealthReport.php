@@ -5,7 +5,6 @@ namespace App\Health;
 use App\Models\TickRun;
 use App\StarDust\StarDustService;
 use App\StarDust\TickPause;
-use Carbon\CarbonImmutable;
 
 /**
  * Everything the health panel shows. On cron-only hosting a new filterable
@@ -17,6 +16,7 @@ class HealthReport
     public function __construct(
         private readonly StarDustService $stardust,
         private readonly TickPause $pause,
+        private readonly TickStatus $ticks,
     ) {}
 
     /**
@@ -43,19 +43,12 @@ class HealthReport
     private function tick(): array
     {
         $recent = TickRun::query()->latest('id')->limit(20)->get();
-        $last = $recent->first();
-        $staleAfter = (int) config('stardust.tick.stale_after_minutes');
-
-        $minutesSince = $last?->started_at
-            ? (int) floor($last->started_at->diffInMinutes(CarbonImmutable::now(), true))
-            : null;
 
         return [
-            // The server profile's daemons don't record ticks.
-            'expected' => config('stardust.profile') === 'shared',
-            'staleAfterMinutes' => $staleAfter,
-            'minutesSinceLast' => $minutesSince,
-            'stale' => $last === null || $minutesSince >= $staleAfter,
+            'expected' => $this->ticks->expected(),
+            'staleAfterMinutes' => $this->ticks->staleAfterMinutes(),
+            'minutesSinceLast' => $this->ticks->minutesSinceLast(),
+            'stale' => $this->ticks->stale(),
             'recent' => $recent->map(fn (TickRun $run) => [
                 'id' => $run->id,
                 'trigger' => $run->trigger,
