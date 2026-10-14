@@ -11,6 +11,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { cellText, EMPTY_CELL } from '@/fields/display';
 import { relativeTime } from '@/lib/time';
 import { index as models } from '@/routes/admin/models';
 import {
@@ -21,12 +22,13 @@ import {
     trash,
 } from '@/routes/admin/models/entries';
 import { store as moveToTrash } from '@/routes/admin/models/entries/trash';
-
-type Column = { key: string; label: string };
+import type { FieldSpecJson } from '@/types/schema';
 
 type EntryRow = {
     id: number;
     values: Record<string, unknown>;
+    /** Names of the files this row's file columns point at, by uuid. */
+    file_names: Record<string, string>;
     created_at: string;
     trashed_at: string | null;
 };
@@ -35,7 +37,8 @@ const props = defineProps<{
     model: { id: number; label: string };
     /** The model's active entries, or its trash. */
     view: 'active' | 'trash';
-    columns: Column[];
+    /** The list's fields, as full specs so each value shows by its type. */
+    columns: FieldSpecJson[];
     entries: EntryRow[];
     nextCursor: string | null;
     /** How long an entry stays in the trash before it is deleted for good. */
@@ -98,21 +101,24 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
 /** How the delete dialog names an entry: its first column, if it has one. */
 function entryName(entry: EntryRow): string | null {
     const first = props.columns[0];
-    const shown = first ? display(entry.values[first.key]) : '—';
+    const shown = first ? cell(entry, first) : EMPTY_CELL;
 
-    return shown === '—' ? null : shown;
+    return shown === EMPTY_CELL ? null : shown;
 }
 
-function display(value: unknown): string {
-    if (value === null || value === undefined || value === '') {
-        return '—';
-    }
+function cell(entry: EntryRow, column: FieldSpecJson): string {
+    return cellText(column, entry.values[column.key], entry.file_names);
+}
 
-    if (Array.isArray(value)) {
-        return value.length === 0 ? '—' : value.map(String).join(', ');
-    }
+/** A color cell's swatch, when the value is a color at all. */
+function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
+    const value = entry.values[column.key];
 
-    return String(value);
+    return column.type === 'color' &&
+        typeof value === 'string' &&
+        /^#[0-9a-f]{3,8}$/i.test(value)
+        ? value
+        : null;
 }
 </script>
 
@@ -204,6 +210,14 @@ function display(value: unknown): string {
                             :key="column.key"
                             class="px-4 py-2"
                         >
+                            <span
+                                v-if="swatch(entry, column)"
+                                class="mr-1.5 inline-block size-3 rounded-sm border align-[-0.1em]"
+                                :style="{
+                                    backgroundColor: swatch(entry, column)!,
+                                }"
+                                aria-hidden="true"
+                            />
                             <Link
                                 v-if="position === 0 && !inTrash"
                                 :href="
@@ -211,10 +225,10 @@ function display(value: unknown): string {
                                 "
                                 class="font-medium underline-offset-4 hover:underline"
                             >
-                                {{ display(entry.values[column.key]) }}
+                                {{ cell(entry, column) }}
                             </Link>
                             <template v-else>
-                                {{ display(entry.values[column.key]) }}
+                                {{ cell(entry, column) }}
                             </template>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap">

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Entries\EntryManager;
+use App\Files\File;
 use App\Http\Controllers\Controller;
 use App\Models\SchemaField;
 use App\Models\SchemaModel;
+use App\Schema\FieldSpec;
+use App\Schema\ModelSchema;
 use App\Schema\SchemaManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -113,16 +116,20 @@ class EntryController extends Controller
             abort(404);
         }
 
+        // Full field specs, so the list can show each value by its type.
+        $specs = collect(ModelSchema::fromModel($model)->fields)->keyBy(fn (FieldSpec $spec) => $spec->key);
+        $fileNames = $this->fileNames($columns, $page->rows);
+
         return Inertia::render('admin/entries/Index', [
             'model' => ['id' => $model->id, 'label' => $model->label],
             'view' => $trashed ? 'trash' : 'active',
-            'columns' => $columns->map(fn (SchemaField $field) => [
-                'key' => $field->key,
-                'label' => $field->label,
-            ])->values(),
+            'columns' => $columns->map(fn (SchemaField $field) => $specs[$field->key]->toJson())->values(),
             'entries' => Inertia::merge(collect($page->rows)->map(fn (Entry $entry) => [
                 'id' => $entry->id,
                 'values' => Arr::only($entry->fields, $keys),
+                // Per row rather than per page, so "Load more" brings the
+                // names of the files it appends.
+                'file_names' => (object) Arr::only($fileNames, $this->fileUuids($columns, $entry)),
                 'created_at' => $entry->createdAt->format(DATE_ATOM),
                 'trashed_at' => $this->entries->trashedAt($entry)?->format(DATE_ATOM),
             ])->values()),
@@ -217,6 +224,43 @@ class EntryController extends Controller
         $validated = Validator::make($request->all(), $rules)->validate();
 
         return $this->entries->normalizeFields($model, $validated['fields'] ?? []);
+    }
+
+    /**
+     * The display names of every file the page's file columns point at,
+     * by uuid. File's site scope keeps another site's files out, and a
+     * trashed or purged file is simply missing.
+     *
+     * @param  Collection<int, SchemaField>  $columns
+     * @param  list<Entry>  $rows
+     * @return array<string, string>
+     */
+    private function fileNames(Collection $columns, array $rows): array
+    {
+        $uuids = collect($rows)->flatMap(fn (Entry $entry) => $this->fileUuids($columns, $entry))->unique()->values();
+
+        if ($uuids->isEmpty()) {
+            return [];
+        }
+
+        /** @var array<string, string> */
+        return File::query()->whereIn('uuid', $uuids)->pluck('original_name', 'uuid')->all();
+    }
+
+    /**
+     * The file uuids an entry holds in the list's file columns, one or many
+     * per field.
+     *
+     * @param  Collection<int, SchemaField>  $columns
+     * @return list<string>
+     */
+    private function fileUuids(Collection $columns, Entry $entry): array
+    {
+        return array_values($columns->where('type', 'file')
+            ->flatMap(fn (SchemaField $field) => (array) ($entry->fields[$field->key] ?? []))
+            ->filter(fn ($uuid) => is_string($uuid) && $uuid !== '')
+            ->map(fn (string $uuid) => strtolower($uuid))
+            ->all());
     }
 
     /**

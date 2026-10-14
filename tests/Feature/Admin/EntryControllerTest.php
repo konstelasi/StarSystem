@@ -3,13 +3,19 @@
 namespace Tests\Feature\Admin;
 
 use App\Entries\EntryManager;
+use App\Files\FileStore;
 use App\Models\SchemaModel;
 use App\Models\User;
+use App\Schema\FieldSpec;
+use App\Schema\ModelSchema;
+use App\Schema\SchemaManager;
 use App\Sites\CurrentSite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CrossSite;
+use Tests\Concerns\FakeUploads;
 use Tests\Concerns\ManagesTestModels;
 use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
@@ -20,7 +26,7 @@ use Tests\TestCase;
  */
 class EntryControllerTest extends TestCase
 {
-    use CrossSite, ManagesTestModels, RefreshDatabase, UsesStarDust;
+    use CrossSite, FakeUploads, ManagesTestModels, RefreshDatabase, UsesStarDust;
 
     protected function setUp(): void
     {
@@ -299,6 +305,34 @@ class EntryControllerTest extends TestCase
         // The request resolved the other site; check as the owner again.
         app(CurrentSite::class)->set($this->site);
         $this->assertNotNull(app(EntryManager::class)->get($model, $trashed));
+    }
+
+    public function test_the_list_sends_field_specs_and_the_names_of_its_files()
+    {
+        Storage::fake(config()->string('files.disk'));
+        $model = app(SchemaManager::class)->createModel(new ModelSchema('people', 'People', fields: [
+            new FieldSpec((string) Str::uuid(), 'name', 'Name', 'text'),
+            new FieldSpec((string) Str::uuid(), 'photos', 'Photos', 'file', settings: ['multiple' => true]),
+        ]))->model;
+        $this->assertNotNull($model);
+
+        $ours = app(FileStore::class)->store($this->png('team-photo.png'));
+
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+        app(CurrentSite::class)->set($other);
+        $theirs = app(FileStore::class)->store($this->png('secret.png'));
+        app(CurrentSite::class)->set($this->site);
+
+        $entryId = app(EntryManager::class)->create($model, ['name' => 'Ada', 'photos' => [$ours->uuid, $theirs->uuid]]);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('columns.1.type', 'file')
+                ->where('columns.1.settings.multiple', true)
+                ->where('entries.0.id', $entryId)
+                ->where('entries.0.file_names', [$ours->uuid => 'team-photo.png'])
+            );
     }
 
     /**
