@@ -5,7 +5,12 @@ namespace App\Entries;
 use App\Models\SchemaModel;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\StarDust\StarDustService;
+use StarDust\Exception\InvalidCursorException;
+use StarDust\Read\Cursor;
 use StarDust\Read\Entry;
+use StarDust\Read\EntryPage;
+use StarDust\Read\SortDirection;
+use StarDust\Read\SortSpec;
 
 /**
  * Entry reads and writes for a model, on top of the thin StarDustService
@@ -20,6 +25,8 @@ class EntryManager
      * key starting with "_", so this never collides with a real field.
      */
     public const TRASH_FIELD = '_trashed';
+
+    public const PAGE_SIZE = 50;
 
     public function __construct(
         private readonly StarDustService $stardust,
@@ -68,14 +75,20 @@ class EntryManager
     }
 
     /**
-     * The model's entries, oldest first. No paging, filtering or sorting
-     * yet.
+     * One page of the model's entries, newest first, from $cursor (the
+     * previous page's nextCursor) on. Sorting by id keeps StarDust on an
+     * index scan however many entries there are.
      *
-     * @return list<Entry>
+     * @throws InvalidCursorException when $cursor isn't one StarDust issued
      */
-    public function list(SchemaModel $model): array
+    public function page(SchemaModel $model, ?string $cursor = null): EntryPage
     {
-        return $this->stardust->listEntries($model->stardust_model_id)->rows;
+        return $this->stardust->listEntries(
+            $model->stardust_model_id,
+            sort: SortSpec::byId(SortDirection::Desc),
+            pageSize: self::PAGE_SIZE,
+            cursor: $cursor === null ? null : new Cursor($cursor),
+        );
     }
 
     /**

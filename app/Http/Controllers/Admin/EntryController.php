@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
+use StarDust\Exception\InvalidCursorException;
 use StarDust\Read\Entry;
 
 /**
@@ -26,10 +27,22 @@ class EntryController extends Controller
         private readonly SchemaManager $schema,
     ) {}
 
-    public function index(SchemaModel $model): Response
+    /**
+     * One page at a time. "Load more" asks for the next page with `cursor`
+     * and the client appends it, since `entries` is a merge prop.
+     */
+    public function index(Request $request, SchemaModel $model): Response
     {
         $columns = $this->listColumns($model);
         $keys = $columns->pluck('key')->all();
+
+        $cursor = $request->query('cursor');
+
+        try {
+            $page = $this->entries->page($model, is_string($cursor) ? $cursor : null);
+        } catch (InvalidCursorException) {
+            abort(404);
+        }
 
         return Inertia::render('admin/entries/Index', [
             'model' => ['id' => $model->id, 'label' => $model->label],
@@ -37,11 +50,12 @@ class EntryController extends Controller
                 'key' => $field->key,
                 'label' => $field->label,
             ])->values(),
-            'entries' => collect($this->entries->list($model))->map(fn (Entry $entry) => [
+            'entries' => Inertia::merge(collect($page->rows)->map(fn (Entry $entry) => [
                 'id' => $entry->id,
                 'values' => Arr::only($entry->fields, $keys),
                 'created_at' => $entry->createdAt->format(DATE_ATOM),
-            ])->values(),
+            ])->values()),
+            'nextCursor' => $page->nextCursor?->opaque,
         ]);
     }
 

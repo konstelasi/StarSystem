@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Head, Link, setLayoutProps } from '@inertiajs/vue3';
+import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
 import { FileText, PlusCircle } from '@lucide/vue';
+import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -8,6 +9,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
 import { index as models } from '@/routes/admin/models';
 import { create, index } from '@/routes/admin/models/entries';
 
@@ -23,7 +25,28 @@ const props = defineProps<{
     model: { id: number; label: string };
     columns: Column[];
     entries: EntryRow[];
+    nextCursor: string | null;
 }>();
+
+const loadingMore = ref(false);
+
+/**
+ * Appends the next page: the server sends `entries` as a merge prop. The
+ * URL stays the same, so reloading the page starts from the newest again.
+ */
+function loadMore() {
+    router.reload({
+        data: { cursor: props.nextCursor },
+        only: ['entries', 'nextCursor'],
+        preserveUrl: true,
+        onStart: () => {
+            loadingMore.value = true;
+        },
+        onFinish: () => {
+            loadingMore.value = false;
+        },
+    });
+}
 
 setLayoutProps({
     breadcrumbs: [
@@ -111,6 +134,13 @@ function display(value: unknown): string {
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <div v-if="entries.length > 0" class="flex justify-center">
+            <Spinner v-if="loadingMore" class="size-5" />
+            <Button v-else-if="nextCursor" variant="outline" @click="loadMore">
+                Load more
+            </Button>
         </div>
     </div>
 </template>
