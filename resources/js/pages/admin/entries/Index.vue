@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { index as models } from '@/routes/admin/models';
-import { create, index } from '@/routes/admin/models/entries';
+import { create, edit, index } from '@/routes/admin/models/entries';
 
 type Column = { key: string; label: string };
 
@@ -122,11 +122,22 @@ function display(value: unknown): string {
                         class="border-t align-top"
                     >
                         <td
-                            v-for="column in columns"
+                            v-for="(column, position) in columns"
                             :key="column.key"
                             class="px-4 py-2"
                         >
-                            {{ display(entry.values[column.key]) }}
+                            <Link
+                                v-if="position === 0"
+                                :href="
+                                    edit({ model: model.id, entry: entry.id })
+                                "
+                                class="font-medium underline-offset-4 hover:underline"
+                            >
+                                {{ display(entry.values[column.key]) }}
+                            </Link>
+                            <template v-else>
+                                {{ display(entry.values[column.key]) }}
+                            </template>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap">
                             {{ formatTime(entry.created_at) }}

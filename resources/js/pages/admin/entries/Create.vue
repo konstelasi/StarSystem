@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import type { FormDataConvertible } from '@inertiajs/core';
-import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
+import { Head, Link, setLayoutProps } from '@inertiajs/vue3';
 import { Save } from '@lucide/vue';
-import { computed, ref } from 'vue';
 import EntryForm from '@/components/entries/EntryForm.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { useLeaveGuard } from '@/composables/useLeaveGuard';
-import { initialValue } from '@/fields';
+import { useEntryForm } from '@/composables/useEntryForm';
 import { index as models } from '@/routes/admin/models';
 import { create, index, store } from '@/routes/admin/models/entries';
 import type { ModelSchemaJson } from '@/types/schema';
@@ -25,46 +22,9 @@ setLayoutProps({
     ],
 });
 
-const values = ref<Record<string, unknown>>(
-    Object.fromEntries(
-        props.schema.fields.map((field) => [field.key, initialValue(field)]),
-    ),
+const { values, errors, processing, updateValue, submit } = useEntryForm(
+    props.schema,
 );
-const errors = ref<Record<string, string>>({});
-const processing = ref(false);
-
-const initial = JSON.stringify(values.value);
-useLeaveGuard(computed(() => JSON.stringify(values.value) !== initial));
-
-function updateValue(key: string, value: unknown) {
-    values.value[key] = value;
-}
-
-function submit() {
-    processing.value = true;
-
-    router.post(
-        store(props.model.id).url,
-        { fields: values.value as Record<string, FormDataConvertible> },
-        {
-            preserveScroll: true,
-            onError: (serverErrors) => {
-                const mapped: Record<string, string> = {};
-
-                for (const [key, message] of Object.entries(serverErrors)) {
-                    if (key.startsWith('fields.')) {
-                        mapped[key.slice('fields.'.length)] = message;
-                    }
-                }
-
-                errors.value = mapped;
-            },
-            onFinish: () => {
-                processing.value = false;
-            },
-        },
-    );
-}
 </script>
 
 <template>
@@ -84,7 +44,10 @@ function submit() {
         />
 
         <div class="flex gap-2">
-            <Button :disabled="processing" @click="submit">
+            <Button
+                :disabled="processing"
+                @click="submit(store(model.id).url, 'post')"
+            >
                 <Spinner v-if="processing" />
                 <Save v-if="!processing" />
                 Create

@@ -79,6 +79,43 @@ class EntryController extends Controller
     }
 
     /**
+     * Values are sent as stored, keyed by the model's field keys only; the
+     * form turns them into what each input expects (see formValue() in
+     * resources/js/fields).
+     */
+    public function edit(SchemaModel $model, int $entry): Response
+    {
+        $found = $this->entryOr404($model, $entry);
+
+        return Inertia::render('admin/entries/Edit', [
+            'model' => ['id' => $model->id, 'label' => $model->label],
+            'schema' => $this->schema->export($model),
+            'entry' => ['id' => $found->id, 'created_at' => $found->createdAt->format(DATE_ATOM)],
+            'values' => (object) Arr::only($found->fields, $model->fields->pluck('key')->all()),
+        ]);
+    }
+
+    public function update(Request $request, SchemaModel $model, int $entry): RedirectResponse
+    {
+        $this->entryOr404($model, $entry);
+
+        $this->entries->update($model, $entry, $this->validated($request, $model));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry saved.']);
+
+        return to_route('admin.models.entries.index', $model);
+    }
+
+    /**
+     * EntryManager::get() is already null for another model's, another
+     * site's or a deleted entry.
+     */
+    private function entryOr404(SchemaModel $model, int $id): Entry
+    {
+        return $this->entries->get($model, $id) ?? abort(404);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validated(Request $request, SchemaModel $model): array

@@ -28,6 +28,18 @@ class EntryControllerTest extends TestCase
         config(['starsystem.multisite' => true]);
     }
 
+    /**
+     * StarDust commits on its own connection, so what these tests queue
+     * (the trash field's promotion, entries to index) outlives the
+     * test's rollback. Finishing it here keeps later tests' ticks idle.
+     */
+    protected function tearDown(): void
+    {
+        $this->drain();
+
+        parent::tearDown();
+    }
+
     public function test_guests_are_redirected_to_the_login_page()
     {
         $model = $this->create('articles', 'Articles');
@@ -108,6 +120,76 @@ class EntryControllerTest extends TestCase
         $rows = app(EntryManager::class)->page($model)->rows;
         $this->assertCount(1, $rows);
         $this->assertSame('Hello', $rows[0]->fields['title']);
+    }
+
+    public function test_editing_shows_the_stored_values_of_the_models_fields()
+    {
+        $model = $this->create('articles', 'Articles');
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello', 'body' => 'World']);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.edit', ['model' => $model->id, 'entry' => $entryId]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('admin/entries/Edit')
+                ->where('entry.id', $entryId)
+                ->where('values.title', 'Hello')
+                ->where('values.body', 'World')
+                ->missing('values.'.EntryManager::TRASH_FIELD)
+                ->has('schema.fields', 2)
+            );
+    }
+
+    public function test_updating_saves_the_values_and_keeps_the_entry_active()
+    {
+        $model = $this->create('articles', 'Articles');
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello', 'body' => 'World']);
+
+        $this->actingAs(User::factory()->create())
+            ->put($this->url('admin.models.entries.update', ['model' => $model->id, 'entry' => $entryId]), ['fields' => ['title' => 'Changed', 'body' => 'World']])
+            ->assertRedirect($this->url('admin.models.entries.index', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'Entry saved.');
+
+        $entry = app(EntryManager::class)->get($model, $entryId);
+        $this->assertSame('Changed', $entry?->fields['title']);
+        $this->assertSame(0, $entry?->fields[EntryManager::TRASH_FIELD]);
+    }
+
+    public function test_updating_reports_errors_per_field()
+    {
+        $model = $this->create('articles', 'Articles');
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello']);
+
+        $this->actingAs(User::factory()->create())
+            ->put($this->url('admin.models.entries.update', ['model' => $model->id, 'entry' => $entryId]), ['fields' => ['title' => str_repeat('x', 5000)]])
+            ->assertSessionHasErrors('fields.title');
+
+        $this->assertSame('Hello', app(EntryManager::class)->get($model, $entryId)?->fields['title']);
+    }
+
+    public function test_an_entry_of_another_model_or_site_is_not_found()
+    {
+        $model = $this->create('articles', 'Articles');
+        $other = $this->create('pages', 'Pages');
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello']);
+        $otherSite = $this->makeSite(Str::lower(Str::random(12)).'.test');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.edit', ['model' => $other->id, 'entry' => $entryId]))
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.edit', ['model' => $model->id, 'entry' => $entryId + 1000]))
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.edit', ['model' => $model->id, 'entry' => $entryId], $otherSite))
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->put($this->url('admin.models.entries.update', ['model' => $other->id, 'entry' => $entryId]), ['fields' => ['title' => 'Hijacked']])
+            ->assertNotFound();
     }
 
     /**

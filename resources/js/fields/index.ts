@@ -13,13 +13,12 @@ import RadioField from '@/fields/radio.vue';
 import RangeField from '@/fields/range.vue';
 import RichTextField from '@/fields/rich_text.vue';
 import SelectField from '@/fields/select.vue';
-import { booleanSetting } from '@/fields/support';
 import TextField from '@/fields/text.vue';
 import TextareaField from '@/fields/textarea.vue';
 import UrlField from '@/fields/url.vue';
-import type { FieldSpecJson } from '@/types/schema';
 
 export type { FieldRendererProps } from '@/fields/support';
+export { formValue, initialValue } from '@/fields/values';
 
 /**
  * Field type key → renderer. The builder preview and the entry forms both
@@ -51,30 +50,4 @@ export function rendererFor(type: string): Component {
 
 export function hasRenderer(type: string): boolean {
     return type in fieldRenderers;
-}
-
-/**
- * The value a new, empty entry starts with: the field's `default` setting
- * where the type has one, otherwise the type's empty value.
- */
-export function initialValue(field: FieldSpecJson): unknown {
-    const fallback = field.settings.default;
-
-    switch (field.type) {
-        case 'checkbox':
-            return fallback === true;
-        case 'checkboxes':
-            return [];
-        case 'select':
-            return booleanSetting(field, 'multiple') ? [] : null;
-        case 'file':
-            return booleanSetting(field, 'multiple') ? [] : null;
-        case 'radio':
-        case 'number':
-        case 'range':
-        case 'datetime':
-            return null;
-        default:
-            return typeof fallback === 'string' ? fallback : '';
-    }
 }
