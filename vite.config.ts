@@ -42,6 +42,9 @@ export default defineConfig({
             ],
         },
     },
+    test: {
+        include: ['resources/js/**/*.test.ts'],
+    },
     lint: {
         ignorePatterns: [
             'vendor/**',

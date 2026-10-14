@@ -31,12 +31,12 @@ Then visit the app in your browser. With no `.env` yet, or one with no `APP_KEY`
 The suite needs a real MariaDB or MySQL server; `phpunit.xml` points at MariaDB on `127.0.0.1:33110` by default. Run against MySQL instead by overriding the port:
 
 ```bash
-composer ci:check              # lint check, types, the full suite (MariaDB)
+composer ci:check              # lint check, types, front-end tests, the full suite (MariaDB)
 php artisan test                # just the suite
 DB_PORT=33080 php artisan test  # the same suite against MySQL
 ```
 
-`composer lint` formats with [Pint](https://laravel.com/docs/pint); `npm run check` formats and lints the front end.
+`composer lint` formats with [Pint](https://laravel.com/docs/pint); `npm run check` formats and lints the front end, and `npm run test` runs its tests.
 
 ## Releasing
 
