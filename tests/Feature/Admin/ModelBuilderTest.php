@@ -62,6 +62,7 @@ class ModelBuilderTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('admin/models/Builder')
                 ->where('model.id', $model->id)
+                ->where('model.schema_rev', $model->schema_rev)
                 ->has('fieldTypes', count(self::CORE_TYPES))
                 ->has('fieldTypes.0', fn (Assert $type) => $type
                     ->has('key')
@@ -110,7 +111,7 @@ class ModelBuilderTest extends TestCase
         $schema['model']['slug'] = 'stories';
 
         $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
             ->assertInertia(fn (Assert $page) => $page->where('saved', true));
 
         $this->assertSame('stories', $model->refresh()->slug);
@@ -205,7 +206,7 @@ class ModelBuilderTest extends TestCase
         $schema['model']['label'] = 'News Article';
 
         $props = $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
             ->assertOk()
             ->inertiaProps();
 
@@ -244,7 +245,7 @@ class ModelBuilderTest extends TestCase
         $schema['fields'][1]['key'] = $schema['fields'][2]['key'];
 
         $props = $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
             ->assertOk()
             ->inertiaProps();
 
@@ -262,7 +263,7 @@ class ModelBuilderTest extends TestCase
         $schema['model']['label'] = 'Changed Label';
 
         $this->actingAs($user)
-            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('saved', true));
 
@@ -280,7 +281,7 @@ class ModelBuilderTest extends TestCase
         $schema['fields'][0]['key'] = $schema['fields'][1]['key'];
 
         $this->actingAs(User::factory()->create())
-            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('saved', false)
@@ -289,6 +290,83 @@ class ModelBuilderTest extends TestCase
 
         // Nothing was written: the stored key is still the original one.
         $this->assertSame('title', app(SchemaManager::class)->export($model)['fields'][0]['key']);
+    }
+
+    public function test_preview_and_save_require_the_revision_the_tab_opened()
+    {
+        $user = User::factory()->create();
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
+
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $schema])
+            ->assertSessionHasErrors('rev');
+
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema])
+            ->assertSessionHasErrors('rev');
+    }
+
+    /**
+     * A tab that opened the model before another tab saved it would
+     * otherwise diff its older schema against the new one and undo that
+     * save, deleting any field the other tab added along with its values.
+     */
+    public function test_a_save_from_an_outdated_tab_is_refused_and_changes_nothing()
+    {
+        $user = User::factory()->create();
+        $model = $this->seedModel();
+        $opened = $model->schema_rev;
+
+        $other = app(SchemaManager::class)->export($model);
+        $other['model']['label'] = 'Saved Elsewhere';
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $other, 'rev' => $opened])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+
+        $stale = $other;
+        $stale['model']['label'] = 'Article';
+        $stale['fields'][0]['key'] = 'headline';
+
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.preview', ['model' => $model->id]), ['schema' => $stale, 'rev' => $opened])
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('preview.errors.0.message', fn (string $message) => str_contains($message, 'after you opened it'))
+            );
+
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $stale, 'rev' => $opened])
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('saved', false)
+                ->where('preview.errors.0.message', fn (string $message) => str_contains($message, 'after you opened it'))
+            );
+
+        $stored = app(SchemaManager::class)->export($model->refresh());
+        $this->assertSame('Saved Elsewhere', $stored['model']['label']);
+        $this->assertSame('title', $stored['fields'][0]['key']);
+    }
+
+    public function test_a_tab_can_save_again_with_the_revision_its_last_save_returned()
+    {
+        $user = User::factory()->create();
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
+
+        $schema['model']['label'] = 'First Save';
+        $rev = $this->actingAs($user)
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true))
+            ->inertiaProps('rev');
+
+        $this->assertSame($model->refresh()->schema_rev, $rev);
+
+        $schema['model']['label'] = 'Second Save';
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $rev])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+
+        $this->assertSame('Second Save', app(SchemaManager::class)->export($model->refresh())['model']['label']);
     }
 
     /**

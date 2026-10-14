@@ -15,6 +15,7 @@ use App\Sites\CurrentSite;
 use App\StarDust\StarDustService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use RuntimeException;
 use StarDust\Schema\FieldDescription;
@@ -419,6 +420,40 @@ class SchemaManagerTest extends TestCase
         foreach ($states as $state) {
             $this->assertContains($state, ['ready', 'indexing', 'renaming', 'retyping', 'deleting', 'waiting']);
         }
+    }
+
+    public function test_a_save_is_refused_while_another_save_of_the_model_runs()
+    {
+        $model = $this->create();
+        $lock = Cache::lock(SchemaManager::SAVE_LOCK.$model->id, 120);
+        $this->assertTrue($lock->get());
+
+        try {
+            $result = $this->manager()->save($model, $this->change($model, [self::TITLE => ['label' => 'Headline']]));
+        } finally {
+            $lock->release();
+        }
+
+        $this->assertSame(SaveResult::INVALID, $result->status);
+        $this->assertStringContainsString('Another save of this model is running', (string) $result->error());
+        $this->assertSame('Title', $model->fields()->find(self::TITLE)?->label);
+    }
+
+    public function test_a_save_checks_the_revision_it_was_given_against_the_stored_one()
+    {
+        $model = $this->create();
+        $opened = $model->schema_rev;
+
+        $this->save($model, [self::TITLE => ['label' => 'Headline']]);
+
+        $result = $this->manager()->save($model, $this->change($model, [self::BODY => ['label' => 'Text']]), $opened);
+
+        $this->assertSame(SaveResult::INVALID, $result->status);
+        $this->assertStringContainsString('after you opened it', (string) $result->error());
+        $this->assertSame('Body', $model->fields()->find(self::BODY)?->label);
+
+        $current = $model->refresh()->schema_rev;
+        $this->assertSame(SaveResult::DONE, $this->manager()->save($model, $this->change($model, [self::BODY => ['label' => 'Text']]), $current)->status);
     }
 
     /**

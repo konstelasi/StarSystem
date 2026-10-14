@@ -1,5 +1,5 @@
 import { inject, provide } from 'vue';
-import type { InjectionKey } from 'vue';
+import type { InjectionKey, Ref } from 'vue';
 import type { ModelBuilder } from '@/composables/useModelBuilder';
 import type { FieldStates } from '@/lib/modelSchema';
 import type { FieldState } from '@/types/schema';
@@ -12,6 +12,11 @@ export type BuilderContext = {
     states: FieldStates;
     /** The model this page edits, for building preview/save URLs. */
     modelId: number;
+    /**
+     * The model's schema_rev this tab last loaded or saved. Sent with
+     * every preview and save, so a save from an outdated tab is refused.
+     */
+    rev: Ref<number>;
     /** Every other model's address name, for checking a rename is free. */
     otherSlugs: string[];
 };

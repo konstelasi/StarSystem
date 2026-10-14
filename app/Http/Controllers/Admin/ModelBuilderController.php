@@ -38,7 +38,7 @@ class ModelBuilderController extends Controller
         }
 
         return Inertia::render('admin/models/Builder', [
-            'model' => ['id' => $model->id],
+            'model' => ['id' => $model->id, 'schema_rev' => $model->schema_rev],
             'fieldTypes' => $this->fieldTypes->toArray(),
             'schema' => $this->schema->export($model),
             'states' => $this->schema->states($model),
@@ -55,23 +55,34 @@ class ModelBuilderController extends Controller
     public function preview(Request $request, SchemaModel $model): Response
     {
         return Inertia::render('admin/models/Builder', [
-            'preview' => $this->schema->preview($model, $this->desiredSchema($request)),
+            'preview' => $this->schema->preview($model, $this->desiredSchema($request), $this->openedRev($request)),
         ]);
     }
 
     /**
      * The two-step save, step two. `saved` is false, with the preview's
      * errors, when the diff has errors or the batch failed partway; the
-     * client only treats a true `saved` as done.
+     * client only treats a true `saved` as done. `rev` is the revision the
+     * tab's next save must send.
      */
     public function save(Request $request, SchemaModel $model): Response
     {
-        $result = $this->schema->save($model, $this->desiredSchema($request));
+        $result = $this->schema->save($model, $this->desiredSchema($request), $this->openedRev($request));
 
         return Inertia::render('admin/models/Builder', [
             'saved' => $result->succeeded(),
             'preview' => $result->preview,
+            'rev' => $result->model->schema_rev ?? $model->schema_rev,
         ]);
+    }
+
+    /**
+     * The schema_rev the tab opened, so a save made from an outdated
+     * schema is refused instead of undoing the newer one.
+     */
+    private function openedRev(Request $request): int
+    {
+        return (int) $request->validate(['rev' => ['required', 'integer', 'min:0']])['rev'];
     }
 
     /**

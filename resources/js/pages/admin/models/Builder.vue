@@ -24,7 +24,7 @@ import type {
 } from '@/types/schema';
 
 const props = defineProps<{
-    model: { id: number };
+    model: { id: number; schema_rev: number };
     fieldTypes: FieldTypeDescriptor[];
     schema: ModelSchemaJson;
     states: FieldStates;
@@ -55,11 +55,14 @@ async function announce(message: string) {
     announcement.value = message;
 }
 
+const rev = ref(props.model.schema_rev);
+
 provideBuilder({
     builder,
     announce: (message) => void announce(message),
     states: props.states,
     modelId: props.model.id,
+    rev,
     otherSlugs: props.otherSlugs,
 });
 

@@ -7,6 +7,7 @@ use App\Models\SchemaModel;
 use App\Schema\Operations\Operation;
 use App\StarDust\StarDustService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -19,6 +20,11 @@ use Throwable;
  */
 class SchemaManager
 {
+    /**
+     * Cache lock name prefix, followed by the model id.
+     */
+    public const SAVE_LOCK = 'schema-save:';
+
     public function __construct(
         private readonly StarDustService $stardust,
         private readonly SchemaDiff $diff,
@@ -70,28 +76,52 @@ class SchemaManager
      * SavePreview: the operations a save would run and what stops it.
      * Writes nothing.
      *
+     * $expectedRev is the schema_rev the builder opened. When given, a
+     * model saved since then is an error, because diffing an older schema
+     * against the stored one would undo that save.
+     *
      * @return array{operations: list<array<string, mixed>>, errors: list<array{field_uuid: ?string, message: string}>}
      */
-    public function preview(SchemaModel $model, ModelSchema $desired): array
+    public function preview(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): array
     {
-        return $this->plan($model, $desired)->toPreview();
+        return $this->plan($model, $desired, $expectedRev)->toPreview();
     }
 
-    public function save(SchemaModel $model, ModelSchema $desired): SaveResult
+    /**
+     * One save per model at a time, so two that arrive together can't both
+     * pass the schema_rev check before either has bumped it.
+     */
+    public function save(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): SaveResult
     {
-        $plan = $this->plan($model, $desired);
+        $lock = Cache::lock(self::SAVE_LOCK.$model->id, 120);
 
-        if ($plan->hasErrors()) {
-            return new SaveResult(SaveResult::INVALID, $model, $plan->toPreview());
+        if (! $lock->get()) {
+            $busy = new DiffResult([], [['field_uuid' => null, 'message' => SchemaException::text('Another save of this model is running. Try again in a moment.')]]);
+
+            return new SaveResult(SaveResult::INVALID, $model, $busy->toPreview());
         }
 
-        if ($plan->isEmpty()) {
-            return new SaveResult(SaveResult::UNCHANGED, $model, $plan->toPreview());
+        try {
+            // A save that finished between loading $model and taking the
+            // lock has moved schema_rev on.
+            $model->refresh();
+
+            $plan = $this->plan($model, $desired, $expectedRev);
+
+            if ($plan->hasErrors()) {
+                return new SaveResult(SaveResult::INVALID, $model, $plan->toPreview());
+            }
+
+            if ($plan->isEmpty()) {
+                return new SaveResult(SaveResult::UNCHANGED, $model, $plan->toPreview());
+            }
+
+            $batch = $this->applier->apply($model, $plan->operations);
+
+            return SaveResult::fromBatch($model, $plan, $batch, $this->applier->changes($batch));
+        } finally {
+            $lock->release();
         }
-
-        $batch = $this->applier->apply($model, $plan->operations);
-
-        return SaveResult::fromBatch($model, $plan, $batch, $this->applier->changes($batch));
     }
 
     /**
@@ -235,10 +265,14 @@ class SchemaManager
         return $this->createModel($schema);
     }
 
-    private function plan(SchemaModel $model, ModelSchema $desired): DiffResult
+    private function plan(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): DiffResult
     {
         if ($model->isDeleting()) {
             return new DiffResult([], [['field_uuid' => null, 'message' => SchemaException::text('This model is being deleted.')]]);
+        }
+
+        if ($expectedRev !== null && $expectedRev !== $model->schema_rev) {
+            return new DiffResult([], [['field_uuid' => null, 'message' => SchemaException::text('This model was saved in another tab or by someone else after you opened it. Copy anything you need from the JSON tab, then reload the page to see the latest version.')]]);
         }
 
         $unfinished = SchemaChange::query()

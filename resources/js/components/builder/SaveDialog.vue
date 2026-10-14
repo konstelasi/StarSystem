@@ -32,7 +32,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>();
 
-const { builder, announce, modelId } = useBuilderContext();
+const { builder, announce, modelId, rev } = useBuilderContext();
 
 type Phase = 'loading' | 'review' | 'saving' | 'error';
 const phase = ref<Phase>('loading');
@@ -68,7 +68,10 @@ watch(
  * which a reactive schema with `Record<string, unknown>` settings isn't.
  */
 function schemaPayload() {
-    return { schema: JSON.parse(JSON.stringify(builder.schema.value)) };
+    return {
+        schema: JSON.parse(JSON.stringify(builder.schema.value)),
+        rev: rev.value,
+    };
 }
 
 function requestPreview() {
@@ -95,9 +98,10 @@ function confirmSave() {
     router.post(saveRoute(modelId).url, schemaPayload(), {
         preserveState: true,
         preserveScroll: true,
-        only: ['saved', 'preview'],
+        only: ['saved', 'preview', 'rev'],
         onSuccess: (page) => {
             if (page.props.saved) {
+                rev.value = page.props.rev as number;
                 builder.markSaved(builder.schema.value);
                 announce('Saved.');
                 emit('update:open', false);
