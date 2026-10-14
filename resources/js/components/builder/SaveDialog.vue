@@ -66,6 +66,10 @@ watch(
 /**
  * A plain JSON clone: `router.post`'s data must be `FormDataConvertible`,
  * which a reactive schema with `Record<string, unknown>` settings isn't.
+ *
+ * Both requests keep the builder's own URL (`preserveUrl`): the preview
+ * and save routes only accept POST, so adopting their URL would make a
+ * reload or the back button land on a 405.
  */
 function schemaPayload() {
     return {
@@ -81,6 +85,7 @@ function requestPreview() {
     router.post(previewRoute(modelId).url, schemaPayload(), {
         preserveState: true,
         preserveScroll: true,
+        preserveUrl: true,
         only: ['preview'],
         onSuccess: () => {
             phase.value = 'review';
@@ -98,6 +103,7 @@ function confirmSave() {
     router.post(saveRoute(modelId).url, schemaPayload(), {
         preserveState: true,
         preserveScroll: true,
+        preserveUrl: true,
         only: ['saved', 'preview', 'rev'],
         onSuccess: (page) => {
             if (page.props.saved) {
