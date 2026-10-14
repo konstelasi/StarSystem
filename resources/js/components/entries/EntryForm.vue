@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { rendererFor } from '@/fields';
+import { errorsPerSlot, firstError } from '@/lib/entryErrors';
 import { blockName, slotName } from '@/lib/modelSchema';
 import type { FieldSpecJson, ModelSchemaJson } from '@/types/schema';
 
@@ -28,6 +29,52 @@ const isEmpty = computed(() => props.schema.fields.length === 0);
 function update(field: FieldSpecJson, value: unknown) {
     emit('update:values', field.key, value);
 }
+
+/** The open tab of each tabs block, by block id. */
+const openTabs = ref<Record<string, string>>(
+    Object.fromEntries(
+        props.schema.layout
+            .filter((block) => block.kind === 'tabs' && block.slots.length > 0)
+            .map((block) => [block.id, block.slots[0].id]),
+    ),
+);
+
+const errorCounts = computed(() => errorsPerSlot(props.schema, props.errors));
+
+/**
+ * After a failed save, open the tab holding the first error and focus that
+ * field, so an error on a hidden tab never looks like a save that did
+ * nothing.
+ */
+watch(
+    () => props.errors,
+    async (errors) => {
+        const place = firstError(props.schema, errors);
+
+        if (place === null) {
+            return;
+        }
+
+        if (place.blockId !== null && place.blockId in openTabs.value) {
+            openTabs.value[place.blockId] = place.slotId as string;
+        }
+
+        // A tab's content mounts when it opens, so its field may need a
+        // frame after the tick before it exists.
+        await nextTick();
+        const id = `field-${place.field.uuid}`;
+        const input =
+            document.getElementById(id) ??
+            (await new Promise<HTMLElement | null>((resolve) =>
+                requestAnimationFrame(() =>
+                    resolve(document.getElementById(id)),
+                ),
+            ));
+
+        input?.scrollIntoView({ block: 'center' });
+        input?.focus({ preventScroll: true });
+    },
+);
 </script>
 
 <template>
@@ -77,7 +124,7 @@ function update(field: FieldSpecJson, value: unknown) {
 
             <Tabs
                 v-else-if="block.kind === 'tabs'"
-                :default-value="block.slots[0]?.id"
+                v-model="openTabs[block.id]"
                 class="gap-4"
             >
                 <TabsList class="max-w-full justify-start overflow-x-auto">
@@ -88,6 +135,23 @@ function update(field: FieldSpecJson, value: unknown) {
                         class="flex-none"
                     >
                         {{ slotName(block, index) }}
+                        <span
+                            v-if="errorCounts[slot.id]"
+                            class="ml-1 inline-flex items-center gap-1 text-xs font-medium text-destructive"
+                        >
+                            <span
+                                class="size-1.5 rounded-full bg-destructive"
+                                aria-hidden="true"
+                            />
+                            {{ errorCounts[slot.id] }}
+                            <span class="sr-only">
+                                {{
+                                    errorCounts[slot.id] === 1
+                                        ? 'error'
+                                        : 'errors'
+                                }}
+                            </span>
+                        </span>
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent
