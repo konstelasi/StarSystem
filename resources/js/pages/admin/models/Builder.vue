@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, setLayoutProps } from '@inertiajs/vue3';
-import { Braces, Eye, Hammer, Save } from '@lucide/vue';
+import { Head, router, setLayoutProps } from '@inertiajs/vue3';
+import { AlertTriangle, Braces, Eye, Hammer, Save } from '@lucide/vue';
 import { nextTick, ref, watchEffect } from 'vue';
 import BlockInspector from '@/components/builder/BlockInspector.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
@@ -11,12 +11,15 @@ import FormPreview from '@/components/builder/FormPreview.vue';
 import JsonEditor from '@/components/builder/JsonEditor.vue';
 import ModelInspector from '@/components/builder/ModelInspector.vue';
 import SaveDialog from '@/components/builder/SaveDialog.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useModelBuilder } from '@/composables/useModelBuilder';
 import type { FieldStates } from '@/lib/modelSchema';
 import { builder as builderPage, index } from '@/routes/admin/models';
+import { retry as retryRoute } from '@/routes/admin/models/builder';
 import type {
     FieldTypeDescriptor,
     ModelSchemaJson,
@@ -30,6 +33,8 @@ const props = defineProps<{
     states: FieldStates;
     otherSlugs: string[];
     preview?: SavePreview | null;
+    /** Set while a save that stopped partway blocks saving this model. */
+    unfinished: { error: string } | null;
 }>();
 
 const builder = useModelBuilder(props.schema, () => props.fieldTypes);
@@ -68,6 +73,27 @@ provideBuilder({
 
 const tab = ref('build');
 const saveDialogOpen = ref(false);
+
+const retrying = ref(false);
+
+/**
+ * Runs the rest of the stopped save. The server redirects back here, so
+ * the builder reloads with the schema as it now stands.
+ */
+function finishSave() {
+    router.post(
+        retryRoute(props.model.id).url,
+        {},
+        {
+            onStart: () => {
+                retrying.value = true;
+            },
+            onFinish: () => {
+                retrying.value = false;
+            },
+        },
+    );
+}
 </script>
 
 <template>
@@ -94,12 +120,34 @@ const saveDialogOpen = ref(false);
                 </p>
             </div>
             <Button
-                :disabled="!builder.isDirty.value"
+                :disabled="!builder.isDirty.value || unfinished !== null"
                 @click="saveDialogOpen = true"
             >
                 <Save /> Save changes
             </Button>
         </header>
+
+        <Alert v-if="unfinished" variant="destructive">
+            <AlertTriangle />
+            <AlertTitle>The last save stopped partway</AlertTitle>
+            <AlertDescription>
+                <p>{{ unfinished.error }}</p>
+                <p>
+                    Saving is paused for this model until it finishes. Finishing
+                    reloads the builder with the saved version.
+                </p>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    class="mt-2"
+                    :disabled="retrying"
+                    @click="finishSave"
+                >
+                    <Spinner v-if="retrying" />
+                    Finish the save
+                </Button>
+            </AlertDescription>
+        </Alert>
 
         <Tabs v-model="tab" class="gap-4">
             <TabsList>

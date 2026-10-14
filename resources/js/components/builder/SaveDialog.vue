@@ -104,7 +104,7 @@ function confirmSave() {
         preserveState: true,
         preserveScroll: true,
         preserveUrl: true,
-        only: ['saved', 'preview', 'rev'],
+        only: ['saved', 'preview', 'rev', 'unfinished'],
         onSuccess: (page) => {
             if (page.props.saved) {
                 rev.value = page.props.rev as number;
@@ -114,9 +114,16 @@ function confirmSave() {
                 return;
             }
 
-            // A well-formed response that still didn't save: the diff
-            // picked up new errors, or the batch failed partway. Show the
-            // reason instead of the generic message below.
+            // The batch failed partway: the builder's banner explains it
+            // and offers to finish it.
+            if (page.props.unfinished) {
+                announce('The save stopped partway.');
+                emit('update:open', false);
+                return;
+            }
+
+            // The diff picked up new errors. Show them instead of the
+            // generic message below.
             phase.value = 'review';
             errorMessage.value = null;
         },

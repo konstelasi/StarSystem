@@ -6,6 +6,7 @@ use App\Models\SchemaChange;
 use App\Models\SchemaModel;
 use App\Schema\Operations\Operation;
 use App\StarDust\StarDustService;
+use Closure;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -93,15 +94,7 @@ class SchemaManager
      */
     public function save(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): SaveResult
     {
-        $lock = Cache::lock(self::SAVE_LOCK.$model->id, 120);
-
-        if (! $lock->get()) {
-            $busy = new DiffResult([], [['field_uuid' => null, 'message' => SchemaException::text('Another save of this model is running. Try again in a moment.')]]);
-
-            return new SaveResult(SaveResult::INVALID, $model, $busy->toPreview());
-        }
-
-        try {
+        return $this->locked($model, function () use ($model, $desired, $expectedRev) {
             // A save that finished between loading $model and taking the
             // lock has moved schema_rev on.
             $model->refresh();
@@ -119,27 +112,72 @@ class SchemaManager
             $batch = $this->applier->apply($model, $plan->operations);
 
             return SaveResult::fromBatch($model, $plan, $batch, $this->applier->changes($batch));
-        } finally {
-            $lock->release();
-        }
+        });
     }
 
     /**
-     * Runs what is left of a failed save.
+     * Runs what is left of a failed save, under the same lock as save(),
+     * so a retry never overlaps a save of the same model.
      *
      * @throws ModelNotFoundException when the current site has no such batch
      */
     public function retry(string $batch): SaveResult
     {
-        $changes = $this->applier->changes($batch);
-        $first = $changes->first() ?? throw (new ModelNotFoundException)->setModel(SchemaChange::class, [$batch]);
+        $first = $this->applier->changes($batch)->first() ?? throw (new ModelNotFoundException)->setModel(SchemaChange::class, [$batch]);
         $model = SchemaModel::query()->findOrFail($first->model_id);
 
-        $this->applier->retry($model, $batch);
+        return $this->locked($model, function () use ($model, $batch) {
+            $this->applier->retry($model, $batch);
 
-        $operations = array_values($changes->map(fn (SchemaChange $change) => Operation::restore($change->op, $change->payload ?? []))->all());
+            $changes = $this->applier->changes($batch);
+            $operations = array_values($changes->map(fn (SchemaChange $change) => Operation::restore($change->op, $change->payload ?? []))->all());
 
-        return SaveResult::fromBatch($model, new DiffResult($operations, []), $batch, $this->applier->changes($batch));
+            return SaveResult::fromBatch($model, new DiffResult($operations, []), $batch, $changes);
+        });
+    }
+
+    /**
+     * The model's save that stopped partway, if there is one: the batch to
+     * retry, and the error that stopped it. Saving the model is refused
+     * until it finishes (see plan()).
+     *
+     * @return array{batch: string, error: string}|null
+     */
+    public function unfinished(SchemaModel $model): ?array
+    {
+        $failed = SchemaChange::query()
+            ->where('model_id', $model->id)
+            ->where('status', SchemaChange::FAILED)
+            ->latest('id')
+            ->first();
+
+        return $failed === null ? null : [
+            'batch' => (string) $failed->batch,
+            'error' => (string) $failed->error,
+        ];
+    }
+
+    /**
+     * Runs $work while holding the model's save lock, or reports that
+     * another save holds it.
+     *
+     * @param  Closure(): SaveResult  $work
+     */
+    private function locked(SchemaModel $model, Closure $work): SaveResult
+    {
+        $lock = Cache::lock(self::SAVE_LOCK.$model->id, 120);
+
+        if (! $lock->get()) {
+            $busy = new DiffResult([], [['field_uuid' => null, 'message' => SchemaException::text('Another save of this model is running. Try again in a moment.')]]);
+
+            return new SaveResult(SaveResult::INVALID, $model, $busy->toPreview());
+        }
+
+        try {
+            return $work();
+        } finally {
+            $lock->release();
+        }
     }
 
     /**

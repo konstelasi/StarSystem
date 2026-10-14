@@ -43,6 +43,7 @@ class ModelBuilderController extends Controller
             'schema' => $this->schema->export($model),
             'states' => $this->schema->states($model),
             'otherSlugs' => SchemaModel::query()->whereKeyNot($model->id)->pluck('slug'),
+            'unfinished' => $this->unfinished($model),
         ]);
     }
 
@@ -63,7 +64,8 @@ class ModelBuilderController extends Controller
      * The two-step save, step two. `saved` is false, with the preview's
      * errors, when the diff has errors or the batch failed partway; the
      * client only treats a true `saved` as done. `rev` is the revision the
-     * tab's next save must send.
+     * tab's next save must send, and `unfinished` is set when the batch
+     * failed partway, for the builder's "finish the save" banner.
      */
     public function save(Request $request, SchemaModel $model): Response
     {
@@ -73,7 +75,39 @@ class ModelBuilderController extends Controller
             'saved' => $result->succeeded(),
             'preview' => $result->preview,
             'rev' => $result->model->schema_rev ?? $model->schema_rev,
+            'unfinished' => $this->unfinished($model),
         ]);
+    }
+
+    /**
+     * Finishes a save that stopped partway. Shared hosting has no shell for
+     * `starsystem:schema:retry`, so this is the owner's only way out. It
+     * redirects to the builder either way, so the page reloads the schema
+     * as it now stands.
+     */
+    public function retry(SchemaModel $model): RedirectResponse
+    {
+        $unfinished = $this->schema->unfinished($model);
+
+        if ($unfinished !== null) {
+            $result = $this->schema->retry($unfinished['batch']);
+
+            Inertia::flash('toast', $result->succeeded()
+                ? ['type' => 'success', 'message' => SchemaException::text('The last save finished.')]
+                : ['type' => 'error', 'message' => (string) $result->error()]);
+        }
+
+        return to_route('admin.models.builder', $model);
+    }
+
+    /**
+     * @return array{error: string}|null
+     */
+    private function unfinished(SchemaModel $model): ?array
+    {
+        $unfinished = $this->schema->unfinished($model);
+
+        return $unfinished === null ? null : ['error' => $unfinished['error']];
     }
 
     /**

@@ -8,12 +8,15 @@ use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
 use App\Schema\SchemaManager;
+use App\Sites\CurrentSite;
+use App\StarDust\StarDustService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CrossSite;
 use Tests\Concerns\ManagesTestModels;
 use Tests\Concerns\UsesStarDust;
+use Tests\Fakes\FlakyStarDust;
 use Tests\TestCase;
 
 /**
@@ -292,6 +295,60 @@ class ModelBuilderTest extends TestCase
         $this->assertSame('title', app(SchemaManager::class)->export($model)['fields'][0]['key']);
     }
 
+    public function test_a_save_that_stops_partway_can_be_finished_from_the_builder()
+    {
+        $user = User::factory()->create();
+        $model = $this->seedModel();
+        $flaky = $this->swapStarDust(failOn: 2);
+
+        $schema = app(SchemaManager::class)->export($model);
+        $schema['fields'][] = $this->newField('excerpt');
+        $schema['fields'][] = $this->newField('byline');
+
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('saved', false)
+                ->where('unfinished.error', fn (string $error) => str_contains($error, 'StarDust went away'))
+            );
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page->has('unfinished.error'));
+
+        // Still failing: the error comes back and the banner stays.
+        $flaky->calls = 0;
+        $flaky->failOn = 1;
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.retry', ['model' => $model->id]))
+            ->assertRedirect($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.type', 'error');
+        $this->assertNotNull(app(SchemaManager::class)->unfinished($model));
+
+        $flaky->failOn = null;
+        $this->actingAs($user)
+            ->post($this->url('admin.models.builder.retry', ['model' => $model->id]))
+            ->assertRedirect($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'The last save finished.');
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unfinished', null)
+                ->has('schema.fields', 5)
+            );
+    }
+
+    public function test_finishing_with_nothing_unfinished_just_returns_to_the_builder()
+    {
+        $model = $this->seedModel();
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.builder.retry', ['model' => $model->id]))
+            ->assertRedirect($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertiaFlashMissing('toast');
+    }
+
     public function test_preview_and_save_require_the_revision_the_tab_opened()
     {
         $user = User::factory()->create();
@@ -393,5 +450,37 @@ class ModelBuilderTest extends TestCase
         $this->drain();
 
         return $result->model;
+    }
+
+    /**
+     * Makes StarDust's Nth schema write fail, like a connection that drops
+     * half-way through a save.
+     */
+    private function swapStarDust(?int $failOn = null): FlakyStarDust
+    {
+        $fake = new FlakyStarDust(app(), app(CurrentSite::class));
+        $fake->failOn = $failOn;
+        $this->app->instance(StarDustService::class, $fake);
+
+        return $fake;
+    }
+
+    /**
+     * A plain text field as the builder posts it.
+     *
+     * @return array<string, mixed>
+     */
+    private function newField(string $key): array
+    {
+        return [
+            'uuid' => (string) Str::uuid(),
+            'key' => $key,
+            'label' => Str::headline($key),
+            'type' => 'text',
+            'required' => false,
+            'filterable' => false,
+            'layout_slot' => null,
+            'settings' => [],
+        ];
     }
 }

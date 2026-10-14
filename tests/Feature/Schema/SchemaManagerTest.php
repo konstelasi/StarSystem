@@ -17,10 +17,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use RuntimeException;
 use StarDust\Schema\FieldDescription;
 use Tests\Concerns\CrossSite;
 use Tests\Concerns\UsesStarDust;
+use Tests\Fakes\FlakyStarDust;
 use Tests\TestCase;
 
 class SchemaManagerTest extends TestCase
@@ -439,6 +439,29 @@ class SchemaManagerTest extends TestCase
         $this->assertSame('Title', $model->fields()->find(self::TITLE)?->label);
     }
 
+    public function test_a_retry_is_refused_while_a_save_of_the_model_runs()
+    {
+        $model = $this->create();
+        $flaky = $this->swapStarDust(failOn: 1);
+        $result = $this->manager()->save($model, $this->withField($this->change($model, []), new FieldSpec(self::EXTRA, 'summary', 'Summary', 'textarea')));
+        $this->assertSame(SaveResult::FAILED, $result->status);
+        $this->assertSame($result->batch, $this->manager()->unfinished($model)['batch'] ?? null);
+
+        $flaky->failOn = null;
+        $lock = Cache::lock(SchemaManager::SAVE_LOCK.$model->id, 120);
+        $this->assertTrue($lock->get());
+
+        try {
+            $retried = $this->manager()->retry((string) $result->batch);
+        } finally {
+            $lock->release();
+        }
+
+        $this->assertSame(SaveResult::INVALID, $retried->status);
+        $this->assertStringContainsString('Another save of this model is running', (string) $retried->error());
+        $this->assertNotNull($this->manager()->unfinished($model));
+    }
+
     public function test_a_save_checks_the_revision_it_was_given_against_the_stored_one()
     {
         $model = $this->create();
@@ -559,69 +582,5 @@ class SchemaManagerTest extends TestCase
         $this->app->instance(StarDustService::class, $fake);
 
         return $fake;
-    }
-}
-
-/**
- * Counts every StarDust schema write and can fail the Nth one, like a
- * connection that drops half-way through a save.
- */
-class FlakyStarDust extends StarDustService
-{
-    public int $calls = 0;
-
-    public ?int $failOn = null;
-
-    public function renameModel(int $modelId, string $newName): void
-    {
-        $this->count();
-        parent::renameModel($modelId, $newName);
-    }
-
-    public function defineField(int $modelId, string $name, string $declaredType, bool $filterable): FieldDescription
-    {
-        $this->count();
-
-        return parent::defineField($modelId, $name, $declaredType, $filterable);
-    }
-
-    public function renameField(int $modelId, int $fieldId, string $newName): void
-    {
-        $this->count();
-        parent::renameField($modelId, $fieldId, $newName);
-    }
-
-    public function retypeField(int $modelId, int $fieldId, string $declaredType): void
-    {
-        $this->count();
-        parent::retypeField($modelId, $fieldId, $declaredType);
-    }
-
-    public function promoteField(int $modelId, int $fieldId): void
-    {
-        $this->count();
-        parent::promoteField($modelId, $fieldId);
-    }
-
-    public function demoteField(int $modelId, int $fieldId): void
-    {
-        $this->count();
-        parent::demoteField($modelId, $fieldId);
-    }
-
-    public function deleteField(int $modelId, int $fieldId): bool
-    {
-        $this->count();
-
-        return parent::deleteField($modelId, $fieldId);
-    }
-
-    private function count(): void
-    {
-        $this->calls++;
-
-        if ($this->calls === $this->failOn) {
-            throw new RuntimeException('StarDust went away');
-        }
     }
 }

@@ -20,6 +20,7 @@ Route::middleware(['auth', 'verified'])
         Route::get('{model}/builder', [ModelBuilderController::class, 'show'])->name('builder')->whereNumber('model');
         Route::post('{model}/builder/preview', [ModelBuilderController::class, 'preview'])->name('builder.preview')->whereNumber('model');
         Route::post('{model}/builder/save', [ModelBuilderController::class, 'save'])->name('builder.save')->whereNumber('model');
+        Route::post('{model}/builder/retry', [ModelBuilderController::class, 'retry'])->name('builder.retry')->whereNumber('model');
         Route::get('{model}/export', [ModelTransferController::class, 'export'])->name('export')->whereNumber('model');
         Route::post('{model}/duplicate', [ModelTransferController::class, 'duplicate'])->name('duplicate')->whereNumber('model');
     });
