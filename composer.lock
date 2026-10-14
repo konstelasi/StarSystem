@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "192f9dcdbe037af44233b4fc4d0c3bd8",
+    "content-hash": "a4949a7e7cce91f5fde5df0e65ac5abf",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -197,16 +197,16 @@
         },
         {
             "name": "damarbob/stardust",
-            "version": "v0.3.0-alpha.1",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "https://github.com/damarbob/StarDust.git",
-                "reference": "f185aa27a14f68e439414e7a54ffdea467cd6c46"
+                "reference": "5b1bbdd1184b8a83c11f074dff12eed89637d40c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/damarbob/StarDust/zipball/f185aa27a14f68e439414e7a54ffdea467cd6c46",
-                "reference": "f185aa27a14f68e439414e7a54ffdea467cd6c46",
+                "url": "https://api.github.com/repos/damarbob/StarDust/zipball/5b1bbdd1184b8a83c11f074dff12eed89637d40c",
+                "reference": "5b1bbdd1184b8a83c11f074dff12eed89637d40c",
                 "shasum": ""
             },
             "require": {
@@ -221,6 +221,7 @@
                 "phpstan/phpstan": "^2.0",
                 "phpunit/phpunit": "^10.5"
             },
+            "default-branch": true,
             "bin": [
                 "bin/stardust"
             ],
@@ -252,9 +253,9 @@
             ],
             "support": {
                 "issues": "https://github.com/damarbob/StarDust/issues",
-                "source": "https://github.com/damarbob/StarDust/tree/v0.3.0-alpha.1"
+                "source": "https://github.com/damarbob/StarDust/tree/main"
             },
-            "time": "2026-09-23T02:01:13+00:00"
+            "time": "2026-10-14T08:13:27+00:00"
         },
         {
             "name": "dasprid/enum",
@@ -10477,7 +10478,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "damarbob/stardust": 15
+        "damarbob/stardust": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
