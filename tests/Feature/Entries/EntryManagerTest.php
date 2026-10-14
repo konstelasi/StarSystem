@@ -40,6 +40,18 @@ class EntryManagerTest extends TestCase
         $this->assertSame([], ModelSchema::fromModel($model->refresh())->fields);
     }
 
+    public function test_a_second_entry_can_be_created_once_the_trash_field_is_filterable()
+    {
+        $model = $this->registerModel('articles');
+        $this->manager()->create($model, ['title' => 'First']);
+
+        $this->drain();
+
+        $entryId = $this->manager()->create($model, ['title' => 'Second']);
+
+        $this->assertSame('Second', $this->manager()->get($model, $entryId)->fields['title']);
+    }
+
     public function test_update_preserves_the_trash_flag_it_did_not_change()
     {
         $model = $this->registerModel('articles');

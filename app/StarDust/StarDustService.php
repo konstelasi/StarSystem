@@ -385,7 +385,11 @@ class StarDustService
      */
     public function ensureTrashField(int $modelId): void
     {
-        $described = $this->defineField($modelId, '_trashed', 'int', false);
+        // Asked for as it already is, so a field promoted by an earlier call
+        // isn't reported as a filterability conflict. The type is still
+        // checked.
+        $existing = collect($this->owned($modelId)->fields)->firstWhere('name', '_trashed');
+        $described = $this->defineField($modelId, '_trashed', 'int', $existing->isFilterable ?? false);
 
         if (! $described->isFilterable) {
             $this->promoteField($modelId, $described->fieldId);
