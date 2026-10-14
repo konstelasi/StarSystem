@@ -127,6 +127,7 @@ class EntryController extends Controller
                 'trashed_at' => $this->entries->trashedAt($entry)?->format(DATE_ATOM),
             ])->values()),
             'nextCursor' => $page->nextCursor?->opaque,
+            'trashDays' => config()->integer('starsystem.entries.trash_days'),
         ]);
     }
 

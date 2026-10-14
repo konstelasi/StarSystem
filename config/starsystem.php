@@ -20,6 +20,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Entries
+    |--------------------------------------------------------------------------
+    |
+    | Deleting an entry moves it to its model's trash. A daily job deletes
+    | entries that have been in the trash longer than this many days for
+    | good, the same as the media library does with its files.
+    |
+    */
+
+    'entries' => [
+        'trash_days' => (int) env('STARSYSTEM_ENTRY_TRASH_DAYS', 30),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Updates
     |--------------------------------------------------------------------------
     |

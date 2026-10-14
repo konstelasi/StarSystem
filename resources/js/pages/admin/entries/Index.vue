@@ -38,6 +38,8 @@ const props = defineProps<{
     columns: Column[];
     entries: EntryRow[];
     nextCursor: string | null;
+    /** How long an entry stays in the trash before it is deleted for good. */
+    trashDays: number;
 }>();
 
 const inTrash = computed(() => props.view === 'trash');
@@ -126,7 +128,8 @@ function display(value: unknown): string {
                 <p class="text-sm text-muted-foreground">
                     <template v-if="inTrash">
                         Entries moved out of {{ model.label }}. Restore one to
-                        use it again.
+                        use it again. Entries in the trash are deleted for good
+                        after {{ trashDays }} days.
                     </template>
                     <template v-else>The entries in this model.</template>
                 </p>

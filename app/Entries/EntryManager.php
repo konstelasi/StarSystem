@@ -160,6 +160,21 @@ class EntryManager
     }
 
     /**
+     * Up to $limit of the model's entries trashed at or before $cutoff (a
+     * Unix time), for the purge. Needs the trash field indexed.
+     *
+     * @return list<Entry>
+     */
+    public function trashedBefore(SchemaModel $model, int $cutoff, int $limit): array
+    {
+        return $this->stardust->listEntries(
+            $model->stardust_model_id,
+            filter: LeafNode::local(self::TRASH_FIELD, 'between', [1, $cutoff]),
+            pageSize: $limit,
+        )->rows;
+    }
+
+    /**
      * Whether StarDust can filter on the trash field yet.
      */
     public function trashIndexed(SchemaModel $model): bool
