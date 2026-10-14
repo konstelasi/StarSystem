@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Link } from '@inertiajs/vue3';
 import { computed, nextTick, ref, watch } from 'vue';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { rendererFor } from '@/fields';
@@ -16,6 +17,8 @@ const props = defineProps<{
     values: Record<string, unknown>;
     errors: Record<string, string>;
     disabled?: boolean;
+    /** Where to add fields, for the message a fieldless model shows. */
+    builderHref?: string;
 }>();
 
 const emit = defineEmits<{ 'update:values': [key: string, value: unknown] }>();
@@ -82,7 +85,15 @@ watch(
         v-if="isEmpty"
         class="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground"
     >
-        This model has no fields yet. Add some in the model builder first.
+        This model has no fields yet.
+        <Link
+            v-if="builderHref"
+            :href="builderHref"
+            class="font-medium text-foreground underline underline-offset-4"
+        >
+            Add some in the model builder first.
+        </Link>
+        <template v-else>Add some in the model builder first.</template>
     </p>
 
     <div v-else class="@container grid max-w-2xl gap-6">

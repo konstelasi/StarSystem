@@ -5,7 +5,7 @@ import EntryForm from '@/components/entries/EntryForm.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useEntryForm } from '@/composables/useEntryForm';
-import { index as models } from '@/routes/admin/models';
+import { builder, index as models } from '@/routes/admin/models';
 import { edit, index, update } from '@/routes/admin/models/entries';
 import type { ModelSchemaJson } from '@/types/schema';
 
@@ -49,6 +49,7 @@ const created = new Date(props.entry.created_at).toLocaleString();
             :values="values"
             :errors="errors"
             :disabled="processing"
+            :builder-href="builder(model.id).url"
             @update:values="updateValue"
         />
 

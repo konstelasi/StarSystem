@@ -307,6 +307,22 @@ class EntryControllerTest extends TestCase
         $this->assertNotNull(app(EntryManager::class)->get($model, $trashed));
     }
 
+    public function test_the_list_says_whether_the_model_has_fields()
+    {
+        $user = User::factory()->create();
+        $empty = app(SchemaManager::class)->createModel(new ModelSchema('drafts', 'Drafts'))->model;
+        $this->assertNotNull($empty);
+        $filled = $this->create('articles', 'Articles');
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.index', ['model' => $empty->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('hasFields', false)->where('columns', []));
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.index', ['model' => $filled->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('hasFields', true));
+    }
+
     public function test_the_list_sends_field_specs_and_the_names_of_its_files()
     {
         Storage::fake(config()->string('files.disk'));

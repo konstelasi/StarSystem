@@ -123,6 +123,7 @@ class EntryController extends Controller
         return Inertia::render('admin/entries/Index', [
             'model' => ['id' => $model->id, 'label' => $model->label],
             'view' => $trashed ? 'trash' : 'active',
+            'hasFields' => $model->fields->isNotEmpty(),
             'columns' => $columns->map(fn (SchemaField $field) => $specs[$field->key]->toJson())->values(),
             'entries' => Inertia::merge(collect($page->rows)->map(fn (Entry $entry) => [
                 'id' => $entry->id,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
-import { ArrowLeft, FileText, PlusCircle, Trash2 } from '@lucide/vue';
+import { ArrowLeft, Blocks, FileText, PlusCircle, Trash2 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import DeleteEntryDialog from '@/components/entries/DeleteEntryDialog.vue';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { cellText, EMPTY_CELL } from '@/fields/display';
 import { relativeTime } from '@/lib/time';
-import { index as models } from '@/routes/admin/models';
+import { builder, index as models } from '@/routes/admin/models';
 import {
     create,
     edit,
@@ -43,6 +43,8 @@ const props = defineProps<{
     nextCursor: string | null;
     /** How long an entry stays in the trash before it is deleted for good. */
     trashDays: number;
+    /** False until the model has fields, so there's nothing to fill in. */
+    hasFields: boolean;
 }>();
 
 const inTrash = computed(() => props.view === 'trash');
@@ -147,7 +149,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                         Back to entries
                     </Link>
                 </Button>
-                <template v-else>
+                <template v-else-if="hasFields">
                     <Button variant="ghost" as-child>
                         <Link :href="trash(model.id)">
                             <Trash2 />
@@ -164,7 +166,23 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
             </div>
         </div>
 
-        <Card v-if="entries.length === 0 && !nextCursor">
+        <Card v-if="!hasFields && !inTrash">
+            <CardHeader class="items-center text-center">
+                <Blocks class="size-8 text-muted-foreground" />
+                <CardTitle>This model has no fields yet</CardTitle>
+                <CardDescription>
+                    Entries are filled in through the model's fields. Add some
+                    first.
+                </CardDescription>
+                <Button as-child class="mt-2">
+                    <Link :href="builder(model.id)"
+                        >Add fields in the builder</Link
+                    >
+                </Button>
+            </CardHeader>
+        </Card>
+
+        <Card v-else-if="entries.length === 0 && !nextCursor">
             <CardHeader class="items-center text-center">
                 <component
                     :is="inTrash ? Trash2 : FileText"
