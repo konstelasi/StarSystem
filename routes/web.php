@@ -2,10 +2,15 @@
 
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\UpdateController;
+use App\Sites\CurrentSite;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
-Route::inertia('/', 'Welcome')->name('home');
+// What visitors see until the site has a public front end.
+Route::get('/', fn (CurrentSite $site) => Inertia::render('Home', [
+    'siteName' => $site->get()->name,
+]))->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
