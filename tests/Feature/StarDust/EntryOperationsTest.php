@@ -9,7 +9,6 @@ use App\StarDust\NotOwnedException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use StarDust\Exception\EntryNotFoundException;
-use StarDust\Read\EntryQuery;
 use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
 
@@ -99,10 +98,7 @@ class EntryOperationsTest extends TestCase
         $this->stardust()->writeEntry($model->stardust_model_id, ['title' => 'One']);
         $this->stardust()->writeEntry($model->stardust_model_id, ['title' => 'Two']);
 
-        $page = $this->stardust()->listEntries(new EntryQuery(
-            tenantId: $this->site->id,
-            modelId: $model->stardust_model_id,
-        ));
+        $page = $this->stardust()->listEntries($model->stardust_model_id);
 
         $this->assertCount(2, $page->rows);
         $this->assertNull($page->nextCursor);
@@ -119,7 +115,7 @@ class EntryOperationsTest extends TestCase
         $this->assertRefused(fn () => $this->stardust()->getEntry($theirs->stardust_model_id, $entryId));
         $this->assertRefused(fn () => $this->stardust()->updateEntry($theirs->stardust_model_id, $entryId, ['title' => 'x']));
         $this->assertRefused(fn () => $this->stardust()->deleteEntry($theirs->stardust_model_id, $entryId));
-        $this->assertRefused(fn () => $this->stardust()->listEntries(new EntryQuery(tenantId: 1, modelId: $theirs->stardust_model_id)));
+        $this->assertRefused(fn () => $this->stardust()->listEntries($theirs->stardust_model_id));
     }
 
     private function asNewSite(): Site

@@ -15,6 +15,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { builder, exportMethod, index } from '@/routes/admin/models';
+import { index as entries } from '@/routes/admin/models/entries';
 
 type ModelRow = {
     id: number;
@@ -127,6 +128,11 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                         </td>
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <template v-if="model.status !== 'deleting'">
+                                <Button as-child variant="ghost" size="sm">
+                                    <Link :href="entries(model.id)"
+                                        >Entries</Link
+                                    >
+                                </Button>
                                 <Button as-child variant="ghost" size="sm">
                                     <Link :href="builder(model.id)">Open</Link>
                                 </Button>

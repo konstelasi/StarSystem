@@ -6,6 +6,7 @@ use App\Modules\ModulesServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\BuilderServiceProvider;
 use App\Providers\DistributionServiceProvider;
+use App\Providers\EntriesServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Schema\SchemaServiceProvider;
 use App\StarDust\StarDustServiceProvider;
@@ -20,4 +21,5 @@ return [
     FilesServiceProvider::class,
     DistributionServiceProvider::class,
     BuilderServiceProvider::class,
+    EntriesServiceProvider::class,
 ];

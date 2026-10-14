@@ -3,6 +3,7 @@
 namespace App\Entries;
 
 use App\Models\SchemaModel;
+use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\StarDust\StarDustService;
 use StarDust\Read\Entry;
 
@@ -20,7 +21,10 @@ class EntryManager
      */
     public const TRASH_FIELD = '_trashed';
 
-    public function __construct(private readonly StarDustService $stardust) {}
+    public function __construct(
+        private readonly StarDustService $stardust,
+        private readonly FieldTypeRegistry $types,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $fields
@@ -61,5 +65,63 @@ class EntryManager
             ...$fields,
             self::TRASH_FIELD => $trashed,
         ]);
+    }
+
+    /**
+     * The model's entries, oldest first. No paging, filtering or sorting
+     * yet.
+     *
+     * @return list<Entry>
+     */
+    public function list(SchemaModel $model): array
+    {
+        return $this->stardust->listEntries($model->stardust_model_id)->rows;
+    }
+
+    /**
+     * Laravel validation rules for a model's fields, keyed by field key
+     * (and "key.*" for list-shaped fields).
+     *
+     * @return array<string, list<mixed>>
+     */
+    public function rulesFor(SchemaModel $model): array
+    {
+        $rules = [];
+
+        foreach ($model->fields as $field) {
+            $type = $this->types->get($field->type);
+            $settings = $type->resolveSettings($field->settings ?? []);
+
+            foreach ($type->rules($settings, $field->required) as $suffix => $fieldRules) {
+                $rules[$field->key.$suffix] = $fieldRules;
+            }
+        }
+
+        return $rules;
+    }
+
+    /**
+     * The submitted values in the shape StarDust stores, dropping any key
+     * that isn't one of the model's fields.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function normalizeFields(SchemaModel $model, array $input): array
+    {
+        $fields = [];
+
+        foreach ($model->fields as $field) {
+            if (! array_key_exists($field->key, $input)) {
+                continue;
+            }
+
+            $type = $this->types->get($field->type);
+            $settings = $type->resolveSettings($field->settings ?? []);
+
+            $fields[$field->key] = $type->normalize($input[$field->key], $settings);
+        }
+
+        return $fields;
     }
 }

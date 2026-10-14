@@ -9,9 +9,12 @@ use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use StarDust\Exception\EntryNotFoundException;
+use StarDust\Filter\Ast\FilterNode;
+use StarDust\Read\Cursor;
 use StarDust\Read\Entry;
 use StarDust\Read\EntryPage;
 use StarDust\Read\EntryQuery;
+use StarDust\Read\SortSpec;
 use StarDust\Rename\RenameCheckpointRepository;
 use StarDust\Retype\RetypeCheckpointRepository;
 use StarDust\Schema\FieldDescription;
@@ -348,13 +351,25 @@ class StarDustService
 
     /**
      * A cursor-paginated, optionally filtered and sorted read of a model's
-     * entries.
+     * entries, oldest first unless $sort says otherwise.
      */
-    public function listEntries(EntryQuery $query): EntryPage
-    {
-        $this->owned($query->modelId);
+    public function listEntries(
+        int $modelId,
+        ?FilterNode $filter = null,
+        ?SortSpec $sort = null,
+        int $pageSize = EntryQuery::DEFAULT_PAGE_SIZE,
+        ?Cursor $cursor = null,
+    ): EntryPage {
+        $this->owned($modelId);
 
-        return $this->engine()->read($query);
+        return $this->engine()->read(new EntryQuery(
+            tenantId: $this->site->tenantId(),
+            modelId: $modelId,
+            filter: $filter,
+            pageSize: $pageSize,
+            cursor: $cursor,
+            sort: $sort,
+        ));
     }
 
     /**
