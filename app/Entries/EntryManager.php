@@ -5,7 +5,9 @@ namespace App\Entries;
 use App\Models\SchemaModel;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\StarDust\StarDustService;
+use Carbon\CarbonImmutable;
 use StarDust\Exception\InvalidCursorException;
+use StarDust\Filter\Ast\LeafNode;
 use StarDust\Read\Cursor;
 use StarDust\Read\Entry;
 use StarDust\Read\EntryPage;
@@ -20,9 +22,13 @@ use StarDust\Read\SortSpec;
 class EntryManager
 {
     /**
-     * StarDust has no restore, so "deleted" from the list is a flag, not
-     * StarDust's own delete. Reserved: SchemaDiff refuses a builder-entered
-     * key starting with "_", so this never collides with a real field.
+     * StarDust has no restore, so moving an entry to the trash sets this
+     * field instead of using StarDust's own delete: 0 while the entry is
+     * active, the Unix time it was trashed once it is, which the purge
+     * reads to empty the trash after the configured days.
+     *
+     * Reserved: SchemaDiff refuses a builder-entered key starting with "_",
+     * so this never collides with a real field.
      */
     public const TRASH_FIELD = '_trashed';
 
@@ -75,20 +81,81 @@ class EntryManager
     }
 
     /**
-     * One page of the model's entries, newest first, from $cursor (the
-     * previous page's nextCursor) on. Sorting by id keeps StarDust on an
-     * index scan however many entries there are.
+     * Moves an entry to the trash, carrying every other value forward.
+     */
+    public function trash(SchemaModel $model, Entry $entry): void
+    {
+        $this->stardust->updateEntry($model->stardust_model_id, $entry->id, [
+            ...$entry->fields,
+            self::TRASH_FIELD => CarbonImmutable::now()->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * Takes an entry back out of the trash.
+     */
+    public function restore(SchemaModel $model, Entry $entry): void
+    {
+        $this->stardust->updateEntry($model->stardust_model_id, $entry->id, [
+            ...$entry->fields,
+            self::TRASH_FIELD => 0,
+        ]);
+    }
+
+    public function isTrashed(Entry $entry): bool
+    {
+        return (int) ($entry->fields[self::TRASH_FIELD] ?? 0) > 0;
+    }
+
+    public function trashedAt(Entry $entry): ?CarbonImmutable
+    {
+        return $this->isTrashed($entry)
+            ? CarbonImmutable::createFromTimestamp((int) $entry->fields[self::TRASH_FIELD])
+            : null;
+    }
+
+    /**
+     * One page of the model's active entries, or of its trash, newest
+     * first, from $cursor (the previous page's nextCursor) on. Sorting by
+     * id keeps StarDust on an index scan however many entries there are.
+     *
+     * StarDust refuses a filter on a field it hasn't finished indexing,
+     * which the trash field is from a model's first entry until the next
+     * tick. Until then the page is read unfiltered and the other kind of
+     * entry dropped here, so a page can come back short; the cursor still
+     * moves on correctly.
      *
      * @throws InvalidCursorException when $cursor isn't one StarDust issued
      */
-    public function page(SchemaModel $model, ?string $cursor = null): EntryPage
+    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false): EntryPage
     {
-        return $this->stardust->listEntries(
+        $indexed = $this->trashIndexed($model);
+
+        $page = $this->stardust->listEntries(
             $model->stardust_model_id,
+            filter: $indexed ? LeafNode::local(self::TRASH_FIELD, $trashed ? 'gt' : 'eq', 0) : null,
             sort: SortSpec::byId(SortDirection::Desc),
             pageSize: self::PAGE_SIZE,
             cursor: $cursor === null ? null : new Cursor($cursor),
         );
+
+        if ($indexed) {
+            return $page;
+        }
+
+        return new EntryPage(
+            array_values(array_filter($page->rows, fn (Entry $entry) => $this->isTrashed($entry) === $trashed)),
+            $page->nextCursor,
+            $page->pageSize,
+        );
+    }
+
+    /**
+     * Whether StarDust can filter on the trash field yet.
+     */
+    public function trashIndexed(SchemaModel $model): bool
+    {
+        return $this->stardust->describeModel($model->stardust_model_id)?->field(self::TRASH_FIELD)->isIndexed ?? false;
     }
 
     /**

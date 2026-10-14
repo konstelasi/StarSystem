@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
-import { FileText, PlusCircle } from '@lucide/vue';
-import { ref } from 'vue';
+import { ArrowLeft, FileText, PlusCircle, Trash2 } from '@lucide/vue';
+import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -10,8 +10,16 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { relativeTime } from '@/lib/time';
 import { index as models } from '@/routes/admin/models';
-import { create, edit, index } from '@/routes/admin/models/entries';
+import {
+    create,
+    edit,
+    index,
+    restore,
+    trash,
+} from '@/routes/admin/models/entries';
+import { store as moveToTrash } from '@/routes/admin/models/entries/trash';
 
 type Column = { key: string; label: string };
 
@@ -19,14 +27,19 @@ type EntryRow = {
     id: number;
     values: Record<string, unknown>;
     created_at: string;
+    trashed_at: string | null;
 };
 
 const props = defineProps<{
     model: { id: number; label: string };
+    /** The model's active entries, or its trash. */
+    view: 'active' | 'trash';
     columns: Column[];
     entries: EntryRow[];
     nextCursor: string | null;
 }>();
+
+const inTrash = computed(() => props.view === 'trash');
 
 const loadingMore = ref(false);
 
@@ -48,10 +61,32 @@ function loadMore() {
     });
 }
 
+/** The entry whose action is running, to disable its buttons. */
+const busy = ref<number | null>(null);
+
+function post(url: string, entryId: number) {
+    router.post(
+        url,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                busy.value = entryId;
+            },
+            onFinish: () => {
+                busy.value = null;
+            },
+        },
+    );
+}
+
 setLayoutProps({
     breadcrumbs: [
         { title: 'Models', href: models() },
         { title: props.model.label, href: index(props.model.id) },
+        ...(props.view === 'trash'
+            ? [{ title: 'Trash', href: trash(props.model.id) }]
+            : []),
     ],
 });
 
@@ -71,37 +106,65 @@ function display(value: unknown): string {
 </script>
 
 <template>
-    <Head :title="model.label" />
+    <Head :title="inTrash ? `${model.label}: trash` : model.label" />
 
     <div class="flex flex-1 flex-col gap-4 p-4">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="space-y-0.5">
                 <h2 class="text-xl font-semibold tracking-tight">
-                    {{ model.label }}
+                    {{ inTrash ? 'Trash' : model.label }}
                 </h2>
                 <p class="text-sm text-muted-foreground">
-                    The entries in this model.
+                    <template v-if="inTrash">
+                        Entries moved out of {{ model.label }}. Restore one to
+                        use it again.
+                    </template>
+                    <template v-else>The entries in this model.</template>
                 </p>
             </div>
-            <Button as-child>
-                <Link :href="create(model.id)">
-                    <PlusCircle />
-                    New entry
-                </Link>
-            </Button>
+            <div class="flex gap-2">
+                <Button v-if="inTrash" variant="secondary" as-child>
+                    <Link :href="index(model.id)">
+                        <ArrowLeft />
+                        Back to entries
+                    </Link>
+                </Button>
+                <template v-else>
+                    <Button variant="ghost" as-child>
+                        <Link :href="trash(model.id)">
+                            <Trash2 />
+                            Trash
+                        </Link>
+                    </Button>
+                    <Button as-child>
+                        <Link :href="create(model.id)">
+                            <PlusCircle />
+                            New entry
+                        </Link>
+                    </Button>
+                </template>
+            </div>
         </div>
 
-        <Card v-if="entries.length === 0">
+        <Card v-if="entries.length === 0 && !nextCursor">
             <CardHeader class="items-center text-center">
-                <FileText class="size-8 text-muted-foreground" />
-                <CardTitle>No entries yet</CardTitle>
-                <CardDescription>
+                <component
+                    :is="inTrash ? Trash2 : FileText"
+                    class="size-8 text-muted-foreground"
+                />
+                <CardTitle>
+                    {{ inTrash ? 'The trash is empty' : 'No entries yet' }}
+                </CardTitle>
+                <CardDescription v-if="!inTrash">
                     Create the first one to get started.
                 </CardDescription>
             </CardHeader>
         </Card>
 
-        <div v-else class="overflow-x-auto rounded-lg border">
+        <div
+            v-else-if="entries.length > 0"
+            class="overflow-x-auto rounded-lg border"
+        >
             <table class="w-full text-sm">
                 <thead class="text-left text-xs text-muted-foreground">
                     <tr>
@@ -112,7 +175,10 @@ function display(value: unknown): string {
                         >
                             {{ column.label }}
                         </th>
-                        <th class="px-4 py-2 font-medium">Created</th>
+                        <th class="px-4 py-2 font-medium">
+                            {{ inTrash ? 'Trashed' : 'Created' }}
+                        </th>
+                        <th class="px-4 py-2"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -127,7 +193,7 @@ function display(value: unknown): string {
                             class="px-4 py-2"
                         >
                             <Link
-                                v-if="position === 0"
+                                v-if="position === 0 && !inTrash"
                                 :href="
                                     edit({ model: model.id, entry: entry.id })
                                 "
@@ -140,16 +206,60 @@ function display(value: unknown): string {
                             </template>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap">
-                            {{ formatTime(entry.created_at) }}
+                            <template v-if="inTrash && entry.trashed_at">
+                                <span :title="formatTime(entry.trashed_at)">
+                                    {{ relativeTime(entry.trashed_at) }}
+                                </span>
+                            </template>
+                            <template v-else>
+                                {{ formatTime(entry.created_at) }}
+                            </template>
+                        </td>
+                        <td class="px-4 py-1 text-right whitespace-nowrap">
+                            <Button
+                                v-if="inTrash"
+                                variant="ghost"
+                                size="sm"
+                                :disabled="busy === entry.id"
+                                @click="
+                                    post(
+                                        restore({
+                                            model: model.id,
+                                            entry: entry.id,
+                                        }).url,
+                                        entry.id,
+                                    )
+                                "
+                            >
+                                Restore
+                            </Button>
+                            <Button
+                                v-else
+                                variant="ghost"
+                                size="sm"
+                                :disabled="busy === entry.id"
+                                @click="
+                                    post(
+                                        moveToTrash({
+                                            model: model.id,
+                                            entry: entry.id,
+                                        }).url,
+                                        entry.id,
+                                    )
+                                "
+                            >
+                                <Trash2 />
+                                Move to trash
+                            </Button>
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <div v-if="entries.length > 0" class="flex justify-center">
+        <div v-if="nextCursor || loadingMore" class="flex justify-center">
             <Spinner v-if="loadingMore" class="size-5" />
-            <Button v-else-if="nextCursor" variant="outline" @click="loadMore">
+            <Button v-else variant="outline" @click="loadMore">
                 Load more
             </Button>
         </div>

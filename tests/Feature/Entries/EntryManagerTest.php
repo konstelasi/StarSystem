@@ -93,6 +93,31 @@ class EntryManagerTest extends TestCase
         $this->assertSame(1, $entry->fields[EntryManager::TRASH_FIELD]);
     }
 
+    public function test_trash_stores_when_and_restore_clears_it()
+    {
+        $model = $this->registerModel('articles');
+        $entryId = $this->manager()->create($model, ['title' => 'Hello']);
+
+        $this->manager()->trash($model, $this->manager()->get($model, $entryId));
+
+        $entry = $this->manager()->get($model, $entryId);
+        $this->assertTrue($this->manager()->isTrashed($entry));
+        $this->assertEqualsWithDelta(now()->getTimestamp(), $entry->fields[EntryManager::TRASH_FIELD], 5);
+        $this->assertSame('Hello', $entry->fields['title']);
+
+        // An edit made while trashed keeps the time it was trashed.
+        $this->manager()->update($model, $entryId, ['title' => 'Changed']);
+        $this->assertSame($entry->fields[EntryManager::TRASH_FIELD], $this->manager()->get($model, $entryId)->fields[EntryManager::TRASH_FIELD]);
+
+        $this->manager()->restore($model, $this->manager()->get($model, $entryId));
+
+        $restored = $this->manager()->get($model, $entryId);
+        $this->assertFalse($this->manager()->isTrashed($restored));
+        $this->assertSame(0, $restored->fields[EntryManager::TRASH_FIELD]);
+
+        $this->drain();
+    }
+
     private function manager(): EntryManager
     {
         return app(EntryManager::class);

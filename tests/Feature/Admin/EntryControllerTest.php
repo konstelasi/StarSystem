@@ -192,6 +192,114 @@ class EntryControllerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_a_trashed_entry_leaves_the_list_for_the_trash_before_the_tick()
+    {
+        $model = $this->create('articles', 'Articles');
+        [$kept, $trashed] = $this->createAndTrash($model);
+
+        // Not indexed yet: the list falls back to filtering in PHP.
+        $this->assertFalse(app(EntryManager::class)->trashIndexed($model));
+        $this->assertLists($model, active: [$kept], trash: [$trashed]);
+    }
+
+    public function test_a_trashed_entry_leaves_the_list_for_the_trash_once_indexed()
+    {
+        $model = $this->create('articles', 'Articles');
+        [$kept, $trashed] = $this->createAndTrash($model);
+
+        $this->drain();
+
+        $this->assertTrue(app(EntryManager::class)->trashIndexed($model));
+        $this->assertLists($model, active: [$kept], trash: [$trashed]);
+    }
+
+    public function test_moving_to_trash_offers_undo()
+    {
+        $model = $this->create('articles', 'Articles');
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello']);
+        $restoreUrl = route('admin.models.entries.restore', ['model' => $model, 'entry' => $entryId], absolute: false);
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.entries.trash.store', ['model' => $model->id, 'entry' => $entryId]))
+            ->assertRedirect($this->url('admin.models.entries.index', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'Moved to trash.')
+            ->assertInertiaFlash('toast.action.label', 'Undo')
+            ->assertInertiaFlash('toast.action.url', $restoreUrl);
+    }
+
+    public function test_restoring_brings_an_entry_back()
+    {
+        $model = $this->create('articles', 'Articles');
+        [$kept, $trashed] = $this->createAndTrash($model);
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.entries.restore', ['model' => $model->id, 'entry' => $trashed]))
+            ->assertRedirect($this->url('admin.models.entries.trash', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'Entry restored.');
+
+        $this->assertLists($model, active: [$trashed, $kept], trash: []);
+    }
+
+    public function test_a_trashed_entry_must_be_restored_before_editing()
+    {
+        $model = $this->create('articles', 'Articles');
+        [, $trashed] = $this->createAndTrash($model);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.edit', ['model' => $model->id, 'entry' => $trashed]))
+            ->assertRedirect($this->url('admin.models.entries.trash', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'Restore this entry to edit it.');
+
+        $this->actingAs($user)
+            ->put($this->url('admin.models.entries.update', ['model' => $model->id, 'entry' => $trashed]), ['fields' => ['title' => 'Changed']])
+            ->assertRedirect($this->url('admin.models.entries.trash', ['model' => $model->id]));
+
+        $this->assertSame('Second', app(EntryManager::class)->get($model, $trashed)?->fields['title']);
+    }
+
+    /**
+     * Two entries; the second is moved to the trash through the admin.
+     *
+     * @return array{int, int} The kept entry's id, then the trashed one's.
+     */
+    private function createAndTrash(SchemaModel $model): array
+    {
+        $kept = app(EntryManager::class)->create($model, ['title' => 'First']);
+        $trashed = app(EntryManager::class)->create($model, ['title' => 'Second']);
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.entries.trash.store', ['model' => $model->id, 'entry' => $trashed]))
+            ->assertRedirect();
+
+        return [$kept, $trashed];
+    }
+
+    /**
+     * @param  list<int>  $active  Expected ids in the list, newest first.
+     * @param  list<int>  $trash  Expected ids in the trash, newest first.
+     */
+    private function assertLists(SchemaModel $model, array $active, array $trash): void
+    {
+        $user = User::factory()->create();
+
+        $listed = $this->actingAs($user)
+            ->get($this->url('admin.models.entries.index', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('view', 'active'))
+            ->inertiaProps('entries');
+        $this->assertSame($active, array_column($listed, 'id'));
+
+        $trashed = $this->actingAs($user)
+            ->get($this->url('admin.models.entries.trash', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('view', 'trash'))
+            ->inertiaProps('entries');
+        $this->assertSame($trash, array_column($trashed, 'id'));
+
+        foreach ($trashed as $row) {
+            $this->assertNotNull($row['trashed_at']);
+        }
+    }
+
     /**
      * @return list<int> The entry ids, oldest first.
      */

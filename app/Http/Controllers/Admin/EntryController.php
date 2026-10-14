@@ -27,11 +27,59 @@ class EntryController extends Controller
         private readonly SchemaManager $schema,
     ) {}
 
+    public function index(Request $request, SchemaModel $model): Response
+    {
+        return $this->listing($request, $model, trashed: false);
+    }
+
+    public function trash(Request $request, SchemaModel $model): Response
+    {
+        return $this->listing($request, $model, trashed: true);
+    }
+
+    /**
+     * The toast offers Undo, since the entry is only one click from coming
+     * back.
+     */
+    public function moveToTrash(SchemaModel $model, int $entry): RedirectResponse
+    {
+        $found = $this->entryOr404($model, $entry);
+
+        if (! $this->entries->isTrashed($found)) {
+            $this->entries->trash($model, $found);
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => 'Moved to trash.',
+            'action' => ['label' => 'Undo', 'url' => route('admin.models.entries.restore', ['model' => $model, 'entry' => $entry], absolute: false)],
+        ]);
+
+        return to_route('admin.models.entries.index', $model);
+    }
+
+    /**
+     * Back to wherever the restore came from: the trash, or the list when
+     * it was the Undo of a move.
+     */
+    public function restore(SchemaModel $model, int $entry): RedirectResponse
+    {
+        $found = $this->entryOr404($model, $entry);
+
+        if ($this->entries->isTrashed($found)) {
+            $this->entries->restore($model, $found);
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry restored.']);
+
+        return back(fallback: route('admin.models.entries.trash', $model));
+    }
+
     /**
      * One page at a time. "Load more" asks for the next page with `cursor`
      * and the client appends it, since `entries` is a merge prop.
      */
-    public function index(Request $request, SchemaModel $model): Response
+    private function listing(Request $request, SchemaModel $model, bool $trashed): Response
     {
         $columns = $this->listColumns($model);
         $keys = $columns->pluck('key')->all();
@@ -39,13 +87,14 @@ class EntryController extends Controller
         $cursor = $request->query('cursor');
 
         try {
-            $page = $this->entries->page($model, is_string($cursor) ? $cursor : null);
+            $page = $this->entries->page($model, is_string($cursor) ? $cursor : null, $trashed);
         } catch (InvalidCursorException) {
             abort(404);
         }
 
         return Inertia::render('admin/entries/Index', [
             'model' => ['id' => $model->id, 'label' => $model->label],
+            'view' => $trashed ? 'trash' : 'active',
             'columns' => $columns->map(fn (SchemaField $field) => [
                 'key' => $field->key,
                 'label' => $field->label,
@@ -54,6 +103,7 @@ class EntryController extends Controller
                 'id' => $entry->id,
                 'values' => Arr::only($entry->fields, $keys),
                 'created_at' => $entry->createdAt->format(DATE_ATOM),
+                'trashed_at' => $this->entries->trashedAt($entry)?->format(DATE_ATOM),
             ])->values()),
             'nextCursor' => $page->nextCursor?->opaque,
         ]);
@@ -83,9 +133,13 @@ class EntryController extends Controller
      * form turns them into what each input expects (see formValue() in
      * resources/js/fields).
      */
-    public function edit(SchemaModel $model, int $entry): Response
+    public function edit(SchemaModel $model, int $entry): Response|RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
+
+        if ($this->entries->isTrashed($found)) {
+            return $this->restoreFirst($model);
+        }
 
         return Inertia::render('admin/entries/Edit', [
             'model' => ['id' => $model->id, 'label' => $model->label],
@@ -97,13 +151,26 @@ class EntryController extends Controller
 
     public function update(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
-        $this->entryOr404($model, $entry);
+        if ($this->entries->isTrashed($this->entryOr404($model, $entry))) {
+            return $this->restoreFirst($model);
+        }
 
         $this->entries->update($model, $entry, $this->validated($request, $model));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry saved.']);
 
         return to_route('admin.models.entries.index', $model);
+    }
+
+    /**
+     * A trashed entry is restored before it can be edited, so an edit never
+     * lands on something about to be purged.
+     */
+    private function restoreFirst(SchemaModel $model): RedirectResponse
+    {
+        Inertia::flash('toast', ['type' => 'info', 'message' => 'Restore this entry to edit it.']);
+
+        return to_route('admin.models.entries.trash', $model);
     }
 
     /**
