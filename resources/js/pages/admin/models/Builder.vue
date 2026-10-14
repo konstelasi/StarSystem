@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { useModelBuilder } from '@/composables/useModelBuilder';
 import type { FieldStates } from '@/lib/modelSchema';
 import { builder as builderPage, index } from '@/routes/admin/models';
@@ -38,6 +39,8 @@ const props = defineProps<{
 }>();
 
 const builder = useModelBuilder(props.schema, () => props.fieldTypes);
+
+useLeaveGuard(builder.isDirty);
 
 watchEffect(() => {
     setLayoutProps({

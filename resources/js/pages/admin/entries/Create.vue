@@ -2,10 +2,11 @@
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
 import { Save } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import EntryForm from '@/components/entries/EntryForm.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { initialValue } from '@/fields';
 import { index as models } from '@/routes/admin/models';
 import { create, index, store } from '@/routes/admin/models/entries';
@@ -31,6 +32,9 @@ const values = ref<Record<string, unknown>>(
 );
 const errors = ref<Record<string, string>>({});
 const processing = ref(false);
+
+const initial = JSON.stringify(values.value);
+useLeaveGuard(computed(() => JSON.stringify(values.value) !== initial));
 
 function updateValue(key: string, value: unknown) {
     values.value[key] = value;
