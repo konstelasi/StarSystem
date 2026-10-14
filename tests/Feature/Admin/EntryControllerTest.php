@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Entries\EntryManager;
 use App\Models\SchemaModel;
 use App\Models\User;
+use App\Sites\CurrentSite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -256,6 +257,48 @@ class EntryControllerTest extends TestCase
             ->assertRedirect($this->url('admin.models.entries.trash', ['model' => $model->id]));
 
         $this->assertSame('Second', app(EntryManager::class)->get($model, $trashed)?->fields['title']);
+    }
+
+    public function test_deleting_for_good_removes_a_trashed_entry()
+    {
+        $model = $this->create('articles', 'Articles');
+        [$kept, $trashed] = $this->createAndTrash($model);
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.entries.destroy', ['model' => $model->id, 'entry' => $trashed]))
+            ->assertRedirect($this->url('admin.models.entries.trash', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'Entry deleted for good.');
+
+        $this->assertNull(app(EntryManager::class)->get($model, $trashed));
+        $this->assertLists($model, active: [$kept], trash: []);
+    }
+
+    public function test_an_active_entry_must_go_through_the_trash_first()
+    {
+        $model = $this->create('articles', 'Articles');
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello']);
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.entries.destroy', ['model' => $model->id, 'entry' => $entryId]))
+            ->assertRedirect($this->url('admin.models.entries.index', ['model' => $model->id]))
+            ->assertInertiaFlash('toast.message', 'Move it to the trash first.');
+
+        $this->assertNotNull(app(EntryManager::class)->get($model, $entryId));
+    }
+
+    public function test_another_sites_entry_cannot_be_deleted()
+    {
+        $model = $this->create('articles', 'Articles');
+        [, $trashed] = $this->createAndTrash($model);
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.entries.destroy', ['model' => $model->id, 'entry' => $trashed], $other))
+            ->assertNotFound();
+
+        // The request resolved the other site; check as the owner again.
+        app(CurrentSite::class)->set($this->site);
+        $this->assertNotNull(app(EntryManager::class)->get($model, $trashed));
     }
 
     /**

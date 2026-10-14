@@ -13,6 +13,7 @@ Route::middleware(['auth', 'verified'])
         Route::get('trash', [EntryController::class, 'trash'])->name('trash')->whereNumber('model');
         Route::get('{entry}', [EntryController::class, 'edit'])->name('edit')->whereNumber(['model', 'entry']);
         Route::put('{entry}', [EntryController::class, 'update'])->name('update')->whereNumber(['model', 'entry']);
+        Route::delete('{entry}', [EntryController::class, 'destroy'])->name('destroy')->whereNumber(['model', 'entry']);
         Route::post('{entry}/trash', [EntryController::class, 'moveToTrash'])->name('trash.store')->whereNumber(['model', 'entry']);
         Route::post('{entry}/restore', [EntryController::class, 'restore'])->name('restore')->whereNumber(['model', 'entry']);
     });

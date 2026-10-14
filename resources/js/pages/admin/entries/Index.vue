@@ -2,6 +2,7 @@
 import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
 import { ArrowLeft, FileText, PlusCircle, Trash2 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import DeleteEntryDialog from '@/components/entries/DeleteEntryDialog.vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -91,6 +92,14 @@ setLayoutProps({
 });
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
+
+/** How the delete dialog names an entry: its first column, if it has one. */
+function entryName(entry: EntryRow): string | null {
+    const first = props.columns[0];
+    const shown = first ? display(entry.values[first.key]) : '—';
+
+    return shown === '—' ? null : shown;
+}
 
 function display(value: unknown): string {
     if (value === null || value === undefined || value === '') {
@@ -216,23 +225,29 @@ function display(value: unknown): string {
                             </template>
                         </td>
                         <td class="px-4 py-1 text-right whitespace-nowrap">
-                            <Button
-                                v-if="inTrash"
-                                variant="ghost"
-                                size="sm"
-                                :disabled="busy === entry.id"
-                                @click="
-                                    post(
-                                        restore({
-                                            model: model.id,
-                                            entry: entry.id,
-                                        }).url,
-                                        entry.id,
-                                    )
-                                "
-                            >
-                                Restore
-                            </Button>
+                            <template v-if="inTrash">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    :disabled="busy === entry.id"
+                                    @click="
+                                        post(
+                                            restore({
+                                                model: model.id,
+                                                entry: entry.id,
+                                            }).url,
+                                            entry.id,
+                                        )
+                                    "
+                                >
+                                    Restore
+                                </Button>
+                                <DeleteEntryDialog
+                                    :model-id="model.id"
+                                    :entry-id="entry.id"
+                                    :name="entryName(entry)"
+                                />
+                            </template>
                             <Button
                                 v-else
                                 variant="ghost"

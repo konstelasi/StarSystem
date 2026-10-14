@@ -76,6 +76,27 @@ class EntryController extends Controller
     }
 
     /**
+     * Deletes a trashed entry for good, with StarDust's own delete, which
+     * has no restore. An active entry has to go through the trash first.
+     */
+    public function destroy(SchemaModel $model, int $entry): RedirectResponse
+    {
+        $found = $this->entryOr404($model, $entry);
+
+        if (! $this->entries->isTrashed($found)) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'Move it to the trash first.']);
+
+            return to_route('admin.models.entries.index', $model);
+        }
+
+        $this->entries->delete($model, $found);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry deleted for good.']);
+
+        return to_route('admin.models.entries.trash', $model);
+    }
+
+    /**
      * One page at a time. "Load more" asks for the next page with `cursor`
      * and the client appends it, since `entries` is a merge prop.
      */

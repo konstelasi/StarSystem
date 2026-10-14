@@ -102,6 +102,15 @@ class EntryManager
         ]);
     }
 
+    /**
+     * Deletes an entry for good: StarDust's delete has no restore. Callers
+     * only offer it for entries already in the trash.
+     */
+    public function delete(SchemaModel $model, Entry $entry): void
+    {
+        $this->stardust->deleteEntry($model->stardust_model_id, $entry->id);
+    }
+
     public function isTrashed(Entry $entry): bool
     {
         return (int) ($entry->fields[self::TRASH_FIELD] ?? 0) > 0;
