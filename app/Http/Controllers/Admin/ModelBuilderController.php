@@ -37,13 +37,14 @@ class ModelBuilderController extends Controller
             return to_route('admin.models.index');
         }
 
+        // Closures, so the builder's poll for `states` builds only that.
         return Inertia::render('admin/models/Builder', [
-            'model' => ['id' => $model->id, 'schema_rev' => $model->schema_rev],
-            'fieldTypes' => $this->fieldTypes->toArray(),
-            'schema' => $this->schema->export($model),
-            'states' => $this->schema->states($model),
-            'otherSlugs' => SchemaModel::query()->whereKeyNot($model->id)->pluck('slug'),
-            'unfinished' => $this->unfinished($model),
+            'model' => fn () => ['id' => $model->id, 'schema_rev' => $model->schema_rev],
+            'fieldTypes' => fn () => $this->fieldTypes->toArray(),
+            'schema' => fn () => $this->schema->export($model),
+            'states' => fn () => $this->schema->states($model),
+            'otherSlugs' => fn () => SchemaModel::query()->whereKeyNot($model->id)->pluck('slug'),
+            'unfinished' => fn () => $this->unfinished($model),
         ]);
     }
 
@@ -64,8 +65,9 @@ class ModelBuilderController extends Controller
      * The two-step save, step two. `saved` is false, with the preview's
      * errors, when the diff has errors or the batch failed partway; the
      * client only treats a true `saved` as done. `rev` is the revision the
-     * tab's next save must send, and `unfinished` is set when the batch
-     * failed partway, for the builder's "finish the save" banner.
+     * tab's next save must send, `unfinished` is set when the batch failed
+     * partway, for the builder's "finish the save" banner, and `states`
+     * shows the badges of fields the save set working.
      */
     public function save(Request $request, SchemaModel $model): Response
     {
@@ -76,6 +78,7 @@ class ModelBuilderController extends Controller
             'preview' => $result->preview,
             'rev' => $result->model->schema_rev ?? $model->schema_rev,
             'unfinished' => $this->unfinished($model),
+            'states' => $this->schema->states($model),
         ]);
     }
 

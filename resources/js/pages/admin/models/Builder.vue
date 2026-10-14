@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Head, router, setLayoutProps } from '@inertiajs/vue3';
+import { Head, router, setLayoutProps, usePoll } from '@inertiajs/vue3';
 import { AlertTriangle, Braces, Eye, Hammer, Save } from '@lucide/vue';
-import { nextTick, ref, watchEffect } from 'vue';
+import { computed, nextTick, ref, watch, watchEffect } from 'vue';
 import BlockInspector from '@/components/builder/BlockInspector.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import BuilderPalette from '@/components/builder/BuilderPalette.vue';
@@ -62,10 +62,30 @@ async function announce(message: string) {
 
 const rev = ref(props.model.schema_rev);
 
+// Refreshed by each save's response and by the poll below.
+const states = computed(() => props.states);
+
+/**
+ * States that end on their own once the tick does its work. "waiting"
+ * isn't one: saves run in the request, so a lasting "waiting" is a save
+ * that stopped partway (the banner below), and polling would never end.
+ */
+const WORKING = ['indexing', 'renaming', 'retyping', 'deleting'];
+
+const working = computed(() =>
+    Object.values(states.value).some((state) => WORKING.includes(state)),
+);
+
+const poll = usePoll(5000, { only: ['states'] }, { autoStart: false });
+
+watch(working, (isWorking) => (isWorking ? poll.start() : poll.stop()), {
+    immediate: true,
+});
+
 provideBuilder({
     builder,
     announce: (message) => void announce(message),
-    states: props.states,
+    states,
     modelId: props.model.id,
     rev,
     otherSlugs: props.otherSlugs,

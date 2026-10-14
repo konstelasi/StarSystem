@@ -8,8 +8,11 @@ export type BuilderContext = {
     builder: ModelBuilder;
     /** Reads a message to screen reader users, e.g. after a move. */
     announce: (message: string) => void;
-    /** Busy state per field uuid, for badges and disabled actions. */
-    states: FieldStates;
+    /**
+     * Busy state per field uuid, for badges and disabled actions. Updated
+     * after each save and while any field is still working.
+     */
+    states: Readonly<Ref<FieldStates>>;
     /** The model this page edits, for building preview/save URLs. */
     modelId: number;
     /**
@@ -32,7 +35,7 @@ export function stateOf(
     context: BuilderContext,
     fieldUuid: string,
 ): FieldState {
-    return context.states[fieldUuid] ?? 'ready';
+    return context.states.value[fieldUuid] ?? 'ready';
 }
 
 export const FIELD_STATE_LABELS: Record<

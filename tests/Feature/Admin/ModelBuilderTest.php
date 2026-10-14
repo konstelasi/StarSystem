@@ -339,6 +339,36 @@ class ModelBuilderTest extends TestCase
             );
     }
 
+    public function test_a_save_returns_the_field_badges_it_set_working()
+    {
+        $model = $this->seedModel();
+        $schema = app(SchemaManager::class)->export($model);
+        $schema['fields'][0]['key'] = 'headline';
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('admin.models.builder.save', ['model' => $model->id]), ['schema' => $schema, 'rev' => $model->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('saved', true)
+                ->where('states.'.self::TITLE, 'renaming')
+                ->where('states.'.self::SUMMARY, 'ready')
+            );
+    }
+
+    public function test_the_builder_can_reload_just_the_field_badges()
+    {
+        $model = $this->seedModel();
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.builder', ['model' => $model->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->reloadOnly('states', fn (Assert $reload) => $reload
+                    ->has('states', 3)
+                    ->missing('schema')
+                    ->missing('fieldTypes')
+                )
+            );
+    }
+
     public function test_finishing_with_nothing_unfinished_just_returns_to_the_builder()
     {
         $model = $this->seedModel();

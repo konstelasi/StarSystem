@@ -104,7 +104,7 @@ function confirmSave() {
         preserveState: true,
         preserveScroll: true,
         preserveUrl: true,
-        only: ['saved', 'preview', 'rev', 'unfinished'],
+        only: ['saved', 'preview', 'rev', 'unfinished', 'states'],
         onSuccess: (page) => {
             if (page.props.saved) {
                 rev.value = page.props.rev as number;
