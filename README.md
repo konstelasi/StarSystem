@@ -1,14 +1,19 @@
 # StarSystem
 
-A content management system built on [StarDust](https://github.com/damarbob/stardust) and Laravel 13, made to run on ordinary shared hosting: no shell access, no daemons, no queue worker required. Background work runs in-process on a scheduled tick, driven by cron where one exists or by a secret URL where it doesn't.
+A content management system built on [StarDust](https://github.com/damarbob/stardust) and Laravel 13, made to run on ordinary shared hosting. It needs no shell access, no daemons and no queue worker. Background work runs in-process on a scheduled tick, driven by cron where the host has it or by a secret URL where it doesn't.
 
 ## What's here
 
-- **Model builder** — a drag-and-drop admin page for defining content models: add, rename, retype, promote and demote fields, with a live preview of what saving will do before it happens. Sixteen core field types ship out of the box (text, rich text, number, date, file, and more), and modules can register their own.
-- **Modules** — Composer-free plugins, installed by uploading a zip from the admin. A module registers its own hooks, migrations and admin pages, and is dropped into automatic safe mode if it fails to load rather than taking the whole site down.
-- **Media library** — a per-site file store with folders, search, drag-and-drop upload and a picker component other admin pages (like the model builder's file field) reuse.
-- **Updater** — the admin can check for and apply a new release from the admin panel: download, verify, swap files, migrate, and roll back automatically if a step fails partway.
-- **Multi-site** — off by default (every request resolves to one site), on with `STARSYSTEM_MULTISITE=true`, at which point each site is matched by its own domain.
+Content starts in the **model builder**, a drag-and-drop admin page where you define a model and its fields. You can add, rename, retype, promote and demote fields, and before anything is saved you see what the save will do to existing entries. Sixteen field types ship with StarSystem (text, rich text, number, date, file and more), and modules can add their own.
+
+Each model then gets its **entries**, the content itself. Editors create and edit them in a form built from the model's fields, and the list pages through them newest first. Deleting an entry moves it to the model's trash, where it can be restored or deleted for good. Anything left in the trash for 30 days is deleted on its own, and `STARSYSTEM_ENTRY_TRASH_DAYS` changes that.
+
+Around them sit the other parts of the admin.
+
+- The **media library** keeps each site's files in folders, with search and drag-and-drop upload. Other pages reuse its picker, the builder's file field among them.
+- **Modules** are Composer-free plugins, installed by uploading a zip. A module registers its own hooks, migrations and admin pages. If one fails to load, StarSystem switches it off and the site keeps running.
+- The **updater** checks for a new release and applies it from the admin. It downloads, verifies, swaps the files and migrates, and rolls back by itself if a step fails partway.
+- **Multi-site** is off by default, so every request resolves to one site. Set `STARSYSTEM_MULTISITE=true` and each site is matched by its own domain.
 
 ## Requirements
 
@@ -24,11 +29,11 @@ composer setup   # composer install, .env, APP_KEY, migrate, npm install, npm ru
 composer dev      # serves the app, queue listener and Vite dev server together
 ```
 
-Then visit the app in your browser. With no `.env` yet, or one with no `APP_KEY`, every request redirects to `/install`, which walks through requirements, database details, migrations and the first administrator — no shell needed for that part either.
+Then open the app in your browser. With no `.env` yet, or one with no `APP_KEY`, every request redirects to `/install`. The installer walks through requirements, database details, migrations and the first administrator, still with no shell.
 
 ## Testing and checks
 
-The suite needs a real MariaDB or MySQL server; `phpunit.xml` points at MariaDB on `127.0.0.1:33110` by default. Run against MySQL instead by overriding the port:
+The suite needs a real MariaDB or MySQL server. `phpunit.xml` points at MariaDB on `127.0.0.1:33110` by default, and overriding the port runs the same suite against MySQL.
 
 ```bash
 composer ci:check              # lint check, types, front-end tests, the full suite (MariaDB)
@@ -36,8 +41,8 @@ php artisan test                # just the suite
 DB_PORT=33080 php artisan test  # the same suite against MySQL
 ```
 
-`composer lint` formats with [Pint](https://laravel.com/docs/pint); `npm run check` formats and lints the front end, and `npm run test` runs its tests.
+`composer lint` formats PHP with [Pint](https://laravel.com/docs/pint). `npm run check` formats and lints the front end, and `npm run test` runs its tests.
 
 ## Releasing
 
-`build/release.php` packages one commit into a zip a shared-host owner can upload: `vendor/` installed with `--no-dev`, the built front end, and a `release.json` feed entry with the version, the zip's URL and its checksum. Pushing a `v*` tag matching `VERSION` builds and publishes it as a GitHub release via `.github/workflows/release.yml`.
+`build/release.php` packages one commit into a zip a shared-host owner can upload. The zip holds `vendor/` installed with `--no-dev` and the built front end, and the script writes a `release.json` feed entry with the version, the zip's URL and its checksum. Pushing a `v*` tag that matches `VERSION` builds it and publishes it as a GitHub release through `.github/workflows/release.yml`.
