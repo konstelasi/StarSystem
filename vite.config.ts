@@ -6,6 +6,13 @@ import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig, lazyPlugins } from 'vite-plus';
 
+// The test runner starts a Vite server from this config, and the Laravel
+// plugin refuses to start one when CI is set. Tests serve nothing, so the
+// check is skipped for them only.
+if (process.env.VITEST) {
+    process.env.LARAVEL_BYPASS_ENV_CHECK = '1';
+}
+
 export default defineConfig({
     plugins: lazyPlugins(() => [
         laravel({
