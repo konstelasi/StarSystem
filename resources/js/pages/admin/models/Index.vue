@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { Blocks, PlusCircle, Upload } from '@lucide/vue';
+import {
+    Blocks,
+    Download,
+    List,
+    Pencil,
+    PlusCircle,
+    Upload,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CreateModelDialog from '@/components/models/CreateModelDialog.vue';
 import DeleteModelDialog from '@/components/models/DeleteModelDialog.vue';
@@ -78,16 +85,16 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
             </CardHeader>
         </Card>
 
-        <div v-else class="overflow-x-auto rounded-lg border">
+        <div v-else class="data-table rounded-lg border">
             <table class="w-full text-sm">
-                <thead class="text-left text-xs text-muted-foreground">
+                <thead>
                     <tr>
-                        <th class="px-4 py-2 font-medium">Name</th>
-                        <th class="px-4 py-2 font-medium">Address name</th>
-                        <th class="px-4 py-2 font-medium">Group</th>
-                        <th class="px-4 py-2 font-medium">Fields</th>
-                        <th class="px-4 py-2 font-medium">Updated</th>
-                        <th class="px-4 py-2 font-medium">Status</th>
+                        <th class="px-4 py-2">Name</th>
+                        <th class="px-4 py-2 max-sm:hidden">Address name</th>
+                        <th class="px-4 py-2 max-sm:hidden">Group</th>
+                        <th class="px-4 py-2 max-sm:hidden">Fields</th>
+                        <th class="px-4 py-2 max-sm:hidden">Updated</th>
+                        <th class="px-4 py-2 max-sm:hidden">Status</th>
                         <th class="px-4 py-2"></th>
                     </tr>
                 </thead>
@@ -95,23 +102,32 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                     <tr
                         v-for="model in models"
                         :key="model.id"
-                        class="border-t align-top"
+                        class="align-top"
                         :data-test="`model-${model.slug}`"
                     >
                         <td class="px-4 py-2 font-medium">
                             {{ model.label }}
+                            <Badge
+                                v-if="model.status === 'deleting'"
+                                variant="secondary"
+                                class="ml-2 sm:hidden"
+                            >
+                                Deleting…
+                            </Badge>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-4 py-2 max-sm:hidden">
                             <code class="text-xs">{{ model.slug }}</code>
                         </td>
-                        <td class="px-4 py-2 text-muted-foreground">
+                        <td
+                            class="px-4 py-2 text-muted-foreground max-sm:hidden"
+                        >
                             {{ model.group ?? 'None' }}
                         </td>
-                        <td class="px-4 py-2 tabular-nums">
+                        <td class="px-4 py-2 tabular-nums max-sm:hidden">
                             {{ model.fields_count }}
                         </td>
                         <td
-                            class="px-4 py-2 whitespace-nowrap"
+                            class="px-4 py-2 whitespace-nowrap max-sm:hidden"
                             :class="{
                                 'text-muted-foreground': !model.updated_at,
                             }"
@@ -122,7 +138,7 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                     : 'Not yet'
                             }}
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-4 py-2 max-sm:hidden">
                             <Badge
                                 v-if="model.status === 'deleting'"
                                 variant="secondary"
@@ -134,17 +150,26 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <template v-if="model.status !== 'deleting'">
                                 <Button as-child variant="ghost" size="sm">
-                                    <Link :href="entries(model.id)"
-                                        >Entries</Link
-                                    >
+                                    <Link :href="entries(model.id)">
+                                        <List />
+                                        <span class="max-sm:sr-only"
+                                            >Entries</span
+                                        >
+                                    </Link>
                                 </Button>
                                 <Button as-child variant="ghost" size="sm">
-                                    <Link :href="builder(model.id)">Open</Link>
+                                    <Link :href="builder(model.id)">
+                                        <Pencil />
+                                        <span class="max-sm:sr-only">Open</span>
+                                    </Link>
                                 </Button>
                                 <Button as-child variant="ghost" size="sm">
-                                    <a :href="exportMethod(model.id).url"
-                                        >Export</a
-                                    >
+                                    <a :href="exportMethod(model.id).url">
+                                        <Download />
+                                        <span class="max-sm:sr-only"
+                                            >Export</span
+                                        >
+                                    </a>
                                 </Button>
                                 <DuplicateModelDialog
                                     :model="model"

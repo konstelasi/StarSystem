@@ -47,7 +47,7 @@ const slugProblem = computed(() =>
         <DialogTrigger as-child>
             <Button variant="ghost" size="sm">
                 <Copy />
-                Duplicate
+                <span class="max-sm:sr-only">Duplicate</span>
             </Button>
         </DialogTrigger>
         <DialogContent>

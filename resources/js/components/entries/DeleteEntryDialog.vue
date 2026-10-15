@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
+import { Trash2 } from '@lucide/vue';
 import EntryController from '@/actions/App/Http/Controllers/Admin/EntryController';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,7 +31,8 @@ defineProps<{
     <Dialog>
         <DialogTrigger as-child>
             <Button variant="ghost" size="sm" class="text-destructive">
-                Delete for good
+                <Trash2 />
+                <span class="max-sm:sr-only">Delete for good</span>
             </Button>
         </DialogTrigger>
         <DialogContent>

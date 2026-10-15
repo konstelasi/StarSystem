@@ -220,40 +220,36 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                     >
                         No ticks yet.
                     </p>
-                    <div v-else class="overflow-x-auto">
+                    <div v-else class="data-table">
                         <table class="w-full text-sm">
-                            <thead
-                                class="text-left text-xs text-muted-foreground"
-                            >
+                            <thead>
                                 <tr>
-                                    <th class="py-2 pr-4 font-medium">
-                                        Started
-                                    </th>
-                                    <th class="py-2 pr-4 font-medium">
+                                    <th class="py-2 pr-4">Started</th>
+                                    <th class="py-2 pr-4 max-sm:hidden">
                                         Trigger
                                     </th>
-                                    <th class="py-2 pr-4 font-medium">
+                                    <th class="py-2 pr-4 max-sm:hidden">
                                         Duration
                                     </th>
-                                    <th class="py-2 font-medium">Result</th>
+                                    <th class="py-2">Result</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr
                                     v-for="run in tick.recent"
                                     :key="run.id"
-                                    class="border-t align-top"
+                                    class="align-top"
                                 >
                                     <td class="py-2 pr-4 whitespace-nowrap">
                                         {{ formatTime(run.startedAt) }}
                                     </td>
-                                    <td class="py-2 pr-4">
+                                    <td class="py-2 pr-4 max-sm:hidden">
                                         <Badge variant="outline">
                                             {{ run.trigger }}
                                         </Badge>
                                     </td>
                                     <td
-                                        class="py-2 pr-4 whitespace-nowrap tabular-nums"
+                                        class="py-2 pr-4 whitespace-nowrap tabular-nums max-sm:hidden"
                                     >
                                         <template
                                             v-if="run.elapsedSeconds !== null"

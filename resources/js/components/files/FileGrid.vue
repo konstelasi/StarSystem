@@ -68,14 +68,16 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
         </button>
     </div>
 
-    <div v-else class="overflow-x-auto rounded-lg border">
+    <div v-else class="data-table rounded-lg border">
         <table class="w-full text-sm">
-            <thead class="text-left text-xs text-muted-foreground">
+            <thead>
                 <tr>
-                    <th class="py-2 pr-4 pl-3 font-medium">Name</th>
-                    <th class="py-2 pr-4 font-medium">Size</th>
-                    <th v-if="!compact" class="py-2 pr-4 font-medium">Type</th>
-                    <th v-if="!compact" class="py-2 pr-3 font-medium">
+                    <th class="py-2 pr-4 pl-3">Name</th>
+                    <th class="py-2 pr-4">Size</th>
+                    <th v-if="!compact" class="py-2 pr-4 max-sm:hidden">
+                        Type
+                    </th>
+                    <th v-if="!compact" class="py-2 pr-3 max-sm:hidden">
                         Uploaded
                     </th>
                 </tr>
@@ -88,7 +90,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
                     :aria-selected="selected.includes(file.uuid)"
                     :class="
                         cn(
-                            'cursor-pointer border-t outline-none focus-visible:bg-accent',
+                            'cursor-pointer outline-none focus-visible:bg-accent',
                             selected.includes(file.uuid)
                                 ? 'bg-accent'
                                 : 'hover:bg-accent/50',
@@ -113,13 +115,13 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString();
                     </td>
                     <td
                         v-if="!compact"
-                        class="py-1.5 pr-4 whitespace-nowrap text-muted-foreground"
+                        class="py-1.5 pr-4 whitespace-nowrap text-muted-foreground max-sm:hidden"
                     >
                         {{ file.extension.toUpperCase() }}
                     </td>
                     <td
                         v-if="!compact"
-                        class="py-1.5 pr-3 whitespace-nowrap text-muted-foreground"
+                        class="py-1.5 pr-3 whitespace-nowrap text-muted-foreground max-sm:hidden"
                     >
                         {{ formatDate(file.createdAt) }}
                     </td>

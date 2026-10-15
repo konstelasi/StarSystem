@@ -25,7 +25,7 @@ defineProps<{
         <DialogTrigger as-child>
             <Button variant="ghost" size="sm" class="text-destructive">
                 <Trash2 />
-                Delete
+                <span class="max-sm:sr-only">Delete</span>
             </Button>
         </DialogTrigger>
         <DialogContent>

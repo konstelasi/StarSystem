@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
-import { ArrowLeft, Blocks, FileText, PlusCircle, Trash2 } from '@lucide/vue';
+import {
+    ArrowLeft,
+    Blocks,
+    FileText,
+    PlusCircle,
+    RotateCcw,
+    Trash2,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import DeleteEntryDialog from '@/components/entries/DeleteEntryDialog.vue';
 import { Button } from '@/components/ui/button';
@@ -204,19 +211,20 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
 
         <div
             v-else-if="entries.length > 0"
-            class="overflow-x-auto rounded-lg border"
+            class="data-table rounded-lg border"
         >
             <table class="w-full text-sm">
-                <thead class="text-left text-xs text-muted-foreground">
+                <thead>
                     <tr>
                         <th
-                            v-for="column in columns"
+                            v-for="(column, position) in columns"
                             :key="column.key"
-                            class="px-4 py-2 font-medium"
+                            class="px-4 py-2"
+                            :class="{ 'max-sm:hidden': position > 0 }"
                         >
                             {{ column.label }}
                         </th>
-                        <th class="px-4 py-2 font-medium">
+                        <th class="px-4 py-2 max-sm:hidden">
                             {{ inTrash ? 'Trashed' : 'Created' }}
                         </th>
                         <th class="px-4 py-2"></th>
@@ -226,12 +234,13 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                     <tr
                         v-for="entry in entries"
                         :key="entry.id"
-                        class="border-t align-top"
+                        class="align-top"
                     >
                         <td
                             v-for="(column, position) in columns"
                             :key="column.key"
                             class="px-4 py-2"
+                            :class="{ 'max-sm:hidden': position > 0 }"
                         >
                             <span
                                 v-if="swatch(entry, column)"
@@ -268,7 +277,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                 {{ cell(entry, column) }}
                             </span>
                         </td>
-                        <td class="px-4 py-2 whitespace-nowrap">
+                        <td class="px-4 py-2 whitespace-nowrap max-sm:hidden">
                             <template v-if="inTrash && entry.trashed_at">
                                 <span :title="formatTime(entry.trashed_at)">
                                     {{ relativeTime(entry.trashed_at) }}
@@ -294,7 +303,8 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                         )
                                     "
                                 >
-                                    Restore
+                                    <RotateCcw />
+                                    <span class="max-sm:sr-only">Restore</span>
                                 </Button>
                                 <DeleteEntryDialog
                                     :model-id="model.id"
@@ -318,7 +328,9 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                 "
                             >
                                 <Trash2 />
-                                Move to trash
+                                <span class="max-sm:sr-only"
+                                    >Move to trash</span
+                                >
                             </Button>
                         </td>
                     </tr>

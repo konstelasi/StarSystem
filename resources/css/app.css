@@ -58,6 +58,7 @@
     --color-warning-wash: var(--warning-wash);
 
     --color-border: var(--border);
+    --color-hairline: var(--hairline);
     --color-input: var(--input);
     --color-ring: var(--ring);
 
@@ -131,6 +132,7 @@
     --warning-line: #d9b45a;
     --warning-wash: #fbf3df;
     --border: #d2d2d2;
+    --hairline: #e4e4e4; /* --p-hair, between table rows */
     --input: #acacac; /* --border-hover, the resting edge of a field */
     --ring: #311b92;
     --chart-1: #311b92;
@@ -173,6 +175,7 @@
     --warning-line: #7a6320;
     --warning-wash: #2a2310;
     --border: #2d2d2d;
+    --hairline: #242424;
     --input: #535353;
     --ring: #b39ddb;
     --chart-1: #b39ddb;
@@ -213,5 +216,29 @@
     ::selection {
         background: var(--primary);
         color: var(--background);
+    }
+}
+
+@layer components {
+    /*
+      A table as the admin guide draws it: small muted headings, hairlines
+      between rows, no stripes. Put it on the wrapper around the <table>.
+      The wrapper is positioned, because without that the hidden text of a
+      screen reader label sits outside the clipped box and widens the page.
+    */
+    .data-table {
+        position: relative;
+        overflow-x: auto;
+    }
+
+    .data-table th {
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-align: left;
+        color: var(--muted-foreground);
+    }
+
+    .data-table tbody tr {
+        border-top: 1px solid var(--hairline);
     }
 }
