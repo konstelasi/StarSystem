@@ -24,9 +24,7 @@ const current = computed(() =>
     <div class="flex min-h-svh flex-col items-center bg-background p-6 md:p-10">
         <div class="flex w-full max-w-xl flex-col gap-8">
             <div class="flex flex-col items-center gap-3">
-                <AppLogoIcon
-                    class="size-9 fill-current text-[var(--foreground)] dark:text-white"
-                />
+                <AppLogoIcon class="size-9 text-foreground" />
                 <p class="text-sm font-medium text-muted-foreground">
                     Install StarSystem
                 </p>
