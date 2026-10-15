@@ -101,10 +101,14 @@ const groups = computed<NavGroup[]>(() => {
 
 <template>
     <Sidebar collapsible="icon" variant="sidebar">
-        <SidebarHeader>
+        <SidebarHeader class="h-14 shrink-0 justify-center py-0">
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
+                    <SidebarMenuButton
+                        size="lg"
+                        as-child
+                        class="group-data-[collapsible=icon]:justify-center"
+                    >
                         <Link :href="dashboard()">
                             <AppLogo />
                         </Link>

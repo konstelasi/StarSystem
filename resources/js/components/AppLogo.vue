@@ -11,8 +11,10 @@ const name = usePage().props.name;
   read.
 -->
 <template>
-    <AppLogoIcon class="size-8 shrink-0 text-sidebar-foreground" />
-    <div class="ml-1 grid flex-1 text-left">
+    <AppLogoIcon class="size-6! shrink-0 text-sidebar-foreground" />
+    <div
+        class="ml-1 grid flex-1 text-left group-data-[collapsible=icon]:hidden"
+    >
         <span
             class="truncate text-[1.0625rem] leading-tight font-semibold tracking-[-0.01em]"
             >{{ name }}</span
