@@ -146,7 +146,7 @@
     --sidebar-foreground: #121212;
     --sidebar-primary: #311b92;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #efecf8; /* --p-wash, behind the current item */
+    --sidebar-accent: #ffffff; /* behind the current item and on hover */
     --sidebar-accent-foreground: #311b92;
     --sidebar-border: #d2d2d2;
     --sidebar-ring: #311b92;
@@ -187,7 +187,7 @@
     --sidebar-foreground: #ededed;
     --sidebar-primary: #b39ddb;
     --sidebar-primary-foreground: #090909;
-    --sidebar-accent: #221c33;
+    --sidebar-accent: #1f1f1f;
     --sidebar-accent-foreground: #b39ddb;
     --sidebar-border: #2d2d2d;
     --sidebar-ring: #b39ddb;
