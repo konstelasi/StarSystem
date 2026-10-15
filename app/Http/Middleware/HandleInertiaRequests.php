@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Health\TickStatus;
+use App\Models\SchemaModel;
+use App\Sites\CurrentSite;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -44,6 +46,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'backgroundWork' => fn () => $this->backgroundWork($request),
+            'navModels' => fn () => $this->navModels($request),
         ];
     }
 
@@ -62,5 +65,33 @@ class HandleInertiaRequests extends Middleware
         $ticks = app(TickStatus::class);
 
         return $ticks->late() ? ['minutesSinceLast' => $ticks->minutesSinceLast()] : null;
+    }
+
+    /**
+     * The current site's models, for the sidebar to list under Content and
+     * under each model group. Models being deleted are left out. Empty for
+     * guests, so public pages never query for it.
+     *
+     * @return list<array{id: int, label: string, group: string|null}>
+     */
+    private function navModels(Request $request): array
+    {
+        if ($request->user() === null || ! app(CurrentSite::class)->has()) {
+            return [];
+        }
+
+        $models = SchemaModel::query()
+            ->where('status', SchemaModel::ACTIVE)
+            ->orderBy('group')
+            ->orderBy('label')
+            ->get(['id', 'label', 'group']);
+
+        $rows = [];
+
+        foreach ($models as $model) {
+            $rows[] = ['id' => $model->id, 'label' => $model->label, 'group' => $model->group];
+        }
+
+        return $rows;
     }
 }

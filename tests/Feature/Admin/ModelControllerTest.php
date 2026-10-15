@@ -59,6 +59,38 @@ class ModelControllerTest extends TestCase
             );
     }
 
+    public function test_the_sidebar_gets_the_sites_active_models_by_group_then_label()
+    {
+        $this->create('pages', 'Pages');
+        $this->create('articles', 'Articles')->update(['group' => 'Blog']);
+        $this->create('authors', 'Authors')->update(['group' => 'Blog']);
+        $this->manager()->deleteModel($this->create('drafts', 'Drafts'));
+
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+        $this->asSite($other);
+        $this->create('secrets', 'Secrets');
+        $this->asSite($this->site);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.index'))
+            ->assertInertia(fn (Assert $assert) => $assert
+                ->has('navModels', 3)
+                ->where('navModels.0.label', 'Pages')
+                ->where('navModels.0.group', null)
+                ->where('navModels.1.label', 'Articles')
+                ->where('navModels.1.group', 'Blog')
+                ->where('navModels.2.label', 'Authors')
+            );
+    }
+
+    public function test_guests_get_no_models_in_the_sidebar()
+    {
+        $this->create('articles', 'Articles');
+
+        $this->get($this->url('home'))
+            ->assertInertia(fn (Assert $assert) => $assert->where('navModels', []));
+    }
+
     public function test_a_purged_model_drops_off_the_list()
     {
         $model = $this->create('articles', 'Articles');

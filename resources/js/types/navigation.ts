@@ -11,4 +11,14 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon;
     isActive?: boolean;
+    /** Active on any page under `href`, not only on `href` itself. */
+    matchPrefix?: boolean;
+    /** For an item no plain match fits: says from the current path. */
+    activeWhen?: (path: string) => boolean;
+};
+
+export type NavGroup = {
+    /** Left out for the group at the top, which needs no heading. */
+    label?: string;
+    items: NavItem[];
 };

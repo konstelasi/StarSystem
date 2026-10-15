@@ -8,23 +8,34 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
-import type { NavItem } from '@/types';
+import type { NavGroup, NavItem } from '@/types';
 
 defineProps<{
-    items: NavItem[];
+    groups: NavGroup[];
 }>();
 
-const { isCurrentUrl } = useCurrentUrl();
+const { currentUrl, isCurrentUrl } = useCurrentUrl();
+
+const isActive = (item: NavItem) =>
+    item.activeWhen
+        ? item.activeWhen(currentUrl.value)
+        : isCurrentUrl(item.href, undefined, item.matchPrefix);
 </script>
 
 <template>
-    <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
+    <SidebarGroup
+        v-for="(group, position) in groups"
+        :key="position"
+        class="px-2 py-1"
+    >
+        <SidebarGroupLabel v-if="group.label">{{
+            group.label
+        }}</SidebarGroupLabel>
         <SidebarMenu>
-            <SidebarMenuItem v-for="item in items" :key="item.title">
+            <SidebarMenuItem v-for="(item, index) in group.items" :key="index">
                 <SidebarMenuButton
                     as-child
-                    :is-active="isCurrentUrl(item.href)"
+                    :is-active="isActive(item)"
                     :tooltip="item.title"
                 >
                     <Link :href="item.href">
