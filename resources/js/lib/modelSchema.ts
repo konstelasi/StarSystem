@@ -294,7 +294,7 @@ export type SchemaJsonResult =
 
 /**
  * Parses the JSON tab's text back into a schema, for the builder to apply.
- * Checks the shape, not every business rule (e.g. duplicate keys) — those
+ * Checks the shape, not every business rule (e.g. duplicate keys), as those
  * surface in the inspector once the schema is applied.
  */
 export function parseSchemaJson(text: string): SchemaJsonResult {

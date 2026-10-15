@@ -105,16 +105,21 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                             <code class="text-xs">{{ model.slug }}</code>
                         </td>
                         <td class="px-4 py-2 text-muted-foreground">
-                            {{ model.group ?? '—' }}
+                            {{ model.group ?? 'None' }}
                         </td>
                         <td class="px-4 py-2 tabular-nums">
                             {{ model.fields_count }}
                         </td>
-                        <td class="px-4 py-2 whitespace-nowrap">
+                        <td
+                            class="px-4 py-2 whitespace-nowrap"
+                            :class="{
+                                'text-muted-foreground': !model.updated_at,
+                            }"
+                        >
                             {{
                                 model.updated_at
                                     ? formatTime(model.updated_at)
-                                    : '—'
+                                    : 'Not yet'
                             }}
                         </td>
                         <td class="px-4 py-2">

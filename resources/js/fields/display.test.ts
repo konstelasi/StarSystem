@@ -20,7 +20,7 @@ function field(
 
 const utc = { locale: 'en-GB', timeZone: 'UTC' };
 
-test('empty values show a dash', () => {
+test('empty values show the word None', () => {
     expect(cellText(field('text'), null)).toBe(EMPTY_CELL);
     expect(cellText(field('text'), '')).toBe(EMPTY_CELL);
     expect(cellText(field('checkboxes'), [])).toBe(EMPTY_CELL);

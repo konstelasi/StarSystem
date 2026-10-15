@@ -50,7 +50,7 @@ const value = computed(() => asNumber(props.modelValue));
                 class="min-w-12 rounded-md border px-2 py-1 text-center text-sm tabular-nums"
                 :class="{ 'text-muted-foreground': value === null }"
             >
-                {{ value ?? '–' }}
+                {{ value ?? 'Not set' }}
             </output>
         </div>
     </FieldShell>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * <FilePicker> — a dialog for choosing files from the current site's media
+ * <FilePicker> is a dialog for choosing files from the current site's media
  * library, with search, folders and upload. It returns file uuids; store
  * those, never URLs, since a file's URL includes its display name.
  *

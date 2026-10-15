@@ -261,7 +261,11 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                                             {{ run.elapsedSeconds.toFixed(1) }}s
                                             of {{ run.budgetSeconds }}s
                                         </template>
-                                        <template v-else>–</template>
+                                        <span
+                                            v-else
+                                            class="text-muted-foreground"
+                                            >Not recorded</span
+                                        >
                                     </td>
                                     <td class="py-2">
                                         <span

@@ -10,7 +10,8 @@ import type { FieldSpecJson } from '@/types/schema';
 /** Longest text a list cell shows before cutting it with "…". */
 export const CELL_MAX_LENGTH = 80;
 
-export const EMPTY_CELL = '—';
+/** What a list cell shows for a value that was never filled in. */
+export const EMPTY_CELL = 'None';
 
 type CellOptions = {
     /** For tests: a fixed language and time zone instead of the browser's. */

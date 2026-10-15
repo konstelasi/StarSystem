@@ -112,6 +112,11 @@ function cell(entry: EntryRow, column: FieldSpecJson): string {
     return cellText(column, entry.values[column.key], entry.file_names);
 }
 
+/** Whether a cell has no value, so the list can show it muted. */
+function isEmpty(entry: EntryRow, column: FieldSpecJson): boolean {
+    return cell(entry, column) === EMPTY_CELL;
+}
+
 /** A color cell's swatch, when the value is a color at all. */
 function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
     const value = entry.values[column.key];
@@ -242,12 +247,26 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                     edit({ model: model.id, entry: entry.id })
                                 "
                                 class="font-medium underline-offset-4 hover:underline"
+                                :class="{
+                                    'text-muted-foreground': isEmpty(
+                                        entry,
+                                        column,
+                                    ),
+                                }"
                             >
                                 {{ cell(entry, column) }}
                             </Link>
-                            <template v-else>
+                            <span
+                                v-else
+                                :class="{
+                                    'text-muted-foreground': isEmpty(
+                                        entry,
+                                        column,
+                                    ),
+                                }"
+                            >
                                 {{ cell(entry, column) }}
-                            </template>
+                            </span>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap">
                             <template v-if="inTrash && entry.trashed_at">
