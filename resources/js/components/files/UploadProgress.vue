@@ -40,7 +40,7 @@ const emit = defineEmits<{
                     />
                     <CheckCircle2
                         v-else-if="item.status === 'done'"
-                        class="size-4 shrink-0 text-green-600 dark:text-green-400"
+                        class="size-4 shrink-0 text-success"
                     />
                     <AlertTriangle
                         v-else-if="item.status === 'error'"

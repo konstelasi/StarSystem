@@ -63,7 +63,14 @@ const THEMES: [string, Map<string, string>][] = [
 const SURFACES = ['background', 'card', 'muted', 'secondary', 'accent'];
 
 /** Every token used as a text colour on those surfaces. */
-const TEXT = ['foreground', 'muted-foreground', 'primary', 'destructive'];
+const TEXT = [
+    'foreground',
+    'muted-foreground',
+    'primary',
+    'destructive',
+    'success',
+    'warning',
+];
 
 /** Text that only ever sits on one particular fill. */
 const FILLED: [string, string][] = [
@@ -72,6 +79,7 @@ const FILLED: [string, string][] = [
     ['sidebar-foreground', 'sidebar-background'],
     ['sidebar-accent-foreground', 'sidebar-accent'],
     ['sidebar-primary-foreground', 'sidebar-primary'],
+    ['warning', 'warning-wash'],
 ];
 
 const PAIRS: [string, string][] = [

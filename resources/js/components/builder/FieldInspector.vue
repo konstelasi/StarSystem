@@ -118,7 +118,7 @@ function remove() {
                 </p>
                 <span
                     v-if="busyLabel"
-                    class="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-600/30 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
+                    class="mt-1 inline-flex items-center gap-1 rounded-full border border-warning-line bg-warning-wash px-1.5 py-0.5 text-[11px] text-warning"
                 >
                     <AlarmClockCheck class="size-3" aria-hidden="true" />
                     {{ busyLabel }}

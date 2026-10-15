@@ -52,6 +52,11 @@
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
 
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-warning-line: var(--warning-line);
+    --color-warning-wash: var(--warning-wash);
+
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -119,6 +124,12 @@
     --accent-foreground: #121212;
     --destructive: #b3261e;
     --destructive-foreground: #ffffff;
+    /* A positive tick, and a warning notice: ink, edge and wash. Small
+       signals only, never a fill (admin.md, "What each colour means"). */
+    --success: #1f6b3a;
+    --warning: #5c4300;
+    --warning-line: #d9b45a;
+    --warning-wash: #fbf3df;
     --border: #d2d2d2;
     --input: #acacac; /* --border-hover, the resting edge of a field */
     --ring: #311b92;
@@ -157,6 +168,10 @@
     --accent-foreground: #ededed;
     --destructive: #f2b8b5;
     --destructive-foreground: #090909;
+    --success: #7fd19b;
+    --warning: #e8d29a;
+    --warning-line: #7a6320;
+    --warning-wash: #2a2310;
     --border: #2d2d2d;
     --input: #535353;
     --ring: #b39ddb;

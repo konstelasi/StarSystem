@@ -231,7 +231,7 @@ const updateError = computed(
                     >
                         <CheckCircle2
                             v-if="stepStatus(name) === 'done'"
-                            class="mt-0.5 size-4 shrink-0 text-green-600 dark:text-green-400"
+                            class="mt-0.5 size-4 shrink-0 text-success"
                         />
                         <AlertTriangle
                             v-else-if="
