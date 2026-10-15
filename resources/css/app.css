@@ -2,6 +2,17 @@
 
 @import 'tw-animate-css';
 
+/* Poppins, self-hosted. Only the Latin subsets, which cover English and
+   Indonesian, in the weights the admin uses. */
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-ext-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-ext-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/poppins/latin-ext-600.css';
+@import '@fontsource/poppins/latin-700.css';
+@import '@fontsource/poppins/latin-ext-700.css';
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
@@ -9,13 +20,13 @@
 
 @theme inline {
     --font-sans:
-        Instrument Sans, ui-sans-serif, system-ui, sans-serif,
-        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
+        Poppins, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+        Arial, sans-serif;
 
+    /* 10px on cards, 6px on fields, buttons and menus, as on the site. */
     --radius-lg: var(--radius);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: var(--radius-sm);
+    --radius-sm: var(--radius-sm);
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -79,87 +90,90 @@
     }
 }
 
-@layer utilities {
-    body,
-    html {
-        --font-sans:
-            'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
-            'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-            'Noto Color Emoji';
-    }
-}
+/*
+  The Konstelasi palette, ported from the website's src/styles/tokens.css as
+  the admin design guide (KonstelasiWebsite/docs/design/admin.md) asks. The
+  shadcn names stay, so the components need no change; the guide's own name
+  for each value is in the comment beside it.
 
+  Violet is the one hue, and it means something: the main action, the active
+  item, a link, focus. Red is only for errors and deleting.
+
+  Every value is a plain hex, because resources/js/lib/theme.test.ts reads
+  them to hold each text colour to 4.5:1 on each surface it sits on.
+*/
 :root {
-    --background: hsl(0 0% 100%);
-    --foreground: hsl(0 0% 3.9%);
-    --card: hsl(0 0% 100%);
-    --card-foreground: hsl(0 0% 3.9%);
-    --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(0 0% 3.9%);
-    --primary: hsl(0 0% 9%);
-    --primary-foreground: hsl(0 0% 98%);
-    --secondary: hsl(0 0% 92.1%);
-    --secondary-foreground: hsl(0 0% 9%);
-    --muted: hsl(0 0% 96.1%);
-    --muted-foreground: hsl(0 0% 45.1%);
-    --accent: hsl(0 0% 96.1%);
-    --accent-foreground: hsl(0 0% 9%);
-    --destructive: hsl(0 84.2% 60.2%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 92.8%);
-    --input: hsl(0 0% 89.8%);
-    --ring: hsl(0 0% 3.9%);
-    --chart-1: hsl(12 76% 61%);
-    --chart-2: hsl(173 58% 39%);
-    --chart-3: hsl(197 37% 24%);
-    --chart-4: hsl(43 74% 66%);
-    --chart-5: hsl(27 87% 67%);
-    --radius: 0.5rem;
-    --sidebar-background: hsl(0 0% 98%);
-    --sidebar-foreground: hsl(240 5.3% 26.1%);
-    --sidebar-primary: hsl(0 0% 10%);
-    --sidebar-primary-foreground: hsl(0 0% 98%);
-    --sidebar-accent: hsl(0 0% 94%);
-    --sidebar-accent-foreground: hsl(0 0% 30%);
-    --sidebar-border: hsl(0 0% 91%);
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
-    --sidebar: hsl(0 0% 98%);
+    --background: #f6f6f6; /* --bg */
+    --foreground: #121212; /* --text */
+    --card: #eeeeee; /* --surface */
+    --card-foreground: #121212;
+    --popover: #eeeeee;
+    --popover-foreground: #121212;
+    --primary: #311b92; /* --brand */
+    --primary-foreground: #ffffff;
+    --secondary: #e0e0e0; /* --panel-2 */
+    --secondary-foreground: #121212;
+    --muted: #e7e7e7; /* --panel */
+    --muted-foreground: #555555; /* --text-dim */
+    --accent: #e0e0e0;
+    --accent-foreground: #121212;
+    --destructive: #b3261e;
+    --destructive-foreground: #ffffff;
+    --border: #d2d2d2;
+    --input: #acacac; /* --border-hover, the resting edge of a field */
+    --ring: #311b92;
+    --chart-1: #311b92;
+    --chart-2: #555555;
+    --chart-3: #acacac;
+    --chart-4: #512da8;
+    --chart-5: #1c0f5c;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --sidebar-background: #eeeeee;
+    --sidebar-foreground: #121212;
+    --sidebar-primary: #311b92;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #efecf8; /* --p-wash, behind the current item */
+    --sidebar-accent-foreground: #311b92;
+    --sidebar-border: #d2d2d2;
+    --sidebar-ring: #311b92;
+    --sidebar: #eeeeee;
 }
 
 .dark {
-    --background: hsl(0 0% 3.9%);
-    --foreground: hsl(0 0% 98%);
-    --card: hsl(0 0% 3.9%);
-    --card-foreground: hsl(0 0% 98%);
-    --popover: hsl(0 0% 3.9%);
-    --popover-foreground: hsl(0 0% 98%);
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(0 0% 9%);
-    --secondary: hsl(0 0% 14.9%);
-    --secondary-foreground: hsl(0 0% 98%);
-    --muted: hsl(0 0% 16.08%);
-    --muted-foreground: hsl(0 0% 63.9%);
-    --accent: hsl(0 0% 14.9%);
-    --accent-foreground: hsl(0 0% 98%);
-    --destructive: hsl(0 84% 60%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 14.9%);
-    --input: hsl(0 0% 14.9%);
-    --ring: hsl(0 0% 83.1%);
-    --chart-1: hsl(220 70% 50%);
-    --chart-2: hsl(160 60% 45%);
-    --chart-3: hsl(30 80% 55%);
-    --chart-4: hsl(280 65% 60%);
-    --chart-5: hsl(340 75% 55%);
-    --sidebar-background: hsl(0 0% 7%);
-    --sidebar-foreground: hsl(0 0% 95.9%);
-    --sidebar-primary: hsl(360, 100%, 100%);
-    --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(0 0% 15.9%);
-    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-    --sidebar-border: hsl(0 0% 15.9%);
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
-    --sidebar: hsl(240 5.9% 10%);
+    --background: #090909;
+    --foreground: #ededed;
+    --card: #111111;
+    --card-foreground: #ededed;
+    --popover: #111111;
+    --popover-foreground: #ededed;
+    --primary: #b39ddb;
+    --primary-foreground: #090909;
+    --secondary: #1f1f1f;
+    --secondary-foreground: #ededed;
+    --muted: #181818;
+    --muted-foreground: #aaaaaa;
+    --accent: #1f1f1f;
+    --accent-foreground: #ededed;
+    --destructive: #f2b8b5;
+    --destructive-foreground: #090909;
+    --border: #2d2d2d;
+    --input: #535353;
+    --ring: #b39ddb;
+    --chart-1: #b39ddb;
+    --chart-2: #aaaaaa;
+    --chart-3: #535353;
+    --chart-4: #7e57c2;
+    --chart-5: #d1c4e9;
+    --sidebar-background: #111111;
+    --sidebar-foreground: #ededed;
+    --sidebar-primary: #b39ddb;
+    --sidebar-primary-foreground: #090909;
+    --sidebar-accent: #221c33;
+    --sidebar-accent-foreground: #b39ddb;
+    --sidebar-border: #2d2d2d;
+    --sidebar-ring: #b39ddb;
+    --sidebar: #111111;
 }
 
 @layer base {
@@ -168,5 +182,21 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+
+    /* Headings as on the site. */
+    h1,
+    h2,
+    h3,
+    h4 {
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        text-wrap: balance;
+    }
+
+    ::selection {
+        background: var(--primary);
+        color: var(--background);
     }
 }
