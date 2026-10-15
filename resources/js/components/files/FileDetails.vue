@@ -161,6 +161,8 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString();
                 preload="metadata"
                 class="w-full bg-black"
             />
+            <!-- Black on purpose, in both themes: it's the letterbox around a
+                 video that doesn't fill its box, not a surface. -->
             <div v-else-if="file.kind === 'audio'" class="grid gap-2 p-3">
                 <FileThumb :file="file" class="h-24 rounded" />
                 <audio :src="file.url" controls preload="none" class="w-full" />

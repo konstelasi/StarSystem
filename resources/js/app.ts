@@ -5,7 +5,7 @@ import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'StarSystem';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
@@ -30,8 +30,10 @@ void createInertiaApp({
             },
         });
     },
+    // Inertia writes this into CSS as is, so the bar follows the theme's
+    // violet in both modes.
     progress: {
-        color: '#4B5563',
+        color: 'var(--primary)',
     },
 });
 
