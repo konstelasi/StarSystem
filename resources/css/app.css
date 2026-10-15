@@ -242,3 +242,39 @@
         border-top: 1px solid var(--hairline);
     }
 }
+
+/*
+  Touch screens. A finger needs about 44px (2.75rem). Menu rows and normal
+  buttons grow to it. Small and icon buttons keep their look and instead get
+  an invisible 44px target around them, as the admin guide does for the
+  avatar button.
+*/
+@media (pointer: coarse) {
+    @layer components {
+        [data-slot='button']:not([data-size='sm']):not([data-size^='icon']),
+        [data-slot='dropdown-menu-item'],
+        [data-slot='dropdown-menu-checkbox-item'],
+        [data-slot='dropdown-menu-radio-item'],
+        [data-slot='dropdown-menu-sub-trigger'],
+        [data-slot='select-item'],
+        [data-slot='sidebar-menu-button']:not([data-collapsible='icon'] *) {
+            min-height: 2.75rem;
+        }
+
+        [data-slot='button'][data-size='sm'],
+        [data-slot='button'][data-size^='icon'] {
+            position: relative;
+        }
+
+        [data-slot='button'][data-size='sm']::after,
+        [data-slot='button'][data-size^='icon']::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: max(100%, 2.75rem);
+            height: max(100%, 2.75rem);
+            transform: translate(-50%, -50%);
+        }
+    }
+}
