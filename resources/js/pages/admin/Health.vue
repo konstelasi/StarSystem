@@ -2,6 +2,8 @@
 import { Head } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, PauseCircle } from '@lucide/vue';
 import { computed } from 'vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -88,7 +90,12 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
 <template>
     <Head title="Health" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
+    <PageBody>
+        <PageHeader
+            title="Health"
+            description="Whether background work is keeping up, and what this install runs on."
+        />
+
         <Alert v-if="paused">
             <PauseCircle />
             <AlertTitle>Updates in progress: background work paused</AlertTitle>
@@ -401,5 +408,5 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                 </Card>
             </div>
         </div>
-    </div>
+    </PageBody>
 </template>

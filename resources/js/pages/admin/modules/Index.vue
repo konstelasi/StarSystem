@@ -3,6 +3,8 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { AlertTriangle, Puzzle, Upload } from '@lucide/vue';
 import ModuleController from '@/actions/App/Http/Controllers/Admin/ModuleController';
 import HookSlot from '@/components/HookSlot.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -61,22 +63,20 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
 <template>
     <Head title="Modules" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="space-y-0.5">
-                <h2 class="text-xl font-semibold tracking-tight">Modules</h2>
-                <p class="text-sm text-muted-foreground">
-                    Modules add features to StarSystem {{ coreVersion }}. They
-                    run for every site on this install.
-                </p>
-            </div>
-            <Button as-child>
-                <Link :href="create()">
-                    <Upload />
-                    Upload module
-                </Link>
-            </Button>
-        </div>
+    <PageBody>
+        <PageHeader
+            title="Modules"
+            :description="`Modules add features to StarSystem ${coreVersion}. They run for every site on this install.`"
+        >
+            <template #actions>
+                <Button as-child>
+                    <Link :href="create()">
+                        <Upload />
+                        Upload module
+                    </Link>
+                </Button>
+            </template>
+        </PageHeader>
 
         <Alert v-if="safeMode">
             <AlertTriangle />
@@ -295,5 +295,5 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                 </CardFooter>
             </Card>
         </div>
-    </div>
+    </PageBody>
 </template>

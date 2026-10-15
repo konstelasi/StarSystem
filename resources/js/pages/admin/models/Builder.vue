@@ -11,6 +11,8 @@ import FormPreview from '@/components/builder/FormPreview.vue';
 import JsonEditor from '@/components/builder/JsonEditor.vue';
 import ModelInspector from '@/components/builder/ModelInspector.vue';
 import SaveDialog from '@/components/builder/SaveDialog.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -122,33 +124,29 @@ function finishSave() {
 <template>
     <Head :title="`${builder.schema.value.model.label}: fields`" />
 
-    <div class="@container flex flex-1 flex-col gap-4 p-4">
-        <header class="flex flex-wrap items-end justify-between gap-3">
-            <div class="min-w-0">
-                <p class="text-xs text-muted-foreground">
-                    {{ builder.schema.value.model.group ?? 'Models' }}
-                </p>
-                <h1 class="flex items-center gap-2 text-xl font-semibold">
-                    {{ builder.schema.value.model.label }}
-                    <Badge
-                        v-if="builder.isDirty.value"
-                        variant="secondary"
-                        class="font-normal"
-                    >
-                        Unsaved changes
-                    </Badge>
-                </h1>
-                <p class="text-sm text-muted-foreground">
-                    Build the form editors fill in for each entry.
-                </p>
-            </div>
-            <Button
-                :disabled="!builder.isDirty.value || unfinished !== null"
-                @click="saveDialogOpen = true"
-            >
-                <Save /> Save changes
-            </Button>
-        </header>
+    <PageBody width="full" class="@container">
+        <PageHeader
+            :title="builder.schema.value.model.label"
+            description="Build the form editors fill in for each entry."
+        >
+            <template #badge>
+                <Badge
+                    v-if="builder.isDirty.value"
+                    variant="secondary"
+                    class="font-normal"
+                >
+                    Unsaved changes
+                </Badge>
+            </template>
+            <template #actions>
+                <Button
+                    :disabled="!builder.isDirty.value || unfinished !== null"
+                    @click="saveDialogOpen = true"
+                >
+                    <Save /> Save changes
+                </Button>
+            </template>
+        </PageHeader>
 
         <Alert v-if="unfinished" variant="destructive">
             <AlertTriangle />
@@ -190,7 +188,7 @@ function finishSave() {
                     class="grid items-start gap-4 @3xl:grid-cols-[minmax(0,1fr)_18rem] @5xl:grid-cols-[13rem_minmax(0,1fr)_20rem]"
                 >
                     <aside
-                        class="rounded-xl border bg-card p-3 @3xl:col-span-2 @5xl:sticky @5xl:top-4 @5xl:col-span-1 @5xl:max-h-[calc(100svh-7rem)] @5xl:overflow-y-auto"
+                        class="rounded-xl border bg-card p-3 @3xl:col-span-2 @5xl:sticky @5xl:top-[4.5rem] @5xl:col-span-1 @5xl:max-h-[calc(100svh-6rem)] @5xl:overflow-y-auto"
                     >
                         <BuilderPalette :field-types="fieldTypes" />
                     </aside>
@@ -204,7 +202,7 @@ function finishSave() {
 
                     <aside
                         aria-label="Settings"
-                        class="rounded-xl border bg-card p-4 @3xl:sticky @3xl:top-4 @3xl:max-h-[calc(100svh-7rem)] @3xl:overflow-y-auto"
+                        class="rounded-xl border bg-card p-4 @3xl:sticky @3xl:top-[4.5rem] @3xl:max-h-[calc(100svh-6rem)] @3xl:overflow-y-auto"
                     >
                         <FieldInspector
                             v-if="builder.selectedField.value"
@@ -240,5 +238,5 @@ function finishSave() {
         <div aria-live="polite" aria-atomic="true" class="sr-only">
             {{ announcement }}
         </div>
-    </div>
+    </PageBody>
 </template>

@@ -2,6 +2,8 @@
 import { Head, Link, setLayoutProps } from '@inertiajs/vue3';
 import { Save } from '@lucide/vue';
 import EntryForm from '@/components/entries/EntryForm.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useEntryForm } from '@/composables/useEntryForm';
@@ -38,11 +40,11 @@ const created = new Date(props.entry.created_at).toLocaleString();
 <template>
     <Head :title="`Edit ${model.label}`" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
-        <header class="space-y-0.5">
-            <h1 class="text-xl font-semibold">Edit {{ model.label }}</h1>
-            <p class="text-sm text-muted-foreground">Created {{ created }}</p>
-        </header>
+    <PageBody width="text">
+        <PageHeader
+            :title="`Edit ${model.label}`"
+            :description="`Created ${created}`"
+        />
 
         <EntryForm
             :schema="schema"
@@ -71,5 +73,5 @@ const created = new Date(props.entry.created_at).toLocaleString();
                 <Link :href="index(model.id)">Cancel</Link>
             </Button>
         </div>
-    </div>
+    </PageBody>
 </template>

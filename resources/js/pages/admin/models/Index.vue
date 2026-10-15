@@ -13,6 +13,8 @@ import CreateModelDialog from '@/components/models/CreateModelDialog.vue';
 import DeleteModelDialog from '@/components/models/DeleteModelDialog.vue';
 import DuplicateModelDialog from '@/components/models/DuplicateModelDialog.vue';
 import ImportModelDialog from '@/components/models/ImportModelDialog.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,15 +56,12 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
 <template>
     <Head title="Models" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="space-y-0.5">
-                <h2 class="text-xl font-semibold tracking-tight">Models</h2>
-                <p class="text-sm text-muted-foreground">
-                    The content models editors fill in entries for.
-                </p>
-            </div>
-            <div class="flex gap-2">
+    <PageBody>
+        <PageHeader
+            title="Models"
+            description="The content models editors fill in entries for."
+        >
+            <template #actions>
                 <Button variant="secondary" @click="importOpen = true">
                     <Upload />
                     Import
@@ -71,8 +70,8 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                     <PlusCircle />
                     New model
                 </Button>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
         <Card v-if="models.length === 0">
             <CardHeader class="items-center text-center">
@@ -188,5 +187,5 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
             :existing-slugs="existingSlugs"
         />
         <ImportModelDialog v-model:open="importOpen" />
-    </div>
+    </PageBody>
 </template>

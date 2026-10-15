@@ -14,6 +14,8 @@ import FileDropzone from '@/components/files/FileDropzone.vue';
 import FileGrid from '@/components/files/FileGrid.vue';
 import FolderNav from '@/components/files/FolderNav.vue';
 import UploadProgress from '@/components/files/UploadProgress.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -147,7 +149,12 @@ function createFolder() {
 <template>
     <Head title="Media" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
+    <PageBody>
+        <PageHeader
+            title="Media"
+            description="The files this site's entries can use."
+        />
+
         <Alert v-if="!limits.canDetectTypes" variant="destructive">
             <AlertTriangle />
             <AlertTitle>Uploads are off</AlertTitle>
@@ -294,7 +301,7 @@ function createFolder() {
                 v-if="selected"
                 :file="selected"
                 :folders="folders"
-                class="w-full shrink-0 lg:sticky lg:top-4 lg:w-80"
+                class="w-full shrink-0 lg:sticky lg:top-[4.5rem] lg:w-80"
                 @updated="onUpdated"
                 @deleted="onDeleted"
                 @close="selected = null"
@@ -338,5 +345,5 @@ function createFolder() {
                 </form>
             </DialogContent>
         </Dialog>
-    </div>
+    </PageBody>
 </template>

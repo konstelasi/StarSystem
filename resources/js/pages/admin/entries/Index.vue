@@ -10,6 +10,8 @@ import {
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import DeleteEntryDialog from '@/components/entries/DeleteEntryDialog.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -107,6 +109,12 @@ setLayoutProps({
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
 
+const description = computed(() =>
+    props.view === 'trash'
+        ? `Entries moved out of ${props.model.label}. Restore one to use it again. Entries in the trash are deleted for good after ${props.trashDays} days.`
+        : 'The entries in this model.',
+);
+
 /** How the delete dialog names an entry: its first column, if it has one. */
 function entryName(entry: EntryRow): string | null {
     const first = props.columns[0];
@@ -139,22 +147,9 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
 <template>
     <Head :title="inTrash ? `${model.label}: trash` : model.label" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="space-y-0.5">
-                <h2 class="text-xl font-semibold tracking-tight">
-                    {{ inTrash ? 'Trash' : model.label }}
-                </h2>
-                <p class="text-sm text-muted-foreground">
-                    <template v-if="inTrash">
-                        Entries moved out of {{ model.label }}. Restore one to
-                        use it again. Entries in the trash are deleted for good
-                        after {{ trashDays }} days.
-                    </template>
-                    <template v-else>The entries in this model.</template>
-                </p>
-            </div>
-            <div class="flex gap-2">
+    <PageBody>
+        <PageHeader :title="inTrash ? 'Trash' : model.label" :description>
+            <template #actions>
                 <Button v-if="inTrash" variant="secondary" as-child>
                     <Link :href="index(model.id)">
                         <ArrowLeft />
@@ -175,8 +170,8 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                         </Link>
                     </Button>
                 </template>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
         <Card v-if="!hasFields && !inTrash">
             <CardHeader class="items-center text-center">
@@ -344,5 +339,5 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                 Load more
             </Button>
         </div>
-    </div>
+    </PageBody>
 </template>

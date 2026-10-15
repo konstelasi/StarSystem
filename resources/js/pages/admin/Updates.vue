@@ -2,6 +2,8 @@
 import { Head, router, useForm, useHttp, usePage } from '@inertiajs/vue3';
 import { AlertTriangle, CheckCircle2, Circle, RotateCcw } from '@lucide/vue';
 import { computed, onMounted, ref } from 'vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -159,7 +161,12 @@ const updateError = computed(
 <template>
     <Head title="Updates" />
 
-    <div class="flex max-w-3xl flex-1 flex-col gap-4 p-4">
+    <PageBody width="text">
+        <PageHeader
+            title="Updates"
+            description="Keep StarSystem on its latest version."
+        />
+
         <Alert v-if="updateError" variant="destructive">
             <AlertTriangle />
             <AlertTitle>The update didn't start</AlertTitle>
@@ -364,5 +371,5 @@ const updateError = computed(
                 </div>
             </CardContent>
         </Card>
-    </div>
+    </PageBody>
 </template>

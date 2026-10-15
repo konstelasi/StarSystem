@@ -2,6 +2,8 @@
 import { Head, Link, setLayoutProps } from '@inertiajs/vue3';
 import { Save } from '@lucide/vue';
 import EntryForm from '@/components/entries/EntryForm.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useEntryForm } from '@/composables/useEntryForm';
@@ -30,10 +32,8 @@ const { values, errors, processing, updateValue, submit } = useEntryForm(
 <template>
     <Head :title="`New ${model.label}`" />
 
-    <div class="flex flex-1 flex-col gap-4 p-4">
-        <header class="space-y-0.5">
-            <h1 class="text-xl font-semibold">New {{ model.label }}</h1>
-        </header>
+    <PageBody width="text">
+        <PageHeader :title="`New ${model.label}`" />
 
         <EntryForm
             :schema="schema"
@@ -57,5 +57,5 @@ const { values, errors, processing, updateValue, submit } = useEntryForm(
                 <Link :href="index(model.id)">Cancel</Link>
             </Button>
         </div>
-    </div>
+    </PageBody>
 </template>

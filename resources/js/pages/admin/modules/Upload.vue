@@ -3,6 +3,8 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { ShieldAlert } from '@lucide/vue';
 import ModuleController from '@/actions/App/Http/Controllers/Admin/ModuleController';
 import InputError from '@/components/InputError.vue';
+import PageBody from '@/components/PageBody.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +37,12 @@ defineOptions({
 <template>
     <Head title="Upload module" />
 
-    <div class="flex max-w-2xl flex-1 flex-col gap-4 p-4">
+    <PageBody width="text">
+        <PageHeader
+            title="Upload module"
+            description="Add a module to this install from a zip file."
+        />
+
         <Alert variant="destructive">
             <ShieldAlert />
             <AlertTitle
@@ -100,5 +107,5 @@ defineOptions({
                 </Form>
             </CardContent>
         </Card>
-    </div>
+    </PageBody>
 </template>
