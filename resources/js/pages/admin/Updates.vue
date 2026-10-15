@@ -161,7 +161,7 @@ const updateError = computed(
 <template>
     <Head title="Updates" />
 
-    <PageBody width="text">
+    <PageBody class="max-w-3xl">
         <PageHeader
             title="Updates"
             description="Keep StarSystem on its latest version."

@@ -13,9 +13,7 @@ defineProps<{
 <template>
     <header class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div class="min-w-0 flex-[1_1_18rem] space-y-1">
-            <h1
-                class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xl md:text-2xl"
-            >
+            <h1 class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xl">
                 {{ title }}
                 <slot name="badge" />
             </h1>

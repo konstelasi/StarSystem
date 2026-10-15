@@ -40,7 +40,7 @@ const created = new Date(props.entry.created_at).toLocaleString();
 <template>
     <Head :title="`Edit ${model.label}`" />
 
-    <PageBody width="text">
+    <PageBody>
         <PageHeader
             :title="`Edit ${model.label}`"
             :description="`Created ${created}`"

@@ -124,7 +124,7 @@ function finishSave() {
 <template>
     <Head :title="`${builder.schema.value.model.label}: fields`" />
 
-    <PageBody width="full" class="@container">
+    <PageBody class="@container">
         <PageHeader
             :title="builder.schema.value.model.label"
             description="Build the form editors fill in for each entry."

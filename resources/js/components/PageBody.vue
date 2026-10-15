@@ -1,34 +1,13 @@
 <script setup lang="ts">
-import { cn } from '@/lib/utils';
-
 /**
- * What every admin page sits in, so the pages line up. `wide` is for lists
- * and dashboards, `text` for forms that read best at a narrower width, and
- * `full` for a page that lays out its own columns, like the builder.
+ * What every admin page sits in, so the pages share one padding and one
+ * gap between their parts. It takes the full width, as the pages did
+ * before; a page that reads better narrower passes its own `max-w-*`.
  */
-withDefaults(
-    defineProps<{
-        width?: 'wide' | 'text' | 'full';
-    }>(),
-    { width: 'wide' },
-);
-
-const widths = {
-    wide: 'max-w-[76rem]',
-    text: 'max-w-[52rem]',
-    full: '',
-};
 </script>
 
 <template>
-    <div
-        :class="
-            cn(
-                'mx-auto flex w-full flex-1 flex-col gap-6 p-4 md:p-6',
-                widths[width],
-            )
-        "
-    >
+    <div class="flex flex-1 flex-col gap-4 p-4">
         <slot />
     </div>
 </template>

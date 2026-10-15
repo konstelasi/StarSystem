@@ -32,7 +32,7 @@ const { values, errors, processing, updateValue, submit } = useEntryForm(
 <template>
     <Head :title="`New ${model.label}`" />
 
-    <PageBody width="text">
+    <PageBody>
         <PageHeader :title="`New ${model.label}`" />
 
         <EntryForm

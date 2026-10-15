@@ -37,7 +37,7 @@ defineOptions({
 <template>
     <Head title="Upload module" />
 
-    <PageBody width="text">
+    <PageBody class="max-w-2xl">
         <PageHeader
             title="Upload module"
             description="Add a module to this install from a zip file."
