@@ -16,8 +16,8 @@ const props = defineProps<{
     email: string;
     role: string;
     invitedBy: string | null;
-    /** new: make an account. join: signed in as the invited email. other: signed in as someone else. */
-    mode: 'new' | 'join' | 'other';
+    /** new: make an account. join: signed in as the invited email. unverified: that account never confirmed its email. other: signed in as someone else. */
+    mode: 'new' | 'join' | 'unverified' | 'other';
     passwordRules: string;
 }>();
 
@@ -102,6 +102,11 @@ setLayoutProps({
                 Join {{ siteName }}
             </Button>
         </Form>
+
+        <p v-else-if="mode === 'unverified'" class="text-center text-sm">
+            This account never confirmed {{ email }}, so it cannot take up the
+            invitation. Ask the person who invited you for help.
+        </p>
 
         <div v-else class="grid gap-4">
             <p class="text-center text-sm">

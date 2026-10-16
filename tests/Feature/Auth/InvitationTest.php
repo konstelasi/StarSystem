@@ -214,6 +214,31 @@ class InvitationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_an_account_that_never_confirmed_the_email_cannot_sign_in_on_the_strength_of_an_invitation()
+    {
+        $this->notMember(User::factory()->unverified()->create(['email' => 'ana@example.com']));
+        $this->invite();
+
+        $this->post(route('login.store'), ['email' => 'ana@example.com', 'password' => 'password']);
+
+        $this->assertGuest();
+    }
+
+    public function test_an_account_that_never_confirmed_the_email_cannot_take_up_the_invitation()
+    {
+        $unverified = $this->notMember(User::factory()->unverified()->create(['email' => 'ana@example.com']));
+        $this->invite();
+
+        $this->actingAs($unverified)
+            ->get(route('invitations.show', self::TOKEN))
+            ->assertInertia(fn (Assert $page) => $page->where('mode', 'unverified'));
+
+        $this->actingAs($unverified)->post(route('invitations.accept', self::TOKEN))->assertForbidden();
+
+        $this->assertSame(0, SiteUser::query()->where('user_id', $unverified->id)->count());
+        $this->assertNull(SiteInvite::query()->sole()->accepted_at);
+    }
+
     public function test_the_link_is_throttled()
     {
         for ($i = 0; $i < 20; $i++) {

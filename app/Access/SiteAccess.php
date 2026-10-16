@@ -74,7 +74,8 @@ class SiteAccess
 
     /**
      * Whether the account may sign in on the current site: it belongs here,
-     * or it holds an invitation here that it has yet to accept.
+     * or it holds an invitation here, for an email it confirmed, that it has
+     * yet to accept.
      */
     public function maySignIn(User $user): bool
     {
@@ -82,7 +83,9 @@ class SiteAccess
             return true;
         }
 
-        return $this->site->has() && SiteInvite::query()
+        // A profile email can be changed without being confirmed, so an invitation
+        // only opens the door for an address the account has confirmed.
+        return $user->email_verified_at !== null && $this->site->has() && SiteInvite::query()
             ->where('email', $user->email)
             ->whereNull('accepted_at')
             ->where('expires_at', '>', now())

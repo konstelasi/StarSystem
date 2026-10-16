@@ -62,9 +62,9 @@ class InvitationController extends Controller
             'role' => $invite->role->name,
             'invitedBy' => $invite->inviter?->name,
             // new: make an account. join: signed in as the invited account.
-            // other: signed in as someone else, who must sign out first. An
-            // existing account without a session was sent to sign in above.
-            'mode' => $account === null ? 'new' : (strtolower($user->email) === $invite->email ? 'join' : 'other'),
+            // unverified: that account never confirmed its email. other:
+            // signed in as someone else, who must sign out first.
+            'mode' => $this->mode($account, $user, $invite),
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]);
     }
@@ -86,7 +86,9 @@ class InvitationController extends Controller
         } else {
             $user = $request->user();
 
-            abort_unless($user !== null && strtolower($user->email) === $invite->email, 403);
+            // An email can be changed on a profile without being confirmed, so
+            // only an account that confirmed this address may claim the invitation.
+            abort_unless($user !== null && strtolower($user->email) === $invite->email && $user->email_verified_at !== null, 403);
         }
 
         DB::transaction(function () use ($invite, $user) {
@@ -100,6 +102,23 @@ class InvitationController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => "You joined {$this->site->get()->name}."]);
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * @return 'new'|'join'|'unverified'|'other'
+     */
+    private function mode(?User $account, ?User $user, SiteInvite $invite): string
+    {
+        // An existing account without a session was sent to sign in before this.
+        if ($account === null) {
+            return 'new';
+        }
+
+        if ($user === null || strtolower($user->email) !== $invite->email) {
+            return 'other';
+        }
+
+        return $user->email_verified_at === null ? 'unverified' : 'join';
     }
 
     private function createAccount(Request $request, SiteInvite $invite): User
