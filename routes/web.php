@@ -2,9 +2,11 @@
 
 use App\Access\Ability;
 use App\Http\Controllers\Admin\HealthController;
+use App\Http\Controllers\Admin\InviteController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UpdateController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\InvitationController;
 use App\Sites\CurrentSite;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +16,13 @@ use Inertia\Inertia;
 Route::get('/', fn (CurrentSite $site) => Inertia::render('Home', [
     'siteName' => $site->get()->name,
 ]))->name('home');
+
+// An invitation link. Open to anyone who holds it, so it is throttled, and
+// outside `site.member` because the person is not a member yet.
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
+    Route::post('invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
+});
 
 Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
@@ -28,6 +37,9 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
         ->controller(UserController::class)
         ->group(function () {
             Route::get('/', 'index')->middleware('can:'.Ability::USERS_VIEW)->name('index');
+            Route::post('invites', [InviteController::class, 'store'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.store');
+            Route::post('invites/{invite}/resend', [InviteController::class, 'resend'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.resend')->whereNumber('invite');
+            Route::delete('invites/{invite}', [InviteController::class, 'destroy'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.destroy')->whereNumber('invite');
             Route::put('{member}', 'update')->middleware('can:'.Ability::USERS_UPDATE)->name('update')->whereNumber('member');
             Route::delete('{member}', 'destroy')->middleware('can:'.Ability::USERS_REMOVE)->name('destroy')->whereNumber('member');
         });

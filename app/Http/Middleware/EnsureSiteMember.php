@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Access\Invitations;
 use App\Access\SiteAccess;
 use Closure;
 use Illuminate\Http\Request;
@@ -14,11 +15,15 @@ use Symfony\Component\HttpFoundation\Response;
  * Signing in already refuses such accounts, so this catches the ones that
  * were let in earlier: someone removed from the site while signed in, or a
  * session carried over to another site. They are signed out, so the next
- * page asks them to sign in again.
+ * page asks them to sign in again. An account that holds an invitation here
+ * is sent to it instead, since signing in to accept it is how they arrive.
  */
 class EnsureSiteMember
 {
-    public function __construct(private readonly SiteAccess $access) {}
+    public function __construct(
+        private readonly SiteAccess $access,
+        private readonly Invitations $invitations,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -29,6 +34,13 @@ class EnsureSiteMember
         }
 
         abort_if($request->expectsJson(), 403);
+
+        // Someone who signed in to accept an invitation goes back to it.
+        $token = $request->session()->get('invitation_token');
+
+        if (is_string($token) && $this->invitations->find($token)?->email === strtolower($user->email)) {
+            return redirect()->route('invitations.show', $token);
+        }
 
         Auth::guard()->logout();
         $request->session()->invalidate();

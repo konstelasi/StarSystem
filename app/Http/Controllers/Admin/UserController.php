@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Access\Invitations;
 use App\Access\SiteAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
+use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
 use App\Sites\CurrentSite;
@@ -25,6 +27,7 @@ class UserController extends Controller
     public function __construct(
         private readonly SiteAccess $access,
         private readonly CurrentSite $site,
+        private readonly Invitations $invitations,
     ) {}
 
     public function index(Request $request): Response
@@ -63,8 +66,20 @@ class UserController extends Controller
                 'editable' => false,
             ]);
 
+        $invites = SiteInvite::query()->with('role')->whereNull('accepted_at')->orderBy('email')->get()
+            ->map(fn (SiteInvite $invite) => [
+                'id' => $invite->id,
+                'email' => $invite->email,
+                'role' => $invite->role->name,
+                'expiresAt' => $invite->expires_at->toIso8601String(),
+                'expired' => $invite->expires_at->isPast(),
+                'manageable' => $this->access->canAssign($actor, $invite->role),
+            ])->values();
+
         return Inertia::render('admin/users/Index', [
             'members' => $rows->concat($owners)->values(),
+            'invites' => $invites,
+            'mailConfigured' => $this->invitations->mailConfigured(),
             'roles' => Role::available()->orderBy('id')->get()->map(fn (Role $role) => [
                 'id' => $role->id,
                 'name' => $role->name,
