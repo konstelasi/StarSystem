@@ -124,6 +124,29 @@ class ProfileUpdateTest extends TestCase
         $this->assertSame('Rina', $row->actor_name);
     }
 
+    public function test_the_install_owner_cannot_delete_their_account()
+    {
+        $owner = User::factory()->installOwner()->create();
+
+        $this->actingAs($owner)
+            ->from(route('profile.edit'))
+            ->delete(route('profile.destroy'), ['password' => 'password'])
+            ->assertRedirect(route('profile.edit'));
+
+        $this->assertAuthenticatedAs($owner);
+        $this->assertNotNull($owner->fresh());
+        $this->assertSame(0, Activity::query()->count());
+    }
+
+    public function test_a_former_owner_can_delete_their_account()
+    {
+        $former = User::factory()->create(['is_install_owner' => false]);
+
+        $this->actingAs($former)->delete(route('profile.destroy'), ['password' => 'password'])->assertRedirect(route('home'));
+
+        $this->assertNull($former->fresh());
+    }
+
     public function test_a_refused_delete_is_not_logged()
     {
         $user = User::factory()->create();

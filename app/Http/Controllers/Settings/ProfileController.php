@@ -64,6 +64,13 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
+        // Nobody could update the program or add modules without an owner.
+        if ($user->is_install_owner) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => 'You own this installation. Hand ownership to another Administrator before you delete your account.']);
+
+            return back();
+        }
+
         // Before the account goes, while the row can still name it.
         $this->activity->record(ActivityAction::ACCOUNT_DELETED, null, [], $user);
 
