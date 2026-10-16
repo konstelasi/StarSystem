@@ -29,8 +29,9 @@ class RolesSchemaTest extends TestCase
         $editor = Role::builtIn(Role::EDITOR)->abilities();
         $viewer = Role::builtIn(Role::VIEWER)->abilities();
 
-        $this->assertCount(25, $administrator);
+        $this->assertCount(26, $administrator);
         $this->assertContains('roles.delete', $administrator);
+        $this->assertContains('activity.view', $administrator);
 
         $this->assertCount(10, $editor);
         $this->assertContains('entries.delete', $editor);
@@ -38,6 +39,7 @@ class RolesSchemaTest extends TestCase
         $this->assertNotContains('models.view', $editor);
         $this->assertNotContains('users.view', $editor);
         $this->assertNotContains('health.view', $editor);
+        $this->assertNotContains('activity.view', $editor);
 
         $this->assertSame(['entries.view', 'media.view'], $viewer);
     }

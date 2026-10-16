@@ -62,6 +62,8 @@ final class Ability
 
     public const HEALTH_VIEW = 'health.view';
 
+    public const ACTIVITY_VIEW = 'activity.view';
+
     /**
      * The abilities by area, each with the short label the roles page shows.
      *
@@ -106,6 +108,7 @@ final class Ability
             ],
             'System' => [
                 self::HEALTH_VIEW => 'See the Health page',
+                self::ACTIVITY_VIEW => 'See the activity log',
             ],
         ];
     }
