@@ -1,7 +1,7 @@
 <x-mail::message>
-# You are invited to {{ $siteName }}
+# You are invited to {{ $site }}
 
-{{ $inviterName }} invited you to {{ $siteName }} as {{ $roleName }}.
+{{ $inviter }} invited you to {{ $site }} as {{ $role }}.
 
 <x-mail::button :url="$link">
 Accept the invitation

@@ -29,6 +29,19 @@ class SiteInvitation extends Mailable
 
     public function content(): Content
     {
-        return new Content(markdown: 'mail.site-invitation');
+        // The body is markdown, and these names are typed by people, so they
+        // are escaped to stay plain text. Otherwise a user named
+        // "[Sign in](https://evil.example)" would put a link in an email
+        // that comes from this server.
+        return new Content(markdown: 'mail.site-invitation', with: [
+            'site' => $this->plain($this->siteName),
+            'inviter' => $this->plain($this->inviterName),
+            'role' => $this->plain($this->roleName),
+        ]);
+    }
+
+    private function plain(string $text): string
+    {
+        return (string) preg_replace('/([\\\\`*_{}\[\]()#+\-.!|<>~=:@&])/', '\\\\$1', $text);
     }
 }
