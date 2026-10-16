@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Activity\ActivityAction;
+use App\Activity\ActivityLog;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
@@ -14,6 +16,8 @@ use Inertia\Response;
 
 class ProfileController extends Controller
 {
+    public function __construct(private readonly ActivityLog $activity) {}
+
     /**
      * Show the user's profile settings page.
      */
@@ -32,11 +36,21 @@ class ProfileController extends Controller
     {
         $request->user()->fill($request->validated());
 
+        $changed = array_keys($request->user()->getDirty());
+        $oldEmail = $request->user()->getOriginal('email');
+
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
         }
 
         $request->user()->save();
+
+        if ($changed !== []) {
+            $this->activity->record(ActivityAction::ACCOUNT_UPDATED, null, [
+                'changed' => $changed,
+                ...(in_array('email', $changed, true) ? ['email_from' => $oldEmail, 'email_to' => $request->user()->email] : []),
+            ]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
 
@@ -49,6 +63,9 @@ class ProfileController extends Controller
     public function destroy(ProfileDeleteRequest $request): RedirectResponse
     {
         $user = $request->user();
+
+        // Before the account goes, while the row can still name it.
+        $this->activity->record(ActivityAction::ACCOUNT_DELETED, null, [], $user);
 
         Auth::logout();
 

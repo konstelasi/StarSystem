@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Activity\ActivityAction;
+use App\Activity\ActivityLog;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
@@ -13,6 +15,8 @@ use Laravel\Fortify\Features;
 
 class SecurityController extends Controller
 {
+    public function __construct(private readonly ActivityLog $activity) {}
+
     /**
      * Show the user's security settings page.
      */
@@ -41,6 +45,8 @@ class SecurityController extends Controller
         $request->user()->update([
             'password' => $request->password,
         ]);
+
+        $this->activity->record(ActivityAction::PASSWORD_CHANGED);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

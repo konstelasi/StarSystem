@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Activity\ActivityAction;
+use App\Models\Activity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -89,6 +91,36 @@ class SecurityTest extends TestCase
             ->assertRedirect(route('security.edit'));
 
         $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+    }
+
+    public function test_changing_the_password_is_logged_without_the_password()
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->put(route('user-password.update'), [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::PASSWORD_CHANGED, $row->action);
+        $this->assertSame($user->id, $row->actor_id);
+        $this->assertNull($row->properties);
+        $this->assertStringNotContainsString('new-password', json_encode($row->toArray()));
+    }
+
+    public function test_a_refused_password_change_is_not_logged()
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->put(route('user-password.update'), [
+            'current_password' => 'wrong-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+        $this->assertSame(0, Activity::query()->count());
     }
 
     public function test_correct_password_must_be_provided_to_update_password()
