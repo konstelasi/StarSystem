@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
-import { useTemplateRef } from 'vue';
+import { Form, Link, usePage } from '@inertiajs/vue3';
+import { computed, useTemplateRef } from 'vue';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -17,8 +17,14 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { index as users } from '@/routes/admin/users';
 
 const passwordInput = useTemplateRef('passwordInput');
+
+const page = usePage();
+
+// The server refuses the owner's deletion too. This only says why up front.
+const installOwner = computed(() => page.props.auth.installOwner === true);
 </script>
 
 <template>
@@ -28,7 +34,21 @@ const passwordInput = useTemplateRef('passwordInput');
             title="Delete account"
             description="Delete your account and all of its resources"
         />
+        <div v-if="installOwner" class="space-y-3 rounded-lg border p-4">
+            <div class="space-y-0.5">
+                <p class="font-medium">You own this installation</p>
+                <p class="text-sm text-muted-foreground">
+                    Your account stays until someone else owns it, because
+                    nobody could update the program or add modules without an
+                    owner. Hand ownership to another Administrator first.
+                </p>
+            </div>
+            <Button variant="secondary" as-child>
+                <Link :href="users()">Open Users</Link>
+            </Button>
+        </div>
         <div
+            v-else
             class="space-y-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4"
         >
             <div class="relative space-y-0.5 text-destructive">
