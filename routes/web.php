@@ -3,6 +3,7 @@
 use App\Access\Ability;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\UpdateController;
+use App\Http\Controllers\Admin\UserController;
 use App\Sites\CurrentSite;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,18 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 
     Route::get('admin/health', HealthController::class)->middleware('can:'.Ability::HEALTH_VIEW)->name('admin.health');
+
+    // Who can use the site and as what. Changing it asks for the password
+    // again, like modules and updates.
+    Route::middleware(RequirePassword::class)
+        ->prefix('admin/users')
+        ->name('admin.users.')
+        ->controller(UserController::class)
+        ->group(function () {
+            Route::get('/', 'index')->middleware('can:'.Ability::USERS_VIEW)->name('index');
+            Route::put('{member}', 'update')->middleware('can:'.Ability::USERS_UPDATE)->name('update')->whereNumber('member');
+            Route::delete('{member}', 'destroy')->middleware('can:'.Ability::USERS_REMOVE)->name('destroy')->whereNumber('member');
+        });
 
     // Updating replaces the program's files for every site, so it belongs to
     // the install owner alone.

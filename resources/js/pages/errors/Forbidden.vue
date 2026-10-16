@@ -9,7 +9,7 @@ import { dashboard } from '@/routes';
 <template>
     <Head title="No access" />
 
-    <PageBody width="text">
+    <PageBody>
         <PageHeader
             title="Your role can't open this"
             description="Whoever manages this site decides what each role may do. Ask them if you need access to this page."

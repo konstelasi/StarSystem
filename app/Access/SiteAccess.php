@@ -55,6 +55,16 @@ class SiteAccess
     }
 
     /**
+     * Whether $actor may hand out $role: only a role whose every ability
+     * the actor holds too. Without this, someone allowed to change roles
+     * could make themselves, or a friend, an administrator.
+     */
+    public function canAssign(User $actor, Role $role): bool
+    {
+        return $actor->is_install_owner || array_diff($role->abilities(), $this->abilities($actor)) === [];
+    }
+
+    /**
      * Whether the account may use the current site at all.
      */
     public function isMember(User $user): bool

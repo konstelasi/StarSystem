@@ -8,6 +8,7 @@ import {
     Images,
     LayoutGrid,
     Puzzle,
+    Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -28,6 +29,7 @@ import { files, health, updates } from '@/routes/admin';
 import { index as models } from '@/routes/admin/models';
 import { index as entries } from '@/routes/admin/models/entries';
 import { index as modules } from '@/routes/admin/modules';
+import { index as users } from '@/routes/admin/users';
 import type { NavGroup, NavItem } from '@/types';
 
 type NavModel = { id: number; label: string; group: string | null };
@@ -111,6 +113,12 @@ const groups = computed<NavGroup[]>(() => {
                     href: health(),
                     icon: Activity,
                     ability: 'health.view',
+                },
+                {
+                    title: 'Users',
+                    href: users(),
+                    icon: Users,
+                    ability: 'users.view',
                 },
                 {
                     title: 'Updates',
