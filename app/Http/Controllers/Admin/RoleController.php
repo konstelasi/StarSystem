@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Access\Ability;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Activity\ActivityLog;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\SiteInvite;
@@ -31,6 +33,7 @@ class RoleController extends Controller
     public function __construct(
         private readonly SiteAccess $access,
         private readonly CurrentSite $site,
+        private readonly ActivityLog $activity,
     ) {}
 
     public function index(Request $request): Response
@@ -70,6 +73,8 @@ class RoleController extends Controller
         $role = Role::create(['tenant_id' => $this->site->tenantId(), 'name' => $data['name'], 'system' => false]);
         $role->syncAbilities($data['abilities']);
 
+        $this->activity->record(ActivityAction::ROLE_CREATED, $role, ['abilities' => $data['abilities']]);
+
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$role->name} was created."]);
 
         return to_route('admin.roles.index');
@@ -86,9 +91,23 @@ class RoleController extends Controller
 
         $data = $this->validated($request, $role);
 
+        $oldName = $role->name;
+        $before = $role->abilities();
+
         $role->update(['name' => $data['name']]);
         $role->syncAbilities($data['abilities']);
         $this->access->forget();
+
+        $added = array_values(array_diff($data['abilities'], $before));
+        $removed = array_values(array_diff($before, $data['abilities']));
+
+        if ($added !== [] || $removed !== [] || $oldName !== $role->name) {
+            $this->activity->record(ActivityAction::ROLE_UPDATED, $role, array_filter([
+                'renamed_from' => $oldName !== $role->name ? $oldName : null,
+                'added' => $added,
+                'removed' => $removed,
+            ]));
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$role->name} was saved."]);
 
@@ -110,6 +129,8 @@ class RoleController extends Controller
 
         $role->delete();
 
+        $this->activity->record(ActivityAction::ROLE_DELETED, $role);
+
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$role->name} was deleted."]);
 
         return to_route('admin.roles.index');
@@ -130,6 +151,8 @@ class RoleController extends Controller
 
         $copy = Role::create(['tenant_id' => $this->site->tenantId(), 'name' => $name, 'system' => false]);
         $copy->syncAbilities($role->abilities());
+
+        $this->activity->record(ActivityAction::ROLE_DUPLICATED, $copy, ['from' => $role->name]);
 
         return to_route('admin.roles.edit', $copy);
     }

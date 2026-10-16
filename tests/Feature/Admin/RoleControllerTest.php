@@ -4,6 +4,8 @@ namespace Tests\Feature\Admin;
 
 use App\Access\Ability;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Models\Activity;
 use App\Models\Role;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
@@ -98,6 +100,23 @@ class RoleControllerTest extends TestCase
         $this->assertSame([Ability::ENTRIES_UPDATE, Ability::ENTRIES_VIEW], $role->abilities());
     }
 
+    public function test_creating_a_role_is_logged_with_its_abilities()
+    {
+        $admin = $this->admin();
+
+        $this->actingConfirmed($admin)->post(route('admin.roles.store'), [
+            'name' => 'Proofreader',
+            'abilities' => [Ability::ENTRIES_VIEW, Ability::ENTRIES_UPDATE],
+        ]);
+
+        $role = Role::query()->where('name', 'Proofreader')->sole();
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::ROLE_CREATED, $row->action);
+        $this->assertSame($admin->id, $row->actor_id);
+        $this->assertSame(['role', $role->id, 'Proofreader'], [$row->subject_type, $row->subject_id, $row->subject_label]);
+        $this->assertSame(['abilities' => [Ability::ENTRIES_VIEW, Ability::ENTRIES_UPDATE]], $row->properties);
+    }
+
     public function test_a_role_may_start_with_no_abilities()
     {
         $this->actingConfirmed($this->admin())
@@ -160,6 +179,34 @@ class RoleControllerTest extends TestCase
 
         $this->assertSame('Copy editor', $role->fresh()->name);
         $this->assertSame([Ability::ENTRIES_UPDATE, Ability::ENTRIES_VIEW], $role->abilities());
+    }
+
+    public function test_editing_a_role_logs_the_new_name_and_what_was_added_and_removed()
+    {
+        $role = $this->custom('Proofreader', [Ability::ENTRIES_VIEW, Ability::MEDIA_VIEW]);
+
+        $this->actingConfirmed($this->admin())
+            ->put(route('admin.roles.update', $role), ['name' => 'Copy editor', 'abilities' => [Ability::ENTRIES_VIEW, Ability::ENTRIES_UPDATE]]);
+
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::ROLE_UPDATED, $row->action);
+        $this->assertSame('Copy editor', $row->subject_label);
+        $this->assertSame([
+            'renamed_from' => 'Proofreader',
+            'added' => [Ability::ENTRIES_UPDATE],
+            'removed' => [Ability::MEDIA_VIEW],
+        ], $row->properties);
+    }
+
+    public function test_saving_a_role_without_changing_it_logs_nothing()
+    {
+        $role = $this->custom('Proofreader', [Ability::ENTRIES_VIEW]);
+
+        $this->actingConfirmed($this->admin())
+            ->put(route('admin.roles.update', $role), ['name' => 'Proofreader', 'abilities' => [Ability::ENTRIES_VIEW]])
+            ->assertRedirect(route('admin.roles.index'));
+
+        $this->assertSame(0, Activity::query()->count());
     }
 
     public function test_a_change_reaches_the_people_who_hold_the_role()
@@ -226,6 +273,23 @@ class RoleControllerTest extends TestCase
         $this->assertSame(0, DB::table('ss_role_abilities')->where('role_id', $role->id)->count());
     }
 
+    public function test_deleting_a_role_is_logged_and_a_refused_delete_is_not()
+    {
+        $unused = $this->custom('Proofreader', [Ability::ENTRIES_VIEW]);
+        $held = $this->custom('Translator', [Ability::ENTRIES_VIEW]);
+        $this->memberAs($held);
+        $admin = $this->admin();
+
+        $this->actingConfirmed($admin)->delete(route('admin.roles.destroy', $held));
+        $this->assertSame(0, Activity::query()->count());
+
+        $this->actingConfirmed($admin)->delete(route('admin.roles.destroy', $unused));
+
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::ROLE_DELETED, $row->action);
+        $this->assertSame('Proofreader', $row->subject_label);
+    }
+
     public function test_a_role_someone_holds_cannot_be_deleted()
     {
         $role = $this->custom('Proofreader', [Ability::ENTRIES_VIEW]);
@@ -260,6 +324,16 @@ class RoleControllerTest extends TestCase
         $this->assertSame(1, $copy->tenant_id);
         $this->assertFalse($copy->system);
         $this->assertEqualsCanonicalizing(Role::builtIn(Role::EDITOR)->abilities(), $copy->abilities());
+    }
+
+    public function test_copying_a_role_is_logged_with_the_original_name()
+    {
+        $this->actingConfirmed($this->admin())->post(route('admin.roles.duplicate', Role::builtIn(Role::EDITOR)));
+
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::ROLE_DUPLICATED, $row->action);
+        $this->assertSame('Copy of Editor', $row->subject_label);
+        $this->assertSame(['from' => 'Editor'], $row->properties);
     }
 
     public function test_copying_twice_does_not_clash_on_the_name()
