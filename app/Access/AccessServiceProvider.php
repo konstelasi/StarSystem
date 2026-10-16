@@ -2,8 +2,10 @@
 
 namespace App\Access;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class AccessServiceProvider extends ServiceProvider
@@ -21,6 +23,10 @@ class AccessServiceProvider extends ServiceProvider
         foreach (Ability::all() as $ability) {
             Gate::define($ability, fn (User $user, mixed $model = null) => $this->app->make(SiteAccess::class)->allows($user, $ability));
         }
+
+        // A role in a URL is one this site can use: a built-in role or its
+        // own. Another site's role is a 404.
+        Route::bind('role', fn (string $value) => Role::available()->findOrFail($value));
 
         // Installing a module runs arbitrary PHP, and an update replaces the
         // program's files for every site, so both belong to the install owner

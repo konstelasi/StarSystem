@@ -2,6 +2,7 @@
 
 use App\Access\Ability;
 use App\Http\Controllers\Admin\HealthController;
+use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UpdateController;
 use App\Http\Controllers\Admin\UserController;
 use App\Sites\CurrentSite;
@@ -29,6 +30,21 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
             Route::get('/', 'index')->middleware('can:'.Ability::USERS_VIEW)->name('index');
             Route::put('{member}', 'update')->middleware('can:'.Ability::USERS_UPDATE)->name('update')->whereNumber('member');
             Route::delete('{member}', 'destroy')->middleware('can:'.Ability::USERS_REMOVE)->name('destroy')->whereNumber('member');
+        });
+
+    // The roles a site can give, behind the same password prompt.
+    Route::middleware(RequirePassword::class)
+        ->prefix('admin/roles')
+        ->name('admin.roles.')
+        ->controller(RoleController::class)
+        ->group(function () {
+            Route::get('/', 'index')->middleware('can:'.Ability::ROLES_VIEW)->name('index');
+            Route::get('create', 'create')->middleware('can:'.Ability::ROLES_CREATE)->name('create');
+            Route::post('/', 'store')->middleware('can:'.Ability::ROLES_CREATE)->name('store');
+            Route::get('{role}', 'edit')->middleware('can:'.Ability::ROLES_VIEW)->name('edit');
+            Route::put('{role}', 'update')->middleware('can:'.Ability::ROLES_UPDATE)->name('update');
+            Route::delete('{role}', 'destroy')->middleware('can:'.Ability::ROLES_DELETE)->name('destroy');
+            Route::post('{role}/duplicate', 'duplicate')->middleware('can:'.Ability::ROLES_CREATE)->name('duplicate');
         });
 
     // Updating replaces the program's files for every site, so it belongs to
