@@ -54,6 +54,15 @@ class Role extends Model
             ->orWhere('tenant_id', app(CurrentSite::class)->tenantId()));
     }
 
+    /**
+     * Whether this is the built-in Administrator role, not a custom one that
+     * happens to hold many abilities.
+     */
+    public function isAdministrator(): bool
+    {
+        return $this->system && $this->tenant_id === null && $this->name === self::ADMINISTRATOR;
+    }
+
     public static function builtIn(string $name): self
     {
         return static::query()->whereNull('tenant_id')->where('name', $name)->firstOrFail();

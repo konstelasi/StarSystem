@@ -4,6 +4,7 @@ use App\Access\Ability;
 use App\Http\Controllers\Admin\ActivityController;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\InviteController;
+use App\Http\Controllers\Admin\OwnershipController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UpdateController;
 use App\Http\Controllers\Admin\UserController;
@@ -43,6 +44,7 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
             Route::post('invites', [InviteController::class, 'store'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.store');
             Route::post('invites/{invite}/resend', [InviteController::class, 'resend'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.resend')->whereNumber('invite');
             Route::delete('invites/{invite}', [InviteController::class, 'destroy'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.destroy')->whereNumber('invite');
+            Route::post('ownership', OwnershipController::class)->middleware('can:transfer-ownership')->name('ownership');
             Route::put('{member}', 'update')->middleware('can:'.Ability::USERS_UPDATE)->name('update')->whereNumber('member');
             Route::delete('{member}', 'destroy')->middleware('can:'.Ability::USERS_REMOVE)->name('destroy')->whereNumber('member');
         });

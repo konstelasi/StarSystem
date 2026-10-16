@@ -83,6 +83,14 @@ class UserController extends Controller
             'members' => $rows->concat($owners)->values(),
             'invites' => $invites,
             'mailConfigured' => $this->invitations->mailConfigured(),
+            // Who the install owner may hand ownership to: the other
+            // Administrators of this site. Nobody else sees the list.
+            'candidates' => $actor->is_install_owner
+                ? $members
+                    ->filter(fn (SiteUser $member) => $member->user_id !== $actor->id && $member->role->isAdministrator())
+                    ->map(fn (SiteUser $member) => ['id' => $member->id, 'name' => $member->user->name, 'email' => $member->user->email])
+                    ->values()
+                : [],
             'roles' => Role::available()->orderBy('id')->get()->map(fn (Role $role) => [
                 'id' => $role->id,
                 'name' => $role->name,

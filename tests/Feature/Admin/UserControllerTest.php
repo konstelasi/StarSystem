@@ -111,6 +111,26 @@ class UserControllerTest extends TestCase
             );
     }
 
+    public function test_only_the_install_owner_is_offered_the_administrators_to_hand_over_to()
+    {
+        $owner = User::factory()->installOwner()->create(['name' => 'Olga']);
+        $ada = $this->memberAs(Role::ADMINISTRATOR, 'Ada');
+        $this->memberAs(Role::EDITOR, 'Ben');
+
+        $this->actingConfirmed($owner)
+            ->get(route('admin.users.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('candidates', 1)
+                ->where('candidates.0.id', $this->membership($ada)->id)
+                ->where('candidates.0.name', 'Ada')
+                ->where('candidates.0.email', $ada->email)
+            );
+
+        $this->actingConfirmed($ada)
+            ->get(route('admin.users.index'))
+            ->assertInertia(fn (Assert $page) => $page->has('candidates', 0));
+    }
+
     public function test_an_administrator_changes_someones_role()
     {
         $admin = $this->memberAs(Role::ADMINISTRATOR);

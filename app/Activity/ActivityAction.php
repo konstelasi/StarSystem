@@ -33,6 +33,8 @@ final class ActivityAction
 
     public const USER_JOINED = 'user.joined';
 
+    public const OWNERSHIP_TRANSFERRED = 'user.ownership_transferred';
+
     public const INVITE_SENT = 'invite.sent';
 
     public const INVITE_RESENT = 'invite.resent';
@@ -73,6 +75,7 @@ final class ActivityAction
                 self::USER_ROLE_CHANGED => 'Changed someone\'s role',
                 self::USER_REMOVED => 'Removed someone from the site',
                 self::USER_JOINED => 'Joined the site',
+                self::OWNERSHIP_TRANSFERRED => 'Handed over ownership of the installation',
                 self::INVITE_SENT => 'Invited someone',
                 self::INVITE_RESENT => 'Sent an invitation again',
                 self::INVITE_WITHDRAWN => 'Withdrew an invitation',

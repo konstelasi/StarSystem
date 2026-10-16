@@ -33,5 +33,9 @@ class AccessServiceProvider extends ServiceProvider
         // alone and not to any site's role.
         Gate::define('manage-modules', fn (User $user) => $user->is_install_owner);
         Gate::define('manage-updates', fn (User $user) => $user->is_install_owner);
+
+        // Handing the ownership over is the owner's to do, since it moves
+        // those two powers to someone else.
+        Gate::define('transfer-ownership', fn (User $user) => $user->is_install_owner);
     }
 }
