@@ -7,6 +7,7 @@ use App\Install\EnvironmentFile;
 use App\Install\Installation;
 use App\Install\Installer;
 use App\Models\Site;
+use App\Models\SiteUser;
 use App\Models\User;
 use Dotenv\Dotenv;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -269,6 +270,8 @@ class InstallFlowTest extends TestCase
         $this->assertSame('ada@bakery.example', $user->email);
         $this->assertNotNull($user->email_verified_at);
         $this->assertTrue(password_verify('A-long-Passw0rd!', $user->password));
+        $this->assertTrue($user->is_install_owner);
+        $this->assertSame('Administrator', SiteUser::withoutGlobalScopes()->sole()->role->name);
 
         $site = Site::findOrFail(1);
         $this->assertSame('Sunrise Bakery', $site->name);

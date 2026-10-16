@@ -2,8 +2,11 @@
 
 namespace App\Install;
 
+use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteUser;
 use App\Models\User;
+use App\Sites\CurrentSite;
 use App\StarDust\StarDustService;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Encryption\Encrypter;
@@ -132,12 +135,18 @@ class Installer
             'name' => $name,
             'password' => $password,
             'email_verified_at' => now(),
+            'is_install_owner' => true,
         ])->save();
 
-        Site::query()->find(config()->integer('starsystem.default_site'))?->update([
+        $site = Site::query()->findOrFail(config()->integer('starsystem.default_site'));
+        $site->update([
             'name' => $siteName,
             'domains' => [strtolower(parse_url($appUrl, PHP_URL_HOST) ?: 'localhost')],
         ]);
+
+        // Also an administrator of the first site, so its user list shows them.
+        app(CurrentSite::class)->set($site);
+        SiteUser::query()->updateOrCreate(['user_id' => $user->id], ['role_id' => Role::builtIn(Role::ADMINISTRATOR)->id]);
 
         $existingSecret = (string) $this->installation->env()->get('STARDUST_TICK_SECRET');
         $secret = $existingSecret !== '' ? $existingSecret : Str::random(48);
