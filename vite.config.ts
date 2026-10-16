@@ -71,6 +71,7 @@ export default defineConfig({
         singleAttributePerLine: false,
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
+            '.agent/rules/**',
             '.github/**',
             'composer.json',
             'resources/js/components/ui/*',
