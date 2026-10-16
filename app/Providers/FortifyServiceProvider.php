@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Access\SiteAccess;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -39,6 +42,21 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureActions(): void
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+
+        // An account signs in only on a site it belongs to (or holds an
+        // invitation to). The refusal is the same as a wrong password, so the
+        // form never tells a stranger which emails have an account.
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::query()->where(Fortify::username(), $request->input(Fortify::username()))->first();
+
+            if ($user !== null
+                && Hash::check((string) $request->input('password'), $user->password)
+                && app(SiteAccess::class)->maySignIn($user)) {
+                return $user;
+            }
+
+            return null;
+        });
     }
 
     /**

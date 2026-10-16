@@ -1,5 +1,6 @@
 <?php
 
+use App\Access\Ability;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\UpdateController;
 use App\Sites\CurrentSite;
@@ -12,12 +13,14 @@ Route::get('/', fn (CurrentSite $site) => Inertia::render('Home', [
     'siteName' => $site->get()->name,
 ]))->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 
-    Route::get('admin/health', HealthController::class)->name('admin.health');
+    Route::get('admin/health', HealthController::class)->middleware('can:'.Ability::HEALTH_VIEW)->name('admin.health');
 
-    Route::controller(UpdateController::class)->prefix('admin/updates')->name('admin.updates')->group(function () {
+    // Updating replaces the program's files for every site, so it belongs to
+    // the install owner alone.
+    Route::controller(UpdateController::class)->prefix('admin/updates')->name('admin.updates')->middleware('can:manage-updates')->group(function () {
         Route::middleware(RequirePassword::class)->group(function () {
             Route::get('/', 'show');
             Route::post('start', 'start')->name('.start');

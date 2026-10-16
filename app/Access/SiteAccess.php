@@ -3,6 +3,7 @@
 namespace App\Access;
 
 use App\Models\Role;
+use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
 use App\Sites\CurrentSite;
@@ -59,6 +60,23 @@ class SiteAccess
     public function isMember(User $user): bool
     {
         return $user->is_install_owner || $this->lookup($user)['role'] !== null;
+    }
+
+    /**
+     * Whether the account may sign in on the current site: it belongs here,
+     * or it holds an invitation here that it has yet to accept.
+     */
+    public function maySignIn(User $user): bool
+    {
+        if ($this->isMember($user)) {
+            return true;
+        }
+
+        return $this->site->has() && SiteInvite::query()
+            ->where('email', $user->email)
+            ->whereNull('accepted_at')
+            ->where('expires_at', '>', now())
+            ->exists();
     }
 
     public function forget(): void

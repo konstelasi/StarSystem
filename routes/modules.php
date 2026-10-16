@@ -13,7 +13,7 @@ Route::get('/_modules/{slug}/{path}', ModuleAssetController::class)
 
 // Installing or enabling a module runs its PHP with full access to the
 // install, so every page here needs the owner and a fresh password.
-Route::middleware(['web', 'auth', 'verified', 'can:manage-modules', RequirePassword::class])
+Route::middleware(['web', 'auth', 'site.member', 'verified', 'can:manage-modules', RequirePassword::class])
     ->prefix('admin/modules')
     ->name('admin.modules.')
     ->group(function () {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureSiteMember;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveSite;
@@ -24,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // read before the web group decrypts anything, so it stays plain;
         // it carries its own signature.
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'laravel_maintenance']);
+
+        $middleware->alias(['site.member' => EnsureSiteMember::class]);
 
         $middleware->web(prepend: [
             ResolveSite::class,

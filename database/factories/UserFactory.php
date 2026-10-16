@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Sites\CurrentSite;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -39,15 +40,18 @@ class UserFactory extends Factory
     }
 
     /**
-     * Every user starts as an administrator of the default site, so a test
-     * that only needs someone signed in isn't turned away. A test about
-     * access gives the user a different membership, or none.
+     * Every user starts as an administrator of the current site, or of the
+     * default site when none is set, so a test that only needs someone
+     * signed in isn't turned away. A test about access gives the user a
+     * different membership, or none.
      */
     public function configure(): static
     {
         return $this->afterCreating(function (User $user) {
+            $site = app(CurrentSite::class);
+
             DB::table('ss_site_users')->insert([
-                'tenant_id' => config('starsystem.default_site'),
+                'tenant_id' => $site->has() ? $site->tenantId() : config('starsystem.default_site'),
                 'user_id' => $user->id,
                 'role_id' => Role::builtIn(Role::ADMINISTRATOR)->id,
                 'created_at' => now(),

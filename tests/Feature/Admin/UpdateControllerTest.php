@@ -60,7 +60,7 @@ class UpdateControllerTest extends TestCase
 
     public function test_the_page_and_starting_an_update_need_a_freshly_confirmed_password(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->installOwner()->create();
 
         $this->actingAs($user)->get(route('admin.updates'))
             ->assertRedirect(route('password.confirm'));
@@ -71,7 +71,7 @@ class UpdateControllerTest extends TestCase
 
     public function test_checking_stepping_and_retrying_do_not_need_a_freshly_confirmed_password(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->installOwner()->create();
 
         $this->actingAs($user)->post(route('admin.updates.check'))
             ->assertRedirect(route('admin.updates'));
@@ -169,7 +169,7 @@ class UpdateControllerTest extends TestCase
 
         $this->asConfirmedUser()->post(route('admin.updates.start'), ['version' => '1.1.0']);
 
-        $user = User::factory()->create();
+        $user = User::factory()->installOwner()->create();
 
         $this->actingAs($user)
             ->post(route('admin.updates.step'))
@@ -180,7 +180,7 @@ class UpdateControllerTest extends TestCase
 
     private function asConfirmedUser(): static
     {
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->installOwner()->create());
         $this->withSession(['auth.password_confirmed_at' => time()]);
 
         return $this;

@@ -1,5 +1,6 @@
 <?php
 
+use App\Access\Ability;
 use App\Files\Http\FileApiController;
 use App\Files\Http\MediaLibraryController;
 use App\Files\Http\ServeFileController;
@@ -15,18 +16,18 @@ Route::get('/files/{uuid}/{name?}', ServeFileController::class)
     ->where('uuid', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
     ->name('files.show');
 
-Route::middleware(['web', 'auth', 'verified'])
+Route::middleware(['web', 'auth', 'site.member', 'verified', 'can:'.Ability::MEDIA_VIEW])
     ->get('admin/files', MediaLibraryController::class)
     ->name('admin.files');
 
 // The media library's JSON API, also used by <FilePicker>.
-Route::middleware(['web', 'auth', 'verified'])
+Route::middleware(['web', 'auth', 'site.member', 'verified'])
     ->prefix('admin/api/files')
     ->name('admin.api.files.')
     ->controller(FileApiController::class)
     ->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::post('/', 'store')->name('store');
-        Route::patch('{uuid}', 'update')->name('update');
-        Route::delete('{uuid}', 'destroy')->name('destroy');
+        Route::get('/', 'index')->middleware('can:'.Ability::MEDIA_VIEW)->name('index');
+        Route::post('/', 'store')->middleware('can:'.Ability::MEDIA_UPLOAD)->name('store');
+        Route::patch('{uuid}', 'update')->middleware('can:'.Ability::MEDIA_UPDATE)->name('update');
+        Route::delete('{uuid}', 'destroy')->middleware('can:'.Ability::MEDIA_DELETE)->name('destroy');
     });

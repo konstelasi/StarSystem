@@ -27,7 +27,8 @@ class FileApiTest extends TestCase
         parent::setUp();
 
         $this->disk = Storage::fake('files');
-        $this->user = User::factory()->create();
+        // The install owner may use every site, so these tests can move between them.
+        $this->user = User::factory()->installOwner()->create();
         $this->asSite($this->defaultSite());
     }
 
