@@ -40,10 +40,10 @@ final class ReleaseBuilder
      * is shipped or left out by accident.
      */
     public const SKIP = [
-        '.editorconfig', '.gitattributes', '.github', '.gitignore', '.npmrc', 'README.md', 'build',
-        'components.json', 'docker', 'docker-compose.yml', 'package-lock.json', 'package.json',
-        'phpstan.neon', 'phpunit.xml', 'pint.json', 'pnpm-workspace.yaml', 'tests', 'tsconfig.json',
-        'vite.config.ts',
+        '.agent', '.editorconfig', '.gitattributes', '.github', '.gitignore', '.npmrc', 'README.md',
+        'build', 'components.json', 'docker', 'docker-compose.yml', 'package-lock.json',
+        'package.json', 'phpstan.neon', 'phpunit.xml', 'pint.json', 'pnpm-workspace.yaml', 'tests',
+        'tsconfig.json', 'vite.config.ts',
     ];
 
     /**
