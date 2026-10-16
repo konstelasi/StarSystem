@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Access\SiteAccess;
 use App\Health\TickStatus;
 use App\Models\SchemaModel;
 use App\Sites\CurrentSite;
@@ -43,11 +44,46 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                'installOwner' => $request->user()?->is_install_owner === true,
+                'role' => fn () => $this->roleName($request),
+                'abilities' => fn () => $this->abilities($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'backgroundWork' => fn () => $this->backgroundWork($request),
             'navModels' => fn () => $this->navModels($request),
         ];
+    }
+
+    /**
+     * The name of the role the account holds on this site, "Owner" for the
+     * install owner. Null for guests and on pages without a site.
+     */
+    private function roleName(Request $request): ?string
+    {
+        $user = $request->user();
+
+        if ($user === null || ! app(CurrentSite::class)->has()) {
+            return null;
+        }
+
+        return $user->is_install_owner ? 'Owner' : app(SiteAccess::class)->role($user)?->name;
+    }
+
+    /**
+     * What the account may do on this site, for the front end to hide what it
+     * can't use. The server checks every action again.
+     *
+     * @return list<string>
+     */
+    private function abilities(Request $request): array
+    {
+        $user = $request->user();
+
+        if ($user === null || ! app(CurrentSite::class)->has()) {
+            return [];
+        }
+
+        return app(SiteAccess::class)->abilities($user);
     }
 
     /**

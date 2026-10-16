@@ -63,7 +63,7 @@ class SafeModeTest extends TestCase
     {
         config(['faulty.fail_in' => 'boot']);
         $this->bootModules();
-        $owner = User::factory()->create();
+        $owner = User::factory()->installOwner()->create();
         $other = User::factory()->create();
 
         $this->actingAs($owner)
@@ -118,7 +118,7 @@ class SafeModeTest extends TestCase
 
         $this->assertSame([], $this->bootModules()->loaded());
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->installOwner()->create())
             ->get(route('dashboard'))
             ->assertInertia(fn (Assert $page) => $page->where('moduleNotices.safeMode', 'file'));
 

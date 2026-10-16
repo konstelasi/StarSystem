@@ -24,7 +24,7 @@ class ModuleAdminTest extends TestCase
 
         $this->useTemporaryModulesFolder();
         $this->beforeApplicationDestroyed(fn () => $this->deleteZips());
-        $this->owner = User::factory()->create();
+        $this->owner = User::factory()->installOwner()->create();
     }
 
     public function test_guests_are_redirected_to_the_login_page()

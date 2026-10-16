@@ -1,5 +1,6 @@
 <?php
 
+use App\Access\AccessServiceProvider;
 use App\Files\FilesServiceProvider;
 use App\Hooks\HooksServiceProvider;
 use App\Modules\ModulesServiceProvider;
@@ -13,6 +14,7 @@ use App\StarDust\StarDustServiceProvider;
 
 return [
     AppServiceProvider::class,
+    AccessServiceProvider::class,
     FortifyServiceProvider::class,
     StarDustServiceProvider::class,
     SchemaServiceProvider::class,
