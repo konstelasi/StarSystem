@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Access\Invitations;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Activity\ActivityLog;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\SiteInvite;
@@ -28,6 +30,7 @@ class InviteController extends Controller
         private readonly Invitations $invitations,
         private readonly SiteAccess $access,
         private readonly CurrentSite $site,
+        private readonly ActivityLog $activity,
     ) {}
 
     public function store(Request $request): RedirectResponse
@@ -54,6 +57,8 @@ class InviteController extends Controller
 
         ['invite' => $invite, 'link' => $link] = $this->invitations->issue($email, $role, $actor);
 
+        $this->activity->record(ActivityAction::INVITE_SENT, $invite, ['role' => $role->name]);
+
         return $this->shown($invite, $link, $actor);
     }
 
@@ -65,6 +70,8 @@ class InviteController extends Controller
 
         $link = $this->invitations->reissue($invite);
 
+        $this->activity->record(ActivityAction::INVITE_RESENT, $invite, ['role' => $invite->role->name]);
+
         return $this->shown($invite, $link, $actor);
     }
 
@@ -73,6 +80,8 @@ class InviteController extends Controller
         abort_unless($this->access->canAssign($this->actor($request), $invite->role), 403);
 
         $invite->delete();
+
+        $this->activity->record(ActivityAction::INVITE_WITHDRAWN, $invite, ['role' => $invite->role->name]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "The invitation to {$invite->email} was withdrawn."]);
 

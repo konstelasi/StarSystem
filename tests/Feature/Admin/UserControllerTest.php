@@ -4,6 +4,8 @@ namespace Tests\Feature\Admin;
 
 use App\Access\Ability;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Models\Activity;
 use App\Models\Role;
 use App\Models\SiteUser;
 use App\Models\User;
@@ -140,6 +142,57 @@ class UserControllerTest extends TestCase
         $this->actingConfirmed($admin)->delete(route('admin.users.destroy', $membership->id))->assertForbidden();
 
         $this->assertSame($this->role(Role::ADMINISTRATOR), $membership->fresh()->role_id);
+    }
+
+    public function test_changing_a_role_is_logged_with_both_roles()
+    {
+        $admin = $this->memberAs(Role::ADMINISTRATOR, 'Ada');
+        $ben = $this->memberAs(Role::EDITOR, 'Ben');
+
+        $this->actingConfirmed($admin)
+            ->put(route('admin.users.update', $this->membership($ben)->id), ['role_id' => $this->role(Role::VIEWER)]);
+
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::USER_ROLE_CHANGED, $row->action);
+        $this->assertSame($admin->id, $row->actor_id);
+        $this->assertSame('user', $row->subject_type);
+        $this->assertSame($ben->id, $row->subject_id);
+        $this->assertSame($ben->email, $row->subject_label);
+        $this->assertSame(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
+    }
+
+    public function test_choosing_the_role_someone_already_holds_logs_nothing()
+    {
+        $ben = $this->memberAs(Role::EDITOR);
+
+        $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR))
+            ->put(route('admin.users.update', $this->membership($ben)->id), ['role_id' => $this->role(Role::EDITOR)])
+            ->assertRedirect(route('admin.users.index'));
+
+        $this->assertSame(0, Activity::query()->count());
+    }
+
+    public function test_removing_someone_is_logged_with_the_role_they_held()
+    {
+        $admin = $this->memberAs(Role::ADMINISTRATOR);
+        $ben = $this->memberAs(Role::EDITOR);
+
+        $this->actingConfirmed($admin)->delete(route('admin.users.destroy', $this->membership($ben)->id));
+
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::USER_REMOVED, $row->action);
+        $this->assertSame($admin->id, $row->actor_id);
+        $this->assertSame($ben->email, $row->subject_label);
+        $this->assertSame(['role' => 'Editor'], $row->properties);
+    }
+
+    public function test_a_refused_change_is_not_logged()
+    {
+        $admin = $this->memberAs(Role::ADMINISTRATOR);
+
+        $this->actingConfirmed($admin)->delete(route('admin.users.destroy', $this->membership($admin)->id))->assertForbidden();
+
+        $this->assertSame(0, Activity::query()->count());
     }
 
     public function test_the_install_owner_cannot_be_changed_or_removed()

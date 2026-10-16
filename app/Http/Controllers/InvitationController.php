@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Access\Invitations;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Activity\ActivityLog;
 use App\Concerns\PasswordValidationRules;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
@@ -35,6 +37,7 @@ class InvitationController extends Controller
         private readonly Invitations $invitations,
         private readonly CurrentSite $site,
         private readonly SiteAccess $access,
+        private readonly ActivityLog $activity,
     ) {}
 
     public function show(Request $request, string $token): InertiaResponse|RedirectResponse|Response
@@ -98,6 +101,8 @@ class InvitationController extends Controller
 
         $request->session()->forget('invitation_token');
         $this->access->forget();
+
+        $this->activity->record(ActivityAction::USER_JOINED, $user, ['role' => $invite->role->name], $user);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "You joined {$this->site->get()->name}."]);
 

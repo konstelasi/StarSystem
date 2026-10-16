@@ -5,7 +5,9 @@ namespace Tests\Feature\Admin;
 use App\Access\Ability;
 use App\Access\Invitations;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
 use App\Mail\SiteInvitation;
+use App\Models\Activity;
 use App\Models\Role;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
@@ -238,6 +240,35 @@ class InviteControllerTest extends TestCase
 
         $this->assertSame(0, SiteInvite::query()->count());
         $this->get(route('invitations.show', 'a-token'))->assertStatus(410);
+    }
+
+    public function test_sending_sending_again_and_withdrawing_are_logged()
+    {
+        $this->realMail();
+        $admin = $this->memberAs(Role::ADMINISTRATOR);
+
+        $this->actingConfirmed($admin)->post(route('admin.users.invites.store'), ['email' => 'ana@example.com', 'role_id' => $this->role(Role::EDITOR)]);
+        $invite = SiteInvite::query()->sole();
+        $this->actingConfirmed($admin)->post(route('admin.users.invites.resend', $invite->id));
+        $this->actingConfirmed($admin)->delete(route('admin.users.invites.destroy', $invite->id));
+
+        $rows = Activity::query()->orderBy('id')->get();
+        $this->assertSame(
+            [ActivityAction::INVITE_SENT, ActivityAction::INVITE_RESENT, ActivityAction::INVITE_WITHDRAWN],
+            $rows->pluck('action')->all(),
+        );
+        $this->assertSame(['ana@example.com'], $rows->pluck('subject_label')->unique()->values()->all());
+        $this->assertSame([$admin->id], $rows->pluck('actor_id')->unique()->values()->all());
+        $this->assertSame(['role' => 'Editor'], $rows[0]->properties);
+    }
+
+    public function test_an_invitation_that_is_refused_is_not_logged()
+    {
+        $this->actingConfirmed($this->memberAs(Role::EDITOR))
+            ->post(route('admin.users.invites.store'), ['email' => 'ana@example.com', 'role_id' => $this->role(Role::EDITOR)])
+            ->assertForbidden();
+
+        $this->assertSame(0, Activity::query()->count());
     }
 
     public function test_nobody_manages_an_invitation_to_a_role_above_them()

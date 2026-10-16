@@ -4,6 +4,8 @@ namespace Tests\Feature\Auth;
 
 use App\Access\Invitations;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Models\Activity;
 use App\Models\Role;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
@@ -86,6 +88,29 @@ class InvitationTest extends TestCase
         $membership = SiteUser::query()->where('user_id', $user->id)->sole();
         $this->assertSame(Role::builtIn(Role::EDITOR)->id, $membership->role_id);
         $this->assertNotNull($invite->fresh()->accepted_at);
+    }
+
+    public function test_joining_is_logged_as_the_new_member()
+    {
+        $this->invite();
+
+        $this->post(route('invitations.accept', self::TOKEN), $this->signUp());
+
+        $user = User::query()->where('email', 'ana@example.com')->sole();
+        $row = Activity::query()->sole();
+        $this->assertSame(ActivityAction::USER_JOINED, $row->action);
+        $this->assertSame($user->id, $row->actor_id);
+        $this->assertSame('Ana Lima', $row->actor_name);
+        $this->assertSame('ana@example.com', $row->subject_label);
+        $this->assertSame(['role' => 'Editor'], $row->properties);
+    }
+
+    public function test_a_link_that_does_not_work_logs_nothing()
+    {
+        $this->get(route('invitations.show', 'a-made-up-link'))->assertStatus(410);
+        $this->post(route('invitations.accept', 'a-made-up-link'), $this->signUp())->assertStatus(410);
+
+        $this->assertSame(0, Activity::query()->count());
     }
 
     public function test_the_new_member_can_use_the_site_straight_away()

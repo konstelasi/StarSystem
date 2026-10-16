@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Access\Invitations;
 use App\Access\SiteAccess;
+use App\Activity\ActivityAction;
+use App\Activity\ActivityLog;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\SiteInvite;
@@ -28,6 +30,7 @@ class UserController extends Controller
         private readonly SiteAccess $access,
         private readonly CurrentSite $site,
         private readonly Invitations $invitations,
+        private readonly ActivityLog $activity,
     ) {}
 
     public function index(Request $request): Response
@@ -105,8 +108,15 @@ class UserController extends Controller
 
         abort_unless($this->access->canAssign($actor, $role), 403);
 
+        $from = $member->role->name;
+        $changed = $member->role_id !== $role->id;
+
         $member->update(['role_id' => $role->id]);
         $this->access->forget();
+
+        if ($changed) {
+            $this->activity->record(ActivityAction::USER_ROLE_CHANGED, $member, ['from' => $from, 'to' => $role->name]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$member->user->name} is now {$role->name}."]);
 
@@ -122,6 +132,8 @@ class UserController extends Controller
 
         $member->delete();
         $this->access->forget();
+
+        $this->activity->record(ActivityAction::USER_REMOVED, $member, ['role' => $member->role->name]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$member->user->name} can no longer use this site."]);
 
