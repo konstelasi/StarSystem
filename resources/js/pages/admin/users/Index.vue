@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { Mail, UserPlus } from '@lucide/vue';
+import { KeyRound, Mail, UserPlus } from '@lucide/vue';
 import { ref, watch } from 'vue';
 import InviteLinkDialog from '@/components/users/InviteLinkDialog.vue';
 import type { InviteLink } from '@/components/users/InviteLinkDialog.vue';
 import InviteUserDialog from '@/components/users/InviteUserDialog.vue';
 import RemoveUserDialog from '@/components/users/RemoveUserDialog.vue';
+import TransferOwnershipDialog from '@/components/users/TransferOwnershipDialog.vue';
 import PageBody from '@/components/PageBody.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +49,8 @@ defineProps<{
     members: Member[];
     roles: RoleOption[];
     invites: Invite[];
+    /** The Administrators the install owner may hand ownership to. */
+    candidates: { id: number; name: string; email: string }[];
 }>();
 
 defineOptions({
@@ -56,9 +59,10 @@ defineOptions({
     },
 });
 
-const { can } = useAbilities();
+const { can, installOwner } = useAbilities();
 
 const inviteOpen = ref(false);
+const ownershipOpen = ref(false);
 const linkOpen = ref(false);
 const shown = ref<InviteLink | null>(null);
 
@@ -98,8 +102,22 @@ function changeRole(member: Member, roleId: unknown) {
             title="Users"
             description="The people who can sign in to this site, and what each role lets them do."
         >
-            <template v-if="can('users.invite')" #actions>
-                <Button @click="inviteOpen = true">
+            <template
+                v-if="
+                    can('users.invite') ||
+                    (installOwner && candidates.length > 0)
+                "
+                #actions
+            >
+                <Button
+                    v-if="installOwner && candidates.length > 0"
+                    variant="ghost"
+                    @click="ownershipOpen = true"
+                >
+                    <KeyRound />
+                    Hand over ownership
+                </Button>
+                <Button v-if="can('users.invite')" @click="inviteOpen = true">
                     <UserPlus />
                     Invite
                 </Button>
@@ -258,5 +276,9 @@ function changeRole(member: Member, roleId: unknown) {
 
         <InviteUserDialog v-model:open="inviteOpen" :roles="roles" />
         <InviteLinkDialog v-model:open="linkOpen" :invite="shown" />
+        <TransferOwnershipDialog
+            v-model:open="ownershipOpen"
+            :candidates="candidates"
+        />
     </PageBody>
 </template>
