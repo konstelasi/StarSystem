@@ -35,6 +35,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Activity log
+    |--------------------------------------------------------------------------
+    |
+    | A daily job deletes log rows older than this many days. Set it to 0 to
+    | keep them for good. A row names the person who did something, so a
+    | shorter time keeps less about people who have since left.
+    |
+    */
+
+    'activity' => [
+        'keep_days' => (int) env('STARSYSTEM_ACTIVITY_KEEP_DAYS', 365),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Updates
     |--------------------------------------------------------------------------
     |
