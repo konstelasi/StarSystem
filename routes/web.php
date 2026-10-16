@@ -1,6 +1,7 @@
 <?php
 
 use App\Access\Ability;
+use App\Http\Controllers\Admin\ActivityController;
 use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\InviteController;
 use App\Http\Controllers\Admin\RoleController;
@@ -28,6 +29,8 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 
     Route::get('admin/health', HealthController::class)->middleware('can:'.Ability::HEALTH_VIEW)->name('admin.health');
+
+    Route::get('admin/activity', ActivityController::class)->middleware('can:'.Ability::ACTIVITY_VIEW)->name('admin.activity');
 
     // Who can use the site and as what. Changing it asks for the password
     // again, like modules and updates.

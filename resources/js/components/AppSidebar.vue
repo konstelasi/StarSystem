@@ -8,6 +8,7 @@ import {
     Images,
     LayoutGrid,
     Puzzle,
+    ScrollText,
     ShieldCheck,
     Users,
 } from '@lucide/vue';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAbilities } from '@/composables/useAbilities';
 import { dashboard } from '@/routes';
-import { files, health, updates } from '@/routes/admin';
+import { activity, files, health, updates } from '@/routes/admin';
 import { index as models } from '@/routes/admin/models';
 import { index as entries } from '@/routes/admin/models/entries';
 import { index as modules } from '@/routes/admin/modules';
@@ -115,6 +116,12 @@ const groups = computed<NavGroup[]>(() => {
                     href: health(),
                     icon: Activity,
                     ability: 'health.view',
+                },
+                {
+                    title: 'Activity',
+                    href: activity(),
+                    icon: ScrollText,
+                    ability: 'activity.view',
                 },
                 {
                     title: 'Users',
