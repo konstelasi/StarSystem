@@ -97,8 +97,8 @@ class InvitationTest extends TestCase
         $this->post(route('invitations.accept', self::TOKEN), $this->signUp());
 
         $user = User::query()->where('email', 'ana@example.com')->sole();
-        $row = Activity::query()->sole();
-        $this->assertSame(ActivityAction::USER_JOINED, $row->action);
+        // Taking up the invitation also signs the new account in, which is logged too.
+        $row = Activity::query()->where('action', ActivityAction::USER_JOINED)->sole();
         $this->assertSame($user->id, $row->actor_id);
         $this->assertSame('Ana Lima', $row->actor_name);
         $this->assertSame('ana@example.com', $row->subject_label);
