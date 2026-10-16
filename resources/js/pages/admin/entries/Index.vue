@@ -20,6 +20,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { useAbilities } from '@/composables/useAbilities';
 import { cellText, EMPTY_CELL } from '@/fields/display';
 import { relativeTime } from '@/lib/time';
 import { builder, index as models } from '@/routes/admin/models';
@@ -55,6 +56,8 @@ const props = defineProps<{
     /** False until the model has fields, so there's nothing to fill in. */
     hasFields: boolean;
 }>();
+
+const { can } = useAbilities();
 
 const inTrash = computed(() => props.view === 'trash');
 
@@ -163,7 +166,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                             Trash
                         </Link>
                     </Button>
-                    <Button as-child>
+                    <Button v-if="can('entries.create')" as-child>
                         <Link :href="create(model.id)">
                             <PlusCircle />
                             New entry
@@ -181,7 +184,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                     Entries are filled in through the model's fields. Add some
                     first.
                 </CardDescription>
-                <Button as-child class="mt-2">
+                <Button v-if="can('models.update')" as-child class="mt-2">
                     <Link :href="builder(model.id)"
                         >Add fields in the builder</Link
                     >
@@ -285,6 +288,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                         <td class="px-4 py-1 text-right whitespace-nowrap">
                             <template v-if="inTrash">
                                 <Button
+                                    v-if="can('entries.restore')"
                                     variant="ghost"
                                     size="sm"
                                     :disabled="busy === entry.id"
@@ -302,13 +306,14 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                     <span class="max-sm:sr-only">Restore</span>
                                 </Button>
                                 <DeleteEntryDialog
+                                    v-if="can('entries.delete')"
                                     :model-id="model.id"
                                     :entry-id="entry.id"
                                     :name="entryName(entry)"
                                 />
                             </template>
                             <Button
-                                v-else
+                                v-else-if="can('entries.trash')"
                                 variant="ghost"
                                 size="sm"
                                 :disabled="busy === entry.id"

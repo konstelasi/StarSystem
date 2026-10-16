@@ -10,6 +10,7 @@ use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CrossSite;
 use Tests\TestCase;
 
@@ -144,6 +145,17 @@ class RouteAccessTest extends TestCase
 
         $this->get(route('admin.models.index'))->assertForbidden();
         $this->get(route('admin.health'))->assertForbidden();
+    }
+
+    public function test_a_page_a_role_cannot_open_says_so_inside_the_admin()
+    {
+        $this->as(Role::VIEWER)
+            ->get(route('admin.models.index'))
+            ->assertForbidden()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('errors/Forbidden')
+                ->where('auth.role', 'Viewer')
+            );
     }
 
     public function test_an_editor_works_on_entries_and_media_but_does_not_build_or_manage()

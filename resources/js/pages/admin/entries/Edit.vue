@@ -6,6 +6,7 @@ import PageBody from '@/components/PageBody.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { useAbilities } from '@/composables/useAbilities';
 import { useEntryForm } from '@/composables/useEntryForm';
 import { builder, index as models } from '@/routes/admin/models';
 import { edit, index, update } from '@/routes/admin/models/entries';
@@ -29,6 +30,8 @@ setLayoutProps({
     ],
 });
 
+const { can } = useAbilities();
+
 const { values, errors, processing, updateValue, submit } = useEntryForm(
     props.schema,
     props.values,
@@ -50,13 +53,16 @@ const created = new Date(props.entry.created_at).toLocaleString();
             :schema="schema"
             :values="values"
             :errors="errors"
-            :disabled="processing"
-            :builder-href="builder(model.id).url"
+            :disabled="processing || !can('entries.update')"
+            :builder-href="
+                can('models.update') ? builder(model.id).url : undefined
+            "
             @update:values="updateValue"
         />
 
         <div class="flex gap-2">
             <Button
+                v-if="can('entries.update')"
                 :disabled="processing"
                 @click="
                     submit(
@@ -70,7 +76,9 @@ const created = new Date(props.entry.created_at).toLocaleString();
                 Save
             </Button>
             <Button variant="secondary" as-child>
-                <Link :href="index(model.id)">Cancel</Link>
+                <Link :href="index(model.id)">{{
+                    can('entries.update') ? 'Cancel' : 'Back'
+                }}</Link>
             </Button>
         </div>
     </PageBody>

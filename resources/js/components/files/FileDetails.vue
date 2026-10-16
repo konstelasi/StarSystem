@@ -22,6 +22,7 @@ import {
     normalizeFolder,
     updateFile,
 } from '@/lib/files';
+import { useAbilities } from '@/composables/useAbilities';
 import type { FileChanges, StoredFile } from '@/types/files';
 
 /**
@@ -41,6 +42,8 @@ const emit = defineEmits<{
 
 const baseName = (file: StoredFile) =>
     file.name.slice(0, file.name.length - file.extension.length - 1);
+
+const { can } = useAbilities();
 
 const name = ref('');
 const alt = ref('');
@@ -186,7 +189,12 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString();
             <div class="grid gap-1.5">
                 <Label for="file-name">Name</Label>
                 <div class="flex items-center gap-2">
-                    <Input id="file-name" v-model="name" maxlength="240" />
+                    <Input
+                        id="file-name"
+                        v-model="name"
+                        maxlength="240"
+                        :disabled="!can('media.update')"
+                    />
                     <span class="shrink-0 text-sm text-muted-foreground"
                         >.{{ file.extension }}</span
                     >
@@ -203,6 +211,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString();
                     v-model="alt"
                     rows="3"
                     maxlength="1000"
+                    :disabled="!can('media.update')"
                     placeholder="Describe the image for people who can't see it"
                     class="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
                 />
@@ -217,6 +226,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString();
                     id="file-folder"
                     v-model="folder"
                     list="file-folder-options"
+                    :disabled="!can('media.update')"
                     placeholder="Top level"
                 />
                 <datalist id="file-folder-options">
@@ -231,7 +241,11 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString();
                 </p>
             </div>
 
-            <Button type="submit" :disabled="!dirty || saving">
+            <Button
+                v-if="can('media.update')"
+                type="submit"
+                :disabled="!dirty || saving"
+            >
                 {{ saving ? 'Saving…' : 'Save changes' }}
             </Button>
         </form>
@@ -265,6 +279,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleString();
                 </a>
             </Button>
             <Button
+                v-if="can('media.delete')"
                 variant="outline"
                 size="sm"
                 class="text-destructive"

@@ -12,6 +12,12 @@ export type User = {
 
 export type Auth = {
     user: User;
+    /** Runs updates and modules for every site. */
+    installOwner: boolean;
+    /** The name of the role held on this site, "Owner" for the install owner. */
+    role: string | null;
+    /** What the account may do on this site. */
+    abilities: string[];
 };
 
 export type TwoFactorConfigContent = {

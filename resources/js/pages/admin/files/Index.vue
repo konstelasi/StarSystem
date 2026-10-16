@@ -30,6 +30,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useAbilities } from '@/composables/useAbilities';
 import { useFileBrowser } from '@/composables/useFileBrowser';
 import { useFileUploads } from '@/composables/useFileUploads';
 import { normalizeFolder } from '@/lib/files';
@@ -47,6 +48,7 @@ defineOptions({
     },
 });
 
+const { can } = useAbilities();
 const browser = useFileBrowser();
 const { folder, search, searching, files, folders, subfolders, loading } =
     browser;
@@ -203,6 +205,7 @@ function createFolder() {
                     </Button>
                 </div>
                 <Button
+                    v-if="can('media.upload')"
                     variant="outline"
                     :disabled="searching"
                     @click="creatingFolder = true"
@@ -210,6 +213,7 @@ function createFolder() {
                     <FolderPlus /> New folder
                 </Button>
                 <Button
+                    v-if="can('media.upload')"
                     :disabled="!limits.canDetectTypes"
                     @click="dropzone?.choose()"
                 >
@@ -229,7 +233,7 @@ function createFolder() {
             <FileDropzone
                 ref="dropzone"
                 class="min-h-64 min-w-0 flex-1"
-                :disabled="!limits.canDetectTypes"
+                :disabled="!limits.canDetectTypes || !can('media.upload')"
                 @files="(picked) => uploads.add(picked, folder)"
             >
                 <div class="grid gap-4">
@@ -267,7 +271,9 @@ function createFolder() {
                         <template v-else>
                             <p>This folder is empty.</p>
                             <p>
-                                Drag files here or use Upload.
+                                <template v-if="can('media.upload')">
+                                    Drag files here or use Upload.
+                                </template>
                                 {{ limitText }}
                             </p>
                             <p v-if="subfolders.length === 0 && folder !== ''">

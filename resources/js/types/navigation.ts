@@ -15,6 +15,10 @@ export type NavItem = {
     matchPrefix?: boolean;
     /** For an item no plain match fits: says from the current path. */
     activeWhen?: (path: string) => boolean;
+    /** Shown only to an account that holds this ability. */
+    ability?: string;
+    /** Shown only to the install owner. */
+    ownerOnly?: boolean;
 };
 
 export type NavGroup = {

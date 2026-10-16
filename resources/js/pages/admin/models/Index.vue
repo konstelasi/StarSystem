@@ -23,6 +23,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { useAbilities } from '@/composables/useAbilities';
 import { builder, exportMethod, index } from '@/routes/admin/models';
 import { index as entries } from '@/routes/admin/models/entries';
 
@@ -46,6 +47,8 @@ defineOptions({
     },
 });
 
+const { can } = useAbilities();
+
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
 
 const createOpen = ref(false);
@@ -62,11 +65,15 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
             description="The content models editors fill in entries for."
         >
             <template #actions>
-                <Button variant="secondary" @click="importOpen = true">
+                <Button
+                    v-if="can('models.import')"
+                    variant="secondary"
+                    @click="importOpen = true"
+                >
                     <Upload />
                     Import
                 </Button>
-                <Button @click="createOpen = true">
+                <Button v-if="can('models.create')" @click="createOpen = true">
                     <PlusCircle />
                     New model
                 </Button>
@@ -148,7 +155,12 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                         </td>
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <template v-if="model.status !== 'deleting'">
-                                <Button as-child variant="ghost" size="sm">
+                                <Button
+                                    v-if="can('entries.view')"
+                                    as-child
+                                    variant="ghost"
+                                    size="sm"
+                                >
                                     <Link :href="entries(model.id)">
                                         <List />
                                         <span class="max-sm:sr-only"
@@ -156,13 +168,23 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                         >
                                     </Link>
                                 </Button>
-                                <Button as-child variant="ghost" size="sm">
+                                <Button
+                                    v-if="can('models.update')"
+                                    as-child
+                                    variant="ghost"
+                                    size="sm"
+                                >
                                     <Link :href="builder(model.id)">
                                         <Pencil />
                                         <span class="max-sm:sr-only">Open</span>
                                     </Link>
                                 </Button>
-                                <Button as-child variant="ghost" size="sm">
+                                <Button
+                                    v-if="can('models.export')"
+                                    as-child
+                                    variant="ghost"
+                                    size="sm"
+                                >
                                     <a :href="exportMethod(model.id).url">
                                         <Download />
                                         <span class="max-sm:sr-only"
@@ -171,10 +193,14 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                     </a>
                                 </Button>
                                 <DuplicateModelDialog
+                                    v-if="can('models.create')"
                                     :model="model"
                                     :existing-slugs="existingSlugs"
                                 />
-                                <DeleteModelDialog :model="model" />
+                                <DeleteModelDialog
+                                    v-if="can('models.delete')"
+                                    :model="model"
+                                />
                             </template>
                         </td>
                     </tr>

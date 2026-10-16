@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import { useAbilities } from '@/composables/useAbilities';
 import { useFileBrowser } from '@/composables/useFileBrowser';
 import { useFileUploads } from '@/composables/useFileUploads';
 import { listFiles } from '@/lib/files';
@@ -74,6 +75,10 @@ const props = withDefaults(
         allowUpload: true,
     },
 );
+
+// The prop asks for uploads; the account's role has the last word.
+const { can } = useAbilities();
+const uploadAllowed = computed(() => props.allowUpload && can('media.upload'));
 
 // Works with or without v-model:open; the trigger slot opens it too.
 const open = defineModel<boolean>('open', { default: false });
@@ -240,7 +245,7 @@ function navigate(path: string) {
                         Choose up to {{ max }}.
                     </template>
                     {{ acceptText }}
-                    <template v-if="allowUpload">
+                    <template v-if="uploadAllowed">
                         Drop files here to upload them.
                     </template>
                 </DialogDescription>
@@ -260,7 +265,7 @@ function navigate(path: string) {
                     />
                 </div>
                 <Button
-                    v-if="allowUpload"
+                    v-if="uploadAllowed"
                     variant="outline"
                     :disabled="browser.limits.value?.canDetectTypes === false"
                     @click="dropzone?.choose()"
@@ -282,7 +287,7 @@ function navigate(path: string) {
             <FileDropzone
                 ref="dropzone"
                 class="min-h-48 flex-1 overflow-y-auto"
-                :disabled="!allowUpload"
+                :disabled="!uploadAllowed"
                 :multiple="multiple"
                 @files="upload"
             >
