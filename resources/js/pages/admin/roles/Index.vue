@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Copy, Eye, Pencil, PlusCircle } from '@lucide/vue';
 import DeleteRoleDialog from '@/components/roles/DeleteRoleDialog.vue';
+import TwoFactorRequirement from '@/components/roles/TwoFactorRequirement.vue';
 import PageBody from '@/components/PageBody.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ type RoleRow = {
 
 defineProps<{
     roles: RoleRow[];
+    twoFactor: { roles: number[]; editable: boolean; yours: boolean };
 }>();
 
 defineOptions({
@@ -121,5 +123,12 @@ const { can } = useAbilities();
                 </tbody>
             </table>
         </div>
+
+        <TwoFactorRequirement
+            :roles="roles"
+            :selected="twoFactor.roles"
+            :editable="twoFactor.editable"
+            :yours="twoFactor.yours"
+        />
     </PageBody>
 </template>
