@@ -7,6 +7,7 @@ use App\Activity\ActivityLog;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
+use App\Security\Sessions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -20,11 +21,14 @@ class SecurityController extends Controller
     /**
      * Show the user's security settings page.
      */
-    public function edit(TwoFactorAuthenticationRequest $request): Response
+    public function edit(TwoFactorAuthenticationRequest $request, Sessions $sessions): Response
     {
         $props = [
             'canManageTwoFactor' => Features::canManageTwoFactorAuthentication(),
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            // Where the account is signed in, or null where sessions aren't
+            // kept in the database and there is nothing to list.
+            'sessions' => $sessions->available() ? $sessions->for($request->user(), $request->session()->getId()) : null,
         ];
 
         if (Features::canManageTwoFactorAuthentication()) {

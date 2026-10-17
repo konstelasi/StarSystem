@@ -21,6 +21,8 @@ final class ActivityAction
 
     public const PASSWORD_CHANGED = 'auth.password_changed';
 
+    public const SESSIONS_ENDED = 'auth.sessions_ended';
+
     public const TWO_FACTOR_ENABLED = 'auth.two_factor_enabled';
 
     public const TWO_FACTOR_DISABLED = 'auth.two_factor_disabled';
@@ -67,6 +69,7 @@ final class ActivityAction
                 self::LOGOUT => 'Signed out',
                 self::PASSWORD_RESET => 'Reset a forgotten password',
                 self::PASSWORD_CHANGED => 'Changed their password',
+                self::SESSIONS_ENDED => 'Signed out their other devices',
                 self::TWO_FACTOR_ENABLED => 'Turned on two-factor sign-in',
                 self::TWO_FACTOR_DISABLED => 'Turned off two-factor sign-in',
                 self::TWO_FACTOR_FAILED => 'Gave a wrong two-factor code',
