@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
+import ActiveSessions from '@/components/ActiveSessions.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -13,6 +14,14 @@ import ManageTwoFactor from '@/components/ManageTwoFactor.vue';
 // oxfmt-ignore
 type Props = {
     passwordRules: string;
+    /** Null where sessions aren't kept in the database. */
+    sessions: {
+        browser: string;
+        os: string;
+        ip: string | null;
+        lastActive: string;
+        current: boolean;
+    }[] | null;
 } &
     ManageTwoFactorProps;
 
@@ -110,4 +119,6 @@ defineOptions({
         :requiresConfirmation="requiresConfirmation"
         :twoFactorEnabled="twoFactorEnabled"
     />
+
+    <ActiveSessions v-if="sessions" :sessions="sessions" />
 </template>
