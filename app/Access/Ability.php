@@ -52,6 +52,12 @@ final class Ability
 
     public const USERS_REMOVE = 'users.remove';
 
+    public const USERS_SUSPEND = 'users.suspend';
+
+    public const USERS_SIGN_OUT = 'users.sign_out';
+
+    public const USERS_RESET_PASSWORD = 'users.reset_password';
+
     public const ROLES_VIEW = 'roles.view';
 
     public const ROLES_CREATE = 'roles.create';
@@ -99,6 +105,9 @@ final class Ability
                 self::USERS_INVITE => 'Invite people',
                 self::USERS_UPDATE => 'Change what role someone holds',
                 self::USERS_REMOVE => 'Remove people from the site',
+                self::USERS_SUSPEND => 'Pause and resume people',
+                self::USERS_SIGN_OUT => 'Sign people out of their devices',
+                self::USERS_RESET_PASSWORD => 'Send people a password reset link',
             ],
             'Roles' => [
                 self::ROLES_VIEW => 'See the roles',
