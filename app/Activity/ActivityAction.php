@@ -55,6 +55,8 @@ final class ActivityAction
 
     public const ACCOUNT_UPDATED = 'account.updated';
 
+    public const ACCOUNT_EMAIL_REQUESTED = 'account.email_requested';
+
     public const ACCOUNT_DELETED = 'account.deleted';
 
     /**
@@ -94,6 +96,7 @@ final class ActivityAction
             ],
             'Account' => [
                 self::ACCOUNT_UPDATED => 'Changed their profile',
+                self::ACCOUNT_EMAIL_REQUESTED => 'Asked to change their email',
                 self::ACCOUNT_DELETED => 'Deleted their account',
             ],
         ];

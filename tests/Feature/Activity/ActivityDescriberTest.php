@@ -80,6 +80,11 @@ class ActivityDescriberTest extends TestCase
         );
     }
 
+    public function test_asking_to_change_an_email_names_the_address_asked_for()
+    {
+        $this->assertSame(['to new@example.com'], $this->details(ActivityAction::ACCOUNT_EMAIL_REQUESTED, ['email_to' => 'new@example.com']));
+    }
+
     public function test_rows_with_nothing_to_add_or_odd_data_give_no_lines()
     {
         $this->assertSame([], $this->details(ActivityAction::LOGIN, null));

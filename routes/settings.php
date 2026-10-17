@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\ConfirmEmailChangeController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Settings\SessionController;
@@ -11,6 +12,13 @@ Route::middleware(['auth', 'site.member'])->group(function () {
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    // The link in the email that confirms a new address. Signed, so it can't
+    // be altered, and throttled like the other links that carry a secret.
+    Route::get('settings/profile/email/{user}/{hash}', ConfirmEmailChangeController::class)
+        ->middleware(['signed', 'throttle:6,1'])
+        ->whereNumber('user')
+        ->name('profile.email.confirm');
 });
 
 Route::middleware(['auth', 'site.member', 'verified'])->group(function () {

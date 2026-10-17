@@ -32,6 +32,7 @@ class ProfileUpdateTest extends TestCase
             ->patch(route('profile.update'), [
                 'name' => 'Test User',
                 'email' => 'test@example.com',
+                'current_password' => 'password',
             ]);
 
         $response
@@ -49,7 +50,7 @@ class ProfileUpdateTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'old@example.com']);
 
-        $this->actingAs($user)->patch(route('profile.update'), ['name' => 'Test User', 'email' => 'new@example.com']);
+        $this->actingAs($user)->patch(route('profile.update'), ['name' => 'Test User', 'email' => 'new@example.com', 'current_password' => 'password']);
 
         $row = Activity::query()->sole();
         $this->assertSame(ActivityAction::ACCOUNT_UPDATED, $row->action);

@@ -17,6 +17,14 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->profileRules($this->user()->id);
+        $rules = $this->profileRules($this->user()->id);
+
+        // A new address asks for the password, since it decides where a
+        // password reset link goes. Typing the address already held doesn't.
+        if (mb_strtolower((string) $this->input('email')) !== mb_strtolower($this->user()->email)) {
+            $rules['current_password'] = ['required', 'string', 'current_password'];
+        }
+
+        return $rules;
     }
 }

@@ -32,7 +32,8 @@ final class ActivityDescriber
             ActivityAction::ROLE_UPDATED => self::updated($with),
             ActivityAction::ROLE_DUPLICATED => self::copied($with),
             ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED => self::twoFactor($with),
-            ActivityAction::ACCOUNT_UPDATED => self::account($with),
+            ActivityAction::ACCOUNT_UPDATED,
+            ActivityAction::ACCOUNT_EMAIL_REQUESTED => self::account($with),
             default => [],
         };
     }
@@ -138,6 +139,8 @@ final class ActivityDescriber
 
         if ($from !== null && $to !== null) {
             $lines[] = "{$from} to {$to}";
+        } elseif ($to !== null) {
+            $lines[] = "to {$to}";
         }
 
         return $lines;
