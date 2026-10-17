@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Access\Invitations;
 use App\Access\SiteAccess;
+use App\Models\SiteUser;
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +22,11 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureSiteMember
 {
+    /**
+     * How often a member's last visit is written, in minutes.
+     */
+    private const SEEN_EVERY_MINUTES = 10;
+
     public function __construct(
         private readonly SiteAccess $access,
         private readonly Invitations $invitations,
@@ -29,7 +36,13 @@ class EnsureSiteMember
     {
         $user = $request->user();
 
-        if ($user === null || $this->access->isMember($user)) {
+        if ($user === null) {
+            return $next($request);
+        }
+
+        if ($this->access->isMember($user)) {
+            $this->noteSeen($request, $user);
+
             return $next($request);
         }
 
@@ -47,5 +60,27 @@ class EnsureSiteMember
         $request->session()->regenerateToken();
 
         return redirect()->route('login')->with('status', 'You do not have access to this site.');
+    }
+
+    /**
+     * Records that the member is using the site, at most once in a while.
+     * The session remembers when it last did, so most requests cost nothing,
+     * and the write skips model events and timestamps on purpose.
+     */
+    private function noteSeen(Request $request, User $user): void
+    {
+        if (! $request->hasSession()) {
+            return;
+        }
+
+        $last = $request->session()->get('member_seen_at');
+
+        if (is_int($last) && $last > now()->subMinutes(self::SEEN_EVERY_MINUTES)->getTimestamp()) {
+            return;
+        }
+
+        SiteUser::query()->where('user_id', $user->id)->toBase()->update(['last_seen_at' => now()]);
+
+        $request->session()->put('member_seen_at', now()->getTimestamp());
     }
 }

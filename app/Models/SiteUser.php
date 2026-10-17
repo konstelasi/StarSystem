@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $tenant_id
  * @property int $user_id
  * @property int $role_id
+ * @property CarbonImmutable|null $last_seen_at
+ * @property CarbonImmutable|null $suspended_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -24,6 +26,14 @@ class SiteUser extends Model
     protected $table = 'ss_site_users';
 
     protected $fillable = ['user_id', 'role_id'];
+
+    protected function casts(): array
+    {
+        return [
+            'last_seen_at' => 'datetime',
+            'suspended_at' => 'datetime',
+        ];
+    }
 
     /**
      * @return BelongsTo<User, $this>
