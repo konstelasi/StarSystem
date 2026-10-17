@@ -6,6 +6,7 @@ use App\Activity\ActivityAction;
 use App\Models\Activity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
@@ -108,6 +109,40 @@ class SecurityTest extends TestCase
         $this->assertSame($user->id, $row->actor_id);
         $this->assertNull($row->properties);
         $this->assertStringNotContainsString('new-password', json_encode($row->toArray()));
+    }
+
+    public function test_changing_the_password_signs_out_the_other_devices()
+    {
+        config(['session.driver' => 'database']);
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        foreach ([[$user, 'phone'], [$other, 'theirs']] as [$owner, $id]) {
+            DB::table('sessions')->insert(['id' => $id, 'user_id' => $owner->id, 'ip_address' => '10.0.0.4', 'user_agent' => '', 'payload' => '', 'last_activity' => now()->getTimestamp()]);
+        }
+
+        $this->actingAs($user)->put(route('user-password.update'), [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+        $this->assertNotContains('phone', DB::table('sessions')->where('user_id', $user->id)->pluck('id')->all());
+        $this->assertSame(['theirs'], DB::table('sessions')->where('user_id', $other->id)->pluck('id')->all());
+    }
+
+    public function test_a_refused_password_change_leaves_the_other_devices_signed_in()
+    {
+        config(['session.driver' => 'database']);
+        $user = User::factory()->create();
+        DB::table('sessions')->insert(['id' => 'phone', 'user_id' => $user->id, 'ip_address' => '10.0.0.4', 'user_agent' => '', 'payload' => '', 'last_activity' => now()->getTimestamp()]);
+
+        $this->actingAs($user)->put(route('user-password.update'), [
+            'current_password' => 'wrong-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+        $this->assertContains('phone', DB::table('sessions')->where('user_id', $user->id)->pluck('id')->all());
     }
 
     public function test_a_refused_password_change_is_not_logged()

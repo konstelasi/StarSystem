@@ -44,11 +44,14 @@ class SecurityController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(PasswordUpdateRequest $request): RedirectResponse
+    public function update(PasswordUpdateRequest $request, Sessions $sessions): RedirectResponse
     {
         $request->user()->update([
             'password' => $request->password,
         ]);
+
+        // Whoever else held the old password is signed out with it.
+        $sessions->endOthers($request->user(), $request->session()->getId());
 
         $this->activity->record(ActivityAction::PASSWORD_CHANGED);
 
