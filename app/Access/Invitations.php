@@ -2,6 +2,7 @@
 
 namespace App\Access;
 
+use App\Mail\MailSetup;
 use App\Mail\SiteInvitation;
 use App\Models\Role;
 use App\Models\SiteInvite;
@@ -105,13 +106,9 @@ class Invitations
         return true;
     }
 
-    /**
-     * Whether mail leaves this install. The `log` mailer writes to a file
-     * and `array` keeps it in memory, so neither reaches a person.
-     */
     public function mailConfigured(): bool
     {
-        return ! in_array(config('mail.default'), ['log', 'array'], true);
+        return MailSetup::configured();
     }
 
     private function link(string $token): string

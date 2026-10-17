@@ -14,6 +14,8 @@ use Illuminate\Mail\Mailables\Envelope;
  */
 class SiteInvitation extends Mailable
 {
+    use EscapesMarkdown;
+
     public function __construct(
         public readonly string $siteName,
         public readonly string $inviterName,
@@ -29,19 +31,11 @@ class SiteInvitation extends Mailable
 
     public function content(): Content
     {
-        // The body is markdown, and these names are typed by people, so they
-        // are escaped to stay plain text. Otherwise a user named
-        // "[Sign in](https://evil.example)" would put a link in an email
-        // that comes from this server.
+        // These names are typed by people, so they are escaped to stay plain text.
         return new Content(markdown: 'mail.site-invitation', with: [
             'site' => $this->plain($this->siteName),
             'inviter' => $this->plain($this->inviterName),
             'role' => $this->plain($this->roleName),
         ]);
-    }
-
-    private function plain(string $text): string
-    {
-        return (string) preg_replace('/([\\\\`*_{}\[\]()#+\-.!|<>~=:@&])/', '\\\\$1', $text);
     }
 }
