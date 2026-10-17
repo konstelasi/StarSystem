@@ -51,6 +51,8 @@ final class ActivityAction
 
     public const ROLE_DUPLICATED = 'role.duplicated';
 
+    public const TWO_FACTOR_REQUIREMENT_CHANGED = 'role.two_factor_changed';
+
     public const ACCOUNT_UPDATED = 'account.updated';
 
     public const ACCOUNT_DELETED = 'account.deleted';
@@ -88,6 +90,7 @@ final class ActivityAction
                 self::ROLE_UPDATED => 'Changed a role',
                 self::ROLE_DELETED => 'Deleted a role',
                 self::ROLE_DUPLICATED => 'Copied a role',
+                self::TWO_FACTOR_REQUIREMENT_CHANGED => 'Changed which roles must use two-factor sign-in',
             ],
             'Account' => [
                 self::ACCOUNT_UPDATED => 'Changed their profile',

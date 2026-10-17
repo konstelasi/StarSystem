@@ -31,6 +31,7 @@ final class ActivityDescriber
             ActivityAction::ROLE_CREATED => self::created($with),
             ActivityAction::ROLE_UPDATED => self::updated($with),
             ActivityAction::ROLE_DUPLICATED => self::copied($with),
+            ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED => self::twoFactor($with),
             ActivityAction::ACCOUNT_UPDATED => self::account($with),
             default => [],
         };
@@ -106,6 +107,17 @@ final class ActivityDescriber
         $from = self::string($with, 'from');
 
         return $from === null ? [] : ["from {$from}"];
+    }
+
+    /**
+     * @param  array<string, mixed>  $with
+     * @return list<string>
+     */
+    private static function twoFactor(array $with): array
+    {
+        $roles = self::strings($with, 'roles');
+
+        return [$roles === [] ? 'no role has to use it now' : 'now required of '.self::sentence($roles)];
     }
 
     /**

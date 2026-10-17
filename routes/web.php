@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\HealthController;
 use App\Http\Controllers\Admin\InviteController;
 use App\Http\Controllers\Admin\OwnershipController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\TwoFactorRequirementController;
 use App\Http\Controllers\Admin\UpdateController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\InvitationController;
@@ -56,6 +57,7 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
         ->controller(RoleController::class)
         ->group(function () {
             Route::get('/', 'index')->middleware('can:'.Ability::ROLES_VIEW)->name('index');
+            Route::put('two-factor', TwoFactorRequirementController::class)->middleware('can:'.Ability::ROLES_UPDATE)->name('two-factor');
             Route::get('create', 'create')->middleware('can:'.Ability::ROLES_CREATE)->name('create');
             Route::post('/', 'store')->middleware('can:'.Ability::ROLES_CREATE)->name('store');
             Route::get('{role}', 'edit')->middleware('can:'.Ability::ROLES_VIEW)->name('edit');

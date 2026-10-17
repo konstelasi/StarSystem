@@ -60,6 +60,12 @@ class ActivityDescriberTest extends TestCase
         $this->assertSame(['added forms.view'], $this->details(ActivityAction::ROLE_UPDATED, ['added' => ['forms.view']]));
     }
 
+    public function test_a_two_factor_change_names_the_roles_now_held_to_it()
+    {
+        $this->assertSame(['now required of Administrator and Editor'], $this->details(ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED, ['roles' => ['Administrator', 'Editor']]));
+        $this->assertSame(['no role has to use it now'], $this->details(ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED, ['roles' => []]));
+    }
+
     public function test_a_copied_role_names_the_original()
     {
         $this->assertSame(['from Editor'], $this->details(ActivityAction::ROLE_DUPLICATED, ['from' => 'Editor']));

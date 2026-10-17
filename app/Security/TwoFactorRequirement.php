@@ -49,11 +49,14 @@ class TwoFactorRequirement
     }
 
     /**
-     * Whether the account's role here demands two-factor.
+     * Whether the account's role here demands two-factor, by the saved list
+     * or by $ids, a list not saved yet, to see what saving it would do.
+     *
+     * @param  list<int>|null  $ids
      */
-    public function appliesTo(User $user): bool
+    public function appliesTo(User $user, ?array $ids = null): bool
     {
-        $ids = $this->roleIds();
+        $ids ??= $this->roleIds();
 
         if ($ids === []) {
             return false;

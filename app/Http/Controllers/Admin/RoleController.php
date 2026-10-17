@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
+use App\Security\TwoFactorRequirement;
 use App\Sites\CurrentSite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,7 @@ class RoleController extends Controller
         private readonly SiteAccess $access,
         private readonly CurrentSite $site,
         private readonly ActivityLog $activity,
+        private readonly TwoFactorRequirement $twoFactor,
     ) {}
 
     public function index(Request $request): Response
@@ -58,6 +60,13 @@ class RoleController extends Controller
                 'duplicable' => $this->access->canAssign($actor, $role),
                 'mine' => $role->id === $own,
             ])->values(),
+            // Which roles must sign in with two-factor, and whether this
+            // account may change that and has two-factor on itself.
+            'twoFactor' => [
+                'roles' => $this->twoFactor->roleIds(),
+                'editable' => $actor->can(Ability::ROLES_UPDATE),
+                'yours' => $actor->hasEnabledTwoFactorAuthentication(),
+            ],
         ]);
     }
 
