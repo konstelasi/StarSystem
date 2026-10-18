@@ -130,6 +130,17 @@ final class Ability
         return array_keys(array_merge(...array_values(self::groups())));
     }
 
+    /**
+     * The first word of every ability, such as "entries" and "users", which a
+     * module's own abilities can't borrow.
+     *
+     * @return list<string>
+     */
+    public static function areas(): array
+    {
+        return array_values(array_unique(array_map(fn (string $ability) => explode('.', $ability)[0], self::all())));
+    }
+
     public static function exists(string $ability): bool
     {
         return in_array($ability, self::all(), true);

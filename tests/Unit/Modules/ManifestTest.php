@@ -22,6 +22,32 @@ class ManifestTest extends TestCase
         $this->assertSame('dist', $manifest->assets);
     }
 
+    public function test_abilities_are_read_with_their_labels_and_named_after_the_module()
+    {
+        $manifest = Manifest::fromArray([...$this->valid(), 'slug' => 'paging-system', 'abilities' => ['view' => ' See submissions ', 'export_all' => 'Export everything']], '/tmp/Example');
+
+        $this->assertSame(['view' => 'See submissions', 'export_all' => 'Export everything'], $manifest->abilities);
+        $this->assertSame(
+            ['paging-system.view' => 'See submissions', 'paging-system.export_all' => 'Export everything'],
+            $manifest->qualifiedAbilities(),
+        );
+    }
+
+    public function test_a_module_adds_no_abilities_unless_it_says_so()
+    {
+        $this->assertSame([], Manifest::fromArray($this->valid(), '/tmp/Example')->abilities);
+        $this->assertSame([], Manifest::fromArray($this->valid(), '/tmp/Example')->qualifiedAbilities());
+        $this->assertSame([], Manifest::fromArray([...$this->valid(), 'abilities' => []], '/tmp/Example')->abilities);
+        $this->assertSame([], Manifest::load(dirname(__DIR__, 2).'/Fixtures/modules/Example')->abilities);
+    }
+
+    public function test_a_core_area_name_is_fine_for_a_module_that_adds_no_abilities()
+    {
+        $manifest = Manifest::fromArray([...$this->valid(), 'slug' => 'users'], '/tmp/Example');
+
+        $this->assertSame('users', $manifest->slug);
+    }
+
     public function test_a_folder_without_a_manifest_is_rejected()
     {
         $this->expectException(InvalidManifest::class);
@@ -54,6 +80,14 @@ class ManifestTest extends TestCase
             'core namespace' => [['namespace' => 'App\Modules', 'provider' => 'App\Modules\Evil'], 'belongs to StarSystem'],
             'assets outside module' => [['assets' => '../../public'], '"assets"'],
             'absolute assets' => [['assets' => 'C:/Windows'], '"assets"'],
+            'abilities as a list' => [['abilities' => ['view']], 'object of short names'],
+            'ability name with capitals' => [['abilities' => ['View' => 'See submissions']], 'An ability name must be'],
+            'ability name too long' => [['abilities' => [str_repeat('a', 33) => 'See submissions']], 'An ability name must be'],
+            'ability label empty' => [['abilities' => ['view' => '  ']], 'needs a label'],
+            'ability label not text' => [['abilities' => ['view' => 5]], 'needs a label'],
+            'ability label too long' => [['abilities' => ['view' => str_repeat('x', 121)]], 'needs a label'],
+            'too many abilities' => [['abilities' => array_combine(array_map(fn (int $n) => "ability_{$n}", range(1, 21)), array_fill(0, 21, 'Does something'))], 'at most 20'],
+            'slug is one of the core areas' => [['slug' => 'users', 'abilities' => ['view' => 'See submissions']], "StarSystem's own abilities"],
         ];
     }
 

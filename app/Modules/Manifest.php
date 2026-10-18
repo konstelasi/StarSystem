@@ -2,6 +2,7 @@
 
 namespace App\Modules;
 
+use App\Access\Ability;
 use JsonException;
 
 /**
@@ -18,7 +19,10 @@ use JsonException;
  *         "requires": { "starsystem": "^0.1" },
  *         "namespace": "Modules\\Example",   // optional, this is the default
  *         "provider": "Modules\\Example\\ExampleServiceProvider",
- *         "assets": "dist"                   // optional, served at /_modules/example/…
+ *         "assets": "dist",                  // optional, served at /_modules/example/…
+ *         "abilities": {                     // optional, what a role can be given for this module
+ *             "view": "See submissions"      // becomes the ability "example.view"
+ *         }
  *     }
  *
  * Classes under the namespace load from the module's src/ folder.
@@ -30,6 +34,12 @@ final class Manifest
     /** Root namespaces a module can't claim, so it can't pose as core code. */
     private const RESERVED_NAMESPACES = ['App', 'Database', 'Tests', 'Illuminate', 'Laravel', 'StarDust', 'Inertia'];
 
+    /** Most abilities one module may add, so a role's page stays readable. */
+    private const MOST_ABILITIES = 20;
+
+    /**
+     * @param  array<string, string>  $abilities  The abilities the module adds, by short name, each with the label the Roles page shows.
+     */
     private function __construct(
         public readonly string $name,
         public readonly string $slug,
@@ -40,6 +50,7 @@ final class Manifest
         public readonly string $namespace,
         public readonly string $provider,
         public readonly ?string $assets,
+        public readonly array $abilities,
         public readonly string $path,
     ) {}
 
@@ -91,6 +102,7 @@ final class Manifest
         $requires = is_array($data['requires'] ?? null) ? ($data['requires']['starsystem'] ?? null) : null;
         $namespace = $data['namespace'] ?? "Modules\\{$name}";
         $assets = $data['assets'] ?? null;
+        $abilities = self::abilities($data['abilities'] ?? [], $slug);
 
         if (! preg_match('/^[A-Z][A-Za-z0-9]{0,63}$/', $name)) {
             throw new InvalidManifest('"name" must be the module\'s folder name in StudlyCase, like "PagingSystem".');
@@ -139,8 +151,26 @@ final class Manifest
             namespace: $namespace,
             provider: $provider,
             assets: $assets === null ? null : trim($assets, '/'),
+            abilities: $abilities,
             path: $directory,
         );
+    }
+
+    /**
+     * The module's abilities as they are named on the Roles page and in a
+     * route's `can:`, "slug.name" with the label for each.
+     *
+     * @return array<string, string>
+     */
+    public function qualifiedAbilities(): array
+    {
+        $qualified = [];
+
+        foreach ($this->abilities as $name => $label) {
+            $qualified["{$this->slug}.{$name}"] = $label;
+        }
+
+        return $qualified;
     }
 
     public function sourcePath(): string
@@ -159,6 +189,48 @@ final class Manifest
     public function assetsPath(): ?string
     {
         return $this->assets === null ? null : $this->path.DIRECTORY_SEPARATOR.$this->assets;
+    }
+
+    /**
+     * @return array<string, string>
+     *
+     * @throws InvalidManifest
+     */
+    private static function abilities(mixed $declared, string $slug): array
+    {
+        if ($declared === [] || $declared === null) {
+            return [];
+        }
+
+        if (! is_array($declared) || array_is_list($declared)) {
+            throw new InvalidManifest('"abilities" must be an object of short names and labels, like {"view": "See submissions"}.');
+        }
+
+        if (count($declared) > self::MOST_ABILITIES) {
+            throw new InvalidManifest('"abilities" can hold at most '.self::MOST_ABILITIES.'.');
+        }
+
+        // An ability is named after the module, so a module named like one
+        // of StarSystem's own areas would speak for it.
+        if (in_array($slug, Ability::areas(), true)) {
+            throw new InvalidManifest("\"slug\" can't be \"{$slug}\" in a module that adds abilities, since that name belongs to StarSystem's own abilities.");
+        }
+
+        $abilities = [];
+
+        foreach ($declared as $name => $label) {
+            if (! is_string($name) || ! preg_match('/^[a-z][a-z0-9_]{0,31}$/', $name)) {
+                throw new InvalidManifest('An ability name must be lowercase letters, digits and underscores, like "view" or "export_all".');
+            }
+
+            if (! is_string($label) || trim($label) === '' || mb_strlen($label) > 120) {
+                throw new InvalidManifest("The ability \"{$name}\" needs a label of up to 120 characters for the Roles page.");
+            }
+
+            $abilities[$name] = trim($label);
+        }
+
+        return $abilities;
     }
 
     /**
