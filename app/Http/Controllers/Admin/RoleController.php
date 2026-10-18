@@ -206,13 +206,41 @@ class RoleController extends Controller
             'readonly' => $role !== null && ! $this->mayChange($actor, $role),
             'areas' => collect($this->registry->groups())->map(fn (array $abilities, string $area) => [
                 'name' => $area,
-                'abilities' => collect($abilities)->map(fn (string $label, string $key) => [
-                    'key' => $key,
-                    'label' => $label,
-                    'held' => in_array($key, $held, true),
-                ])->values(),
+                'abilities' => $this->rows($abilities, $held),
             ])->values(),
         ]);
+    }
+
+    /**
+     * The rows of one area on the role form. An ability that has an
+     * own-entries form is one row carrying that form as `own`, which the page
+     * shows as None, Own or All, and the own form has no row of its own.
+     *
+     * @param  array<string, string>  $abilities  Label by ability.
+     * @param  list<string>  $held
+     * @return list<array{key: string, label: string, held: bool, own?: array{key: string, label: string, held: bool}}>
+     */
+    private function rows(array $abilities, array $held): array
+    {
+        $ownForms = array_flip(Ability::OWN);
+        $rows = [];
+
+        foreach ($abilities as $key => $label) {
+            if (isset($ownForms[$key]) && isset($abilities[$ownForms[$key]])) {
+                continue;
+            }
+
+            $row = ['key' => $key, 'label' => $label, 'held' => in_array($key, $held, true)];
+            $own = Ability::OWN[$key] ?? null;
+
+            if ($own !== null && isset($abilities[$own])) {
+                $row['own'] = ['key' => $own, 'label' => $abilities[$own], 'held' => in_array($own, $held, true)];
+            }
+
+            $rows[] = $row;
+        }
+
+        return $rows;
     }
 
     /**

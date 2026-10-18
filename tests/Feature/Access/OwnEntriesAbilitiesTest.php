@@ -203,15 +203,54 @@ class OwnEntriesAbilitiesTest extends TestCase
             ->assertSessionHasNoErrors();
     }
 
+    /**
+     * @return list<array<string, mixed>> The Entries rows of the role form.
+     */
+    private function entryRows(User $actor): array
+    {
+        $page = $this->actingConfirmed($actor)->get(route('admin.roles.create'))->viewData('page');
+
+        return collect($page['props']['areas'])->firstWhere('name', 'Entries')['abilities'];
+    }
+
+    public function test_the_role_form_pairs_each_ability_with_its_own_form_in_one_row()
+    {
+        $rows = collect($this->entryRows($this->memberAs(Role::ADMINISTRATOR)))->keyBy('key');
+
+        $this->assertSame(
+            ['entries.view', 'entries.create', 'entries.update', 'entries.trash', 'entries.restore', 'entries.delete'],
+            $rows->keys()->all(),
+        );
+        $this->assertSame(['key' => 'entries.update_own', 'label' => 'Edit entries they created', 'held' => true], $rows['entries.update']['own']);
+        $this->assertSame('entries.delete_own', $rows['entries.delete']['own']['key']);
+        $this->assertArrayNotHasKey('own', $rows['entries.view']);
+        $this->assertArrayNotHasKey('own', $rows['entries.create']);
+    }
+
     public function test_the_role_form_offers_the_own_forms_as_held_to_those_who_may_give_them()
     {
-        $actor = $this->memberWith([Ability::ROLES_VIEW, Ability::ROLES_CREATE, Ability::ENTRIES_UPDATE]);
+        $actor = $this->memberWith([Ability::ROLES_VIEW, Ability::ROLES_CREATE, Ability::ENTRIES_UPDATE, Ability::ENTRIES_TRASH_OWN]);
 
-        $this->actingConfirmed($actor)
-            ->get(route('admin.roles.create'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('areas', fn ($areas) => collect(collect($areas)->firstWhere('name', 'Entries')['abilities'])
-                    ->contains(fn ($ability) => $ability['key'] === 'entries.update_own' && $ability['held'] === true))
-            );
+        $rows = collect($this->entryRows($actor))->keyBy('key');
+
+        // Holding the full ability lets them give it and its own form.
+        $this->assertTrue($rows['entries.update']['held']);
+        $this->assertTrue($rows['entries.update']['own']['held']);
+        // Holding only an own form lets them give that and not the full one.
+        $this->assertFalse($rows['entries.trash']['held']);
+        $this->assertTrue($rows['entries.trash']['own']['held']);
+        // Holding neither lets them give neither.
+        $this->assertFalse($rows['entries.delete']['held']);
+        $this->assertFalse($rows['entries.delete']['own']['held']);
+    }
+
+    public function test_a_role_form_for_an_existing_role_selects_its_own_forms_by_key()
+    {
+        $role = Role::create(['tenant_id' => 1, 'name' => 'Contributor']);
+        $role->syncAbilities([Ability::ENTRIES_VIEW, Ability::ENTRIES_UPDATE_OWN]);
+
+        $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR))
+            ->get(route('admin.roles.edit', $role))
+            ->assertInertia(fn (Assert $page) => $page->where('selected', ['entries.update_own', 'entries.view']));
     }
 }
