@@ -385,11 +385,21 @@ class StarDustService
      */
     public function ensureTrashField(int $modelId): void
     {
+        $this->ensureReservedIntField($modelId, '_trashed');
+    }
+
+    /**
+     * Any other reserved whole-number field StarSystem keeps on every entry,
+     * such as who created it: get- or create it, and make it filterable.
+     * Idempotent, and kept out of ss_fields like the trash field.
+     */
+    public function ensureReservedIntField(int $modelId, string $name): void
+    {
         // Asked for as it already is, so a field promoted by an earlier call
         // isn't reported as a filterability conflict. The type is still
         // checked.
-        $existing = collect($this->owned($modelId)->fields)->firstWhere('name', '_trashed');
-        $described = $this->defineField($modelId, '_trashed', 'int', $existing->isFilterable ?? false);
+        $existing = collect($this->owned($modelId)->fields)->firstWhere('name', $name);
+        $described = $this->defineField($modelId, $name, 'int', $existing->isFilterable ?? false);
 
         if (! $described->isFilterable) {
             $this->promoteField($modelId, $described->fieldId);

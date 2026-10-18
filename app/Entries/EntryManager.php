@@ -32,6 +32,15 @@ class EntryManager
      */
     public const TRASH_FIELD = '_trashed';
 
+    /**
+     * Who made the entry and who last saved it, as user ids. Reserved the
+     * same way as the trash flag. An entry written before these existed has
+     * neither, and stays that way.
+     */
+    public const CREATED_BY_FIELD = '_created_by';
+
+    public const UPDATED_BY_FIELD = '_updated_by';
+
     public const PAGE_SIZE = 50;
 
     public function __construct(
@@ -41,8 +50,9 @@ class EntryManager
 
     /**
      * @param  array<string, mixed>  $fields
+     * @param  int|null  $userId  Who is creating it. Without one the entry has no author.
      */
-    public function create(SchemaModel $model, array $fields): int
+    public function create(SchemaModel $model, array $fields, ?int $userId = null): int
     {
         // Written before the field is promoted to filterable, the same
         // order the builder itself uses for a brand-new field: an
@@ -52,9 +62,15 @@ class EntryManager
         $entryId = $this->stardust->writeEntry($model->stardust_model_id, [
             ...$fields,
             self::TRASH_FIELD => 0,
+            ...($userId === null ? [] : [self::CREATED_BY_FIELD => $userId, self::UPDATED_BY_FIELD => $userId]),
         ]);
 
         $this->stardust->ensureTrashField($model->stardust_model_id);
+
+        // Filterable, so a list can ask for the entries one person made.
+        if ($userId !== null) {
+            $this->stardust->ensureReservedIntField($model->stardust_model_id, self::CREATED_BY_FIELD);
+        }
 
         return $entryId;
     }
@@ -65,18 +81,23 @@ class EntryManager
     }
 
     /**
-     * A full replace, but never of the trash flag: whatever it currently
-     * is carries forward, since a plain update would otherwise clear it.
+     * A full replace, but never of the reserved fields: the trash flag and
+     * who made the entry carry forward, since a plain update would otherwise
+     * clear them. Who saved it last becomes $userId, or stays as it was.
      *
      * @param  array<string, mixed>  $fields
      */
-    public function update(SchemaModel $model, int $entryId, array $fields): void
+    public function update(SchemaModel $model, int $entryId, array $fields, ?int $userId = null): void
     {
-        $trashed = $this->get($model, $entryId)?->fields[self::TRASH_FIELD] ?? 0;
+        $existing = $this->get($model, $entryId);
+        $createdBy = $existing === null ? null : $this->createdBy($existing);
+        $updatedBy = $userId ?? ($existing === null ? null : $this->updatedBy($existing));
 
         $this->stardust->updateEntry($model->stardust_model_id, $entryId, [
             ...$fields,
-            self::TRASH_FIELD => $trashed,
+            self::TRASH_FIELD => $existing?->fields[self::TRASH_FIELD] ?? 0,
+            ...($createdBy === null ? [] : [self::CREATED_BY_FIELD => $createdBy]),
+            ...($updatedBy === null ? [] : [self::UPDATED_BY_FIELD => $updatedBy]),
         ]);
     }
 
@@ -109,6 +130,28 @@ class EntryManager
     public function delete(SchemaModel $model, Entry $entry): void
     {
         $this->stardust->deleteEntry($model->stardust_model_id, $entry->id);
+    }
+
+    /**
+     * The user id of whoever made the entry, or null for one written before
+     * authors were kept.
+     */
+    public function createdBy(Entry $entry): ?int
+    {
+        return $this->userId($entry->fields[self::CREATED_BY_FIELD] ?? null);
+    }
+
+    /**
+     * The user id of whoever saved the entry last, or null if unknown.
+     */
+    public function updatedBy(Entry $entry): ?int
+    {
+        return $this->userId($entry->fields[self::UPDATED_BY_FIELD] ?? null);
+    }
+
+    private function userId(mixed $value): ?int
+    {
+        return is_int($value) || (is_string($value) && ctype_digit($value)) ? (int) $value : null;
     }
 
     public function isTrashed(Entry $entry): bool

@@ -129,6 +129,39 @@ class EntryControllerTest extends TestCase
         $this->assertSame('Hello', $rows[0]->fields['title']);
     }
 
+    public function test_a_new_entry_records_the_signed_in_user_as_its_author()
+    {
+        $model = $this->create('articles', 'Articles');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post($this->url('admin.models.entries.store', ['model' => $model->id]), ['fields' => ['title' => 'Hello']]);
+
+        // A list read carries the creator, which is registered, and only a
+        // point read carries who saved last.
+        $row = app(EntryManager::class)->page($model)->rows[0];
+        $this->assertSame($user->id, app(EntryManager::class)->createdBy($row));
+
+        $entry = app(EntryManager::class)->get($model, $row->id);
+        $this->assertSame($user->id, app(EntryManager::class)->createdBy($entry));
+        $this->assertSame($user->id, app(EntryManager::class)->updatedBy($entry));
+    }
+
+    public function test_saving_an_entry_records_who_saved_it_and_keeps_who_made_it()
+    {
+        $model = $this->create('articles', 'Articles');
+        $maker = User::factory()->create();
+        $editor = User::factory()->create();
+        $entryId = app(EntryManager::class)->create($model, ['title' => 'Hello'], $maker->id);
+
+        $this->actingAs($editor)
+            ->put($this->url('admin.models.entries.update', ['model' => $model->id, 'entry' => $entryId]), ['fields' => ['title' => 'Changed']]);
+
+        $entry = app(EntryManager::class)->get($model, $entryId);
+        $this->assertSame($maker->id, app(EntryManager::class)->createdBy($entry));
+        $this->assertSame($editor->id, app(EntryManager::class)->updatedBy($entry));
+    }
+
     public function test_editing_shows_the_stored_values_of_the_models_fields()
     {
         $model = $this->create('articles', 'Articles');

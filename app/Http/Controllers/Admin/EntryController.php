@@ -151,7 +151,7 @@ class EntryController extends Controller
     {
         $fields = $this->validated($request, $model);
 
-        $this->entries->create($model, $fields);
+        $this->entries->create($model, $fields, $request->user()?->id);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry created.']);
 
@@ -185,7 +185,7 @@ class EntryController extends Controller
             return $this->restoreFirst($model);
         }
 
-        $this->entries->update($model, $entry, $this->validated($request, $model));
+        $this->entries->update($model, $entry, $this->validated($request, $model), $request->user()?->id);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry saved.']);
 
