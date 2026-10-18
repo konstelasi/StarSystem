@@ -91,6 +91,58 @@ class Role extends Model
     }
 
     /**
+     * What the role holds for particular models, on top of what it holds for
+     * all of them, as the abilities by model id. The built-in Administrator
+     * holds everything everywhere, so it has none.
+     *
+     * @return array<int, list<string>>
+     */
+    public function modelAbilities(): array
+    {
+        if ($this->isAdministrator()) {
+            return [];
+        }
+
+        $rows = DB::table('ss_role_model_abilities')
+            ->where('role_id', $this->id)
+            ->orderBy('model_id')
+            ->orderBy('ability')
+            ->get(['model_id', 'ability']);
+
+        $grants = [];
+
+        foreach ($rows as $row) {
+            $grants[(int) $row->model_id][] = (string) $row->ability;
+        }
+
+        return $grants;
+    }
+
+    /**
+     * Replace the role's per-model abilities with exactly these.
+     *
+     * @param  array<int, list<string>>  $grants  The abilities by model id.
+     */
+    public function syncModelAbilities(array $grants): void
+    {
+        DB::transaction(function () use ($grants) {
+            DB::table('ss_role_model_abilities')->where('role_id', $this->id)->delete();
+
+            $rows = [];
+
+            foreach ($grants as $modelId => $abilities) {
+                foreach (array_unique($abilities) as $ability) {
+                    $rows[] = ['role_id' => $this->id, 'model_id' => $modelId, 'ability' => $ability];
+                }
+            }
+
+            if ($rows !== []) {
+                DB::table('ss_role_model_abilities')->insert($rows);
+            }
+        });
+    }
+
+    /**
      * Replace the role's abilities with exactly these.
      *
      * @param  list<string>  $abilities

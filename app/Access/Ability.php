@@ -161,6 +161,19 @@ final class Ability
     }
 
     /**
+     * The abilities a role can hold for one model only, as well as for all of
+     * them: everything about a model's entries, and changing or exporting
+     * the model itself. The rest, such as inviting people or creating a
+     * model, belong to the site as a whole.
+     *
+     * @return list<string>
+     */
+    public static function modelScoped(): array
+    {
+        return [...array_keys(self::groups()['Entries']), self::MODELS_UPDATE, self::MODELS_EXPORT];
+    }
+
+    /**
      * The first word of every ability, such as "entries" and "users", which a
      * module's own abilities can't borrow.
      *

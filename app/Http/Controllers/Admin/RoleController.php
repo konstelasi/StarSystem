@@ -166,6 +166,7 @@ class RoleController extends Controller
 
         $copy = Role::create(['tenant_id' => $this->site->tenantId(), 'name' => $name, 'system' => false]);
         $copy->syncAbilities($role->abilities());
+        $copy->syncModelAbilities($role->modelAbilities());
 
         $this->activity->record(ActivityAction::ROLE_DUPLICATED, $copy, ['from' => $role->name]);
 
