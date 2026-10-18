@@ -24,7 +24,10 @@ class SiteAccess
     /** @var array<string, array{role: Role|null, abilities: list<string>, suspended: bool}> */
     private array $remembered = [];
 
-    public function __construct(private readonly CurrentSite $site) {}
+    public function __construct(
+        private readonly CurrentSite $site,
+        private readonly AbilityRegistry $registry,
+    ) {}
 
     public function allows(User $user, string $ability): bool
     {
@@ -39,7 +42,7 @@ class SiteAccess
     public function abilities(User $user): array
     {
         if ($user->is_install_owner) {
-            return Ability::all();
+            return $this->registry->all();
         }
 
         return $this->lookup($user)['abilities'];
@@ -61,7 +64,9 @@ class SiteAccess
      */
     public function canAssign(User $actor, Role $role): bool
     {
-        return $actor->is_install_owner || array_diff($role->abilities(), $this->abilities($actor)) === [];
+        // Only abilities that exist now count. A role may still hold one of a
+        // module that is switched off, which nobody can use and so nobody lacks.
+        return $actor->is_install_owner || array_diff($this->registry->known($role->abilities()), $this->abilities($actor)) === [];
     }
 
     /**
@@ -154,6 +159,6 @@ class SiteAccess
             return ['role' => null, 'abilities' => [], 'suspended' => true];
         }
 
-        return ['role' => $membership->role, 'abilities' => $membership->role->abilities(), 'suspended' => false];
+        return ['role' => $membership->role, 'abilities' => $this->registry->known($membership->role->abilities()), 'suspended' => false];
     }
 }

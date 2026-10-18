@@ -34,6 +34,17 @@ abstract class ModuleServiceProvider extends ServiceProvider
     }
 
     /**
+     * The `can:` middleware for one of the module's own abilities, for its
+     * routes. `can('view')` in a module with the slug "forms" is
+     * `can:forms.view`. Declare the ability in `module.json` first, or
+     * nobody will hold it.
+     */
+    protected function can(string $ability): string
+    {
+        return 'can:'.$this->module->slug.'.'.$ability;
+    }
+
+    /**
      * Adds one of the module's components to a view slot. $export is a
      * named export of $script, a prebuilt ES module in the assets folder.
      *

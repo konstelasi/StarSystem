@@ -1,0 +1,15 @@
+{
+    "name": "Forms",
+    "slug": "forms",
+    "version": "1.0.0",
+    "description": "Adds two abilities and two pages guarded by them, for the tests.",
+    "author": "StarSystem",
+    "requires": {
+        "starsystem": "^0.1"
+    },
+    "provider": "Modules\\Forms\\FormsServiceProvider",
+    "abilities": {
+        "view": "See form submissions",
+        "export": "Export form submissions"
+    }
+}

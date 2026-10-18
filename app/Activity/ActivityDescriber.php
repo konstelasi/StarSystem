@@ -2,7 +2,7 @@
 
 namespace App\Activity;
 
-use App\Access\Ability;
+use App\Access\AbilityRegistry;
 use App\Models\Activity;
 
 /**
@@ -171,7 +171,7 @@ final class ActivityDescriber
 
     private static function abilityLabel(string $ability): string
     {
-        return array_merge(...array_values(Ability::groups()))[$ability] ?? $ability;
+        return app(AbilityRegistry::class)->label($ability);
     }
 
     /**

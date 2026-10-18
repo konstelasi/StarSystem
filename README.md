@@ -11,7 +11,7 @@ Each model then gets its **entries**, the content itself. Editors create and edi
 Around them sit the other parts of the admin.
 
 - The **media library** keeps each site's files in folders, with search and drag-and-drop upload. Other pages reuse its picker, the builder's file field among them.
-- **Modules** are Composer-free plugins, installed by uploading a zip. A module registers its own hooks, migrations and admin pages. If one fails to load, StarSystem switches it off and the site keeps running.
+- **Modules** are Composer-free plugins, installed by uploading a zip. A module registers its own hooks, migrations and admin pages, and can add abilities for roles to be given. If one fails to load, StarSystem switches it off and the site keeps running.
 - The **updater** checks for a new release and applies it from the admin. It downloads, verifies, swaps the files and migrates, and rolls back by itself if a step fails partway.
 - **Multi-site** is off by default, so every request resolves to one site. Set `STARSYSTEM_MULTISITE=true` and each site is matched by its own domain.
 

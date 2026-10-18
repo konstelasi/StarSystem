@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Access\AbilityRegistry;
 use App\Sites\CurrentSite;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -69,10 +70,21 @@ class Role extends Model
     }
 
     /**
+     * What the role holds. The built-in Administrator holds every ability
+     * that exists, a module's included, so it needs no row for each. Any
+     * other role holds what its rows say.
+     *
      * @return list<string>
      */
     public function abilities(): array
     {
+        if ($this->isAdministrator()) {
+            $all = app(AbilityRegistry::class)->all();
+            sort($all);
+
+            return $all;
+        }
+
         $names = DB::table('ss_role_abilities')->where('role_id', $this->id)->orderBy('ability')->pluck('ability')->all();
 
         return array_values(array_map(strval(...), $names));

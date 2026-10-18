@@ -12,17 +12,15 @@ class AccessServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(AbilityRegistry::class);
         $this->app->singleton(SiteAccess::class);
     }
 
     public function boot(): void
     {
-        // One gate per ability, so routes can say `can:entries.update` and code
-        // can ask `$user->can('entries.update')`. The optional model is for
-        // per-model permissions later and is ignored for now.
-        foreach (Ability::all() as $ability) {
-            Gate::define($ability, fn (User $user, mixed $model = null) => $this->app->make(SiteAccess::class)->allows($user, $ability));
-        }
+        // One gate per ability, StarSystem's own and those of the modules
+        // running now, which are registered before any provider boots.
+        $this->app->make(AbilityRegistry::class)->defineGates();
 
         // A role in a URL is one this site can use: a built-in role or its
         // own. Another site's role is a 404.

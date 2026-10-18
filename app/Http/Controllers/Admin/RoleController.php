@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Access\Ability;
+use App\Access\AbilityRegistry;
 use App\Access\SiteAccess;
 use App\Activity\ActivityAction;
 use App\Activity\ActivityLog;
@@ -15,7 +16,6 @@ use App\Security\TwoFactorRequirement;
 use App\Sites\CurrentSite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -36,6 +36,7 @@ class RoleController extends Controller
         private readonly CurrentSite $site,
         private readonly ActivityLog $activity,
         private readonly TwoFactorRequirement $twoFactor,
+        private readonly AbilityRegistry $registry,
     ) {}
 
     public function index(Request $request): Response
@@ -101,10 +102,15 @@ class RoleController extends Controller
         $data = $this->validated($request, $role);
 
         $oldName = $role->name;
-        $before = $role->abilities();
+        $held = $role->abilities();
+        $before = $this->registry->known($held);
+
+        // A module that is switched off hides its abilities, and saving must
+        // not lose them, or switching it back on would find the role empty.
+        $dormant = array_values(array_diff($held, $this->registry->all()));
 
         $role->update(['name' => $data['name']]);
-        $role->syncAbilities($data['abilities']);
+        $role->syncAbilities([...$data['abilities'], ...$dormant]);
         $this->access->forget();
 
         $added = array_values(array_diff($data['abilities'], $before));
@@ -189,14 +195,14 @@ class RoleController extends Controller
     {
         $actor = $this->actor($request);
         $held = $this->access->abilities($actor);
-        $selected = $role?->abilities() ?? [];
+        $selected = $this->registry->known($role?->abilities() ?? []);
 
         return Inertia::render('admin/roles/Form', [
             'role' => $role ? ['id' => $role->id, 'name' => $role->name, 'system' => $role->system] : null,
             'selected' => $selected,
             // A locked role is shown but not editable.
             'readonly' => $role !== null && ! $this->mayChange($actor, $role),
-            'areas' => collect(Ability::groups())->map(fn (array $abilities, string $area) => [
+            'areas' => collect($this->registry->groups())->map(fn (array $abilities, string $area) => [
                 'name' => $area,
                 'abilities' => collect($abilities)->map(fn (string $label, string $key) => [
                     'key' => $key,
@@ -217,7 +223,7 @@ class RoleController extends Controller
                 ->where(fn ($query) => $query->whereNull('tenant_id')->orWhere('tenant_id', $this->site->tenantId()))
                 ->ignore($role?->id)],
             'abilities' => ['present', 'array'],
-            'abilities.*' => ['string', Rule::in(Ability::all())],
+            'abilities.*' => ['string', Rule::in($this->registry->all())],
         ]);
 
         $abilities = array_values(array_unique($data['abilities']));
@@ -235,14 +241,12 @@ class RoleController extends Controller
      */
     private function abilityCounts(iterable $roles): array
     {
-        $ids = collect($roles)->pluck('id');
+        $counts = [];
 
-        return DB::table('ss_role_abilities')
-            ->selectRaw('role_id, count(*) as total')
-            ->whereIn('role_id', $ids)
-            ->groupBy('role_id')
-            ->pluck('total', 'role_id')
-            ->map(fn ($total) => (int) $total)
-            ->all();
+        foreach ($roles as $role) {
+            $counts[$role->id] = count($this->registry->known($role->abilities()));
+        }
+
+        return $counts;
     }
 }
