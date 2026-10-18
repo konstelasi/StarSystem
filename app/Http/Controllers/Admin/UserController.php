@@ -148,16 +148,8 @@ class UserController extends Controller
         return to_route('admin.users.index');
     }
 
-    /**
-     * Whether $actor may change or remove this membership. Never their own,
-     * never the install owner's, and never one that holds a role with an
-     * ability the actor lacks, since that would let them reach above
-     * themselves.
-     */
     private function mayChange(User $actor, SiteUser $member): bool
     {
-        return $member->user_id !== $actor->id
-            && ! $member->user->is_install_owner
-            && $this->access->canAssign($actor, $member->role);
+        return $this->access->mayManage($actor, $member);
     }
 }

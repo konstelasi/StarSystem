@@ -37,6 +37,10 @@ final class ActivityAction
 
     public const OWNERSHIP_TRANSFERRED = 'user.ownership_transferred';
 
+    public const USER_SUSPENDED = 'user.suspended';
+
+    public const USER_RESUMED = 'user.resumed';
+
     public const INVITE_SENT = 'invite.sent';
 
     public const INVITE_RESENT = 'invite.resent';
@@ -83,6 +87,8 @@ final class ActivityAction
                 self::USER_REMOVED => 'Removed someone from the site',
                 self::USER_JOINED => 'Joined the site',
                 self::OWNERSHIP_TRANSFERRED => 'Handed over ownership of the installation',
+                self::USER_SUSPENDED => 'Paused someone\'s access',
+                self::USER_RESUMED => 'Resumed someone\'s access',
                 self::INVITE_SENT => 'Invited someone',
                 self::INVITE_RESENT => 'Sent an invitation again',
                 self::INVITE_WITHDRAWN => 'Withdrew an invitation',

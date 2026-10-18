@@ -21,7 +21,7 @@ use App\Sites\CurrentSite;
  */
 class SiteAccess
 {
-    /** @var array<string, array{role: Role|null, abilities: list<string>}> */
+    /** @var array<string, array{role: Role|null, abilities: list<string>, suspended: bool}> */
     private array $remembered = [];
 
     public function __construct(private readonly CurrentSite $site) {}
@@ -73,6 +73,28 @@ class SiteAccess
     }
 
     /**
+     * Whether the account belongs to the current site but has been paused.
+     * The install owner can't be paused.
+     */
+    public function isSuspended(User $user): bool
+    {
+        return ! $user->is_install_owner && $this->lookup($user)['suspended'];
+    }
+
+    /**
+     * Whether $actor may change, pause or remove this membership. Never their
+     * own, never the install owner's, and never one that holds a role with an
+     * ability the actor lacks, since that would let them reach above
+     * themselves.
+     */
+    public function mayManage(User $actor, SiteUser $member): bool
+    {
+        return $member->user_id !== $actor->id
+            && ! $member->user->is_install_owner
+            && $this->canAssign($actor, $member->role);
+    }
+
+    /**
      * Whether the account may sign in on the current site: it belongs here,
      * or it holds an invitation here, for an email it confirmed, that it has
      * yet to accept.
@@ -81,6 +103,11 @@ class SiteAccess
     {
         if ($this->isMember($user)) {
             return true;
+        }
+
+        // A paused account is turned away, whatever invitation it still holds.
+        if ($this->isSuspended($user)) {
+            return false;
         }
 
         // A profile email can be changed without being confirmed, so an invitation
@@ -98,12 +125,12 @@ class SiteAccess
     }
 
     /**
-     * @return array{role: Role|null, abilities: list<string>}
+     * @return array{role: Role|null, abilities: list<string>, suspended: bool}
      */
     private function lookup(User $user): array
     {
         if (! $this->site->has()) {
-            return ['role' => null, 'abilities' => []];
+            return ['role' => null, 'abilities' => [], 'suspended' => false];
         }
 
         $key = $this->site->tenantId().':'.$user->id;
@@ -112,13 +139,21 @@ class SiteAccess
     }
 
     /**
-     * @return array{role: Role|null, abilities: list<string>}
+     * @return array{role: Role|null, abilities: list<string>, suspended: bool}
      */
     private function load(User $user): array
     {
         $membership = SiteUser::query()->with('role')->where('user_id', $user->id)->first();
-        $role = $membership?->role;
 
-        return ['role' => $role, 'abilities' => $role?->abilities() ?? []];
+        if ($membership === null) {
+            return ['role' => null, 'abilities' => [], 'suspended' => false];
+        }
+
+        // A paused membership keeps its role but holds no abilities and doesn't count as one.
+        if ($membership->suspended_at !== null) {
+            return ['role' => null, 'abilities' => [], 'suspended' => true];
+        }
+
+        return ['role' => $membership->role, 'abilities' => $membership->role->abilities(), 'suspended' => false];
     }
 }

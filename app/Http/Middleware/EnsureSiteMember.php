@@ -48,10 +48,14 @@ class EnsureSiteMember
 
         abort_if($request->expectsJson(), 403);
 
+        // A paused member is signed out and told so. They are already signed
+        // in, so it gives nothing away about which accounts exist.
+        $paused = $this->access->isSuspended($user);
+
         // Someone who signed in to accept an invitation goes back to it.
         $token = $request->session()->get('invitation_token');
 
-        if (is_string($token) && $this->invitations->find($token)?->email === strtolower($user->email)) {
+        if (! $paused && is_string($token) && $this->invitations->find($token)?->email === strtolower($user->email)) {
             return redirect()->route('invitations.show', $token);
         }
 
@@ -59,7 +63,7 @@ class EnsureSiteMember
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login')->with('status', 'You do not have access to this site.');
+        return redirect()->route('login')->with('status', $paused ? 'Your access to this site is paused. Ask an administrator.' : 'You do not have access to this site.');
     }
 
     /**
