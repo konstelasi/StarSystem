@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Activity\ActivityAction;
-use App\Activity\ActivityDescriber;
+use App\Activity\ActivityRow;
 use App\Http\Controllers\Controller;
 use App\Models\Activity;
 use App\Models\SiteUser;
@@ -49,16 +49,7 @@ class ActivityController extends Controller
         $rows = $rows->take(self::PAGE_SIZE);
 
         return Inertia::render('admin/activity/Index', [
-            'rows' => Inertia::merge($rows->map(fn (Activity $row) => [
-                'id' => $row->id,
-                'at' => $row->created_at->toIso8601String(),
-                'actor' => $row->actor_name,
-                'action' => $row->action,
-                'label' => ActivityAction::label($row->action),
-                'subject' => $row->subject_label,
-                'details' => ActivityDescriber::details($row),
-                'ip' => $row->ip_address,
-            ])->values()),
+            'rows' => Inertia::merge($rows->map(fn (Activity $row) => ActivityRow::from($row))->values()),
             'nextCursor' => $more ? (string) $rows->last()->id : null,
             'filters' => [
                 'person' => $person,

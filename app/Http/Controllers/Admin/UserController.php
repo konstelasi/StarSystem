@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Access\Ability;
 use App\Access\Invitations;
 use App\Access\SiteAccess;
 use App\Activity\ActivityAction;
 use App\Activity\ActivityLog;
+use App\Activity\ActivityRow;
 use App\Http\Controllers\Controller;
+use App\Models\Activity;
 use App\Models\Role;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
+use App\Security\Sessions;
 use App\Sites\CurrentSite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -113,6 +117,57 @@ class UserController extends Controller
         ]);
     }
 
+    /**
+     * One person: who they are here, what they can be asked to do, and what
+     * the log says about them.
+     */
+    public function show(Request $request, SiteUser $member, Sessions $sessions): Response
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $member->load(['user', 'role']);
+        $user = $member->user;
+
+        // Who invited them, from the invitation they took up.
+        $invitation = SiteInvite::query()
+            ->with('inviter')
+            ->where('email', $user->email)
+            ->whereNotNull('accepted_at')
+            ->latest('accepted_at')
+            ->first();
+
+        return Inertia::render('admin/users/Show', [
+            'member' => [
+                'id' => $member->id,
+                'userId' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => ['id' => $member->role->id, 'name' => $member->role->name],
+                'isYou' => $member->user_id === $actor->id,
+                'isOwner' => $user->is_install_owner,
+                'twoFactor' => $user->hasEnabledTwoFactorAuthentication(),
+                'lastSeenAt' => $member->last_seen_at?->toIso8601String(),
+                'joinedAt' => $member->created_at?->toIso8601String(),
+                'suspended' => $member->suspended_at !== null,
+                'editable' => $this->mayChange($actor, $member),
+                'invitedBy' => $invitation?->inviter?->name,
+            ],
+            // How many devices they are signed in on, or null where sessions
+            // aren't kept in the database and there is no way to know.
+            'devices' => $sessions->available() ? count($sessions->for($user, '')) : null,
+            // Their recent doings and what was done to them, for those who
+            // may read the log.
+            'activity' => $actor->can(Ability::ACTIVITY_VIEW) ? $this->recent($user) : null,
+            'mailConfigured' => $this->invitations->mailConfigured(),
+            'roles' => Role::available()->orderBy('id')->get()->map(fn (Role $role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'assignable' => $this->access->canAssign($actor, $role),
+            ])->values(),
+        ]);
+    }
+
     public function update(Request $request, SiteUser $member): RedirectResponse
     {
         /** @var User $actor */
@@ -142,7 +197,8 @@ class UserController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$member->user->name} is now {$role->name}."]);
 
-        return to_route('admin.users.index');
+        // Back to the list or to the person's page, whichever it came from.
+        return back(fallback: route('admin.users.index'));
     }
 
     public function destroy(Request $request, SiteUser $member): RedirectResponse
@@ -240,5 +296,30 @@ class UserController extends Controller
             ->sortBy(fn (SiteUser $member) => mb_strtolower($member->user->name))
             ->map(fn (SiteUser $member) => ['id' => $member->id, 'name' => $member->user->name, 'email' => $member->user->email])
             ->all());
+    }
+
+    /**
+     * The last rows the log holds about this account, as the one who did
+     * something or the one it was done to.
+     *
+     * @return list<array{id: int, at: string, actor: string|null, action: string, label: string, subject: string|null, details: list<string>, ip: string|null}>
+     */
+    private function recent(User $user): array
+    {
+        $rows = Activity::query()
+            ->where(fn (Builder $query) => $query
+                ->where('actor_id', $user->id)
+                ->orWhere(fn (Builder $inner) => $inner->where('subject_type', 'user')->where('subject_id', $user->id)))
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get();
+
+        $recent = [];
+
+        foreach ($rows as $row) {
+            $recent[] = ActivityRow::from($row);
+        }
+
+        return $recent;
     }
 }

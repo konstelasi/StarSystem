@@ -45,6 +45,7 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
         ->controller(UserController::class)
         ->group(function () {
             Route::get('/', 'index')->middleware('can:'.Ability::USERS_VIEW)->name('index');
+            Route::get('{member}', 'show')->middleware('can:'.Ability::USERS_VIEW)->name('show')->whereNumber('member');
             Route::post('invites', [InviteController::class, 'store'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.store');
             Route::post('invites/{invite}/resend', [InviteController::class, 'resend'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.resend')->whereNumber('invite');
             Route::delete('invites/{invite}', [InviteController::class, 'destroy'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.destroy')->whereNumber('invite');

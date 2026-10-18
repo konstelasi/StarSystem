@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { KeyRound, Mail, ShieldCheck, UserPlus, Users } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import Pager from '@/components/Pager.vue';
@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { useAbilities } from '@/composables/useAbilities';
 import { relativeTime } from '@/lib/time';
-import { index, update } from '@/routes/admin/users';
+import { index, show, update } from '@/routes/admin/users';
 import { destroy as withdraw, resend } from '@/routes/admin/users/invites';
 
 type Member = {
@@ -298,7 +298,12 @@ function changeRole(member: Member, roleId: unknown) {
                         :data-test="`user-${member.email}`"
                     >
                         <td class="px-4 py-2 font-medium">
-                            {{ member.name }}
+                            <Link
+                                :href="show(member.id)"
+                                class="underline-offset-4 hover:underline"
+                            >
+                                {{ member.name }}
+                            </Link>
                             <Badge v-if="member.isYou" variant="secondary">
                                 You
                             </Badge>
