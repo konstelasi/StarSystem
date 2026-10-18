@@ -3,6 +3,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { KeyRound, Mail, ShieldCheck, UserPlus, Users } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import Pager from '@/components/Pager.vue';
+import BulkRemoveDialog from '@/components/users/BulkRemoveDialog.vue';
 import SortButton from '@/components/SortButton.vue';
 import UserFilters from '@/components/users/UserFilters.vue';
 import type { UserFilterValues } from '@/components/users/UserFilters.vue';
@@ -15,6 +16,7 @@ import PageBody from '@/components/PageBody.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Card,
     CardDescription,
@@ -31,6 +33,7 @@ import {
 import { useAbilities } from '@/composables/useAbilities';
 import { relativeTime } from '@/lib/time';
 import { index, show, update } from '@/routes/admin/users';
+import { update as bulkUpdate } from '@/routes/admin/users/bulk';
 import { destroy as withdraw, resend } from '@/routes/admin/users/invites';
 
 type Member = {
@@ -157,6 +160,49 @@ function visit(values: UserFilterValues, pageNumber: number) {
     });
 }
 
+/** The memberships ticked for a bulk action. */
+const selected = ref<number[]>([]);
+
+const selectable = computed(() =>
+    props.members.filter((member) => member.editable),
+);
+
+const selectionOn = computed(
+    () =>
+        (can('users.update') || can('users.remove')) &&
+        selectable.value.length > 0,
+);
+
+const allSelected = computed(
+    () =>
+        selectable.value.length > 0 &&
+        selectable.value.every((member) => selected.value.includes(member.id)),
+);
+
+function toggle(id: number, on: boolean) {
+    selected.value = on
+        ? [...new Set([...selected.value, id])]
+        : selected.value.filter((chosen) => chosen !== id);
+}
+
+function toggleAll(on: boolean) {
+    selected.value = on ? selectable.value.map((member) => member.id) : [];
+}
+
+// A new page or filter shows other people, so the ticks start over.
+watch(
+    () => props.members.map((member) => member.id).join(','),
+    () => (selected.value = []),
+);
+
+function changeSelectedRole(roleId: unknown) {
+    router.put(
+        bulkUpdate().url,
+        { ids: selected.value, role_id: Number(roleId) },
+        { preserveScroll: true, onSuccess: () => (selected.value = []) },
+    );
+}
+
 function changeRole(member: Member, roleId: unknown) {
     if (roleId === String(member.role.id)) {
         return;
@@ -202,6 +248,46 @@ function changeRole(member: Member, roleId: unknown) {
 
         <UserFilters :filters="filters" :roles="roles" @change="apply" />
 
+        <div
+            v-if="selected.length > 0"
+            class="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2"
+            data-test="bulk-bar"
+        >
+            <span class="text-sm font-medium">
+                {{ selected.length }} selected
+            </span>
+            <Select
+                v-if="can('users.update')"
+                model-value=""
+                @update:model-value="changeSelectedRole"
+            >
+                <SelectTrigger
+                    class="w-48"
+                    aria-label="Change the role of the selected people"
+                >
+                    <SelectValue placeholder="Change role to" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem
+                        v-for="role in roles"
+                        :key="role.id"
+                        :value="String(role.id)"
+                        :disabled="!role.assignable"
+                    >
+                        {{ role.name }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+            <BulkRemoveDialog
+                v-if="can('users.remove')"
+                :ids="selected"
+                @done="selected = []"
+            />
+            <Button variant="ghost" @click="selected = []">
+                Clear selection
+            </Button>
+        </div>
+
         <Card v-if="members.length === 0 && owners.length === 0">
             <CardHeader class="items-center text-center">
                 <Users class="size-8 text-muted-foreground" />
@@ -230,6 +316,15 @@ function changeRole(member: Member, roleId: unknown) {
             <table class="w-full text-sm">
                 <thead>
                     <tr>
+                        <th v-if="selectionOn" class="w-10 px-4 py-2">
+                            <Checkbox
+                                :model-value="allSelected"
+                                aria-label="Select everyone on this page"
+                                @update:model-value="
+                                    (on) => toggleAll(on === true)
+                                "
+                            />
+                        </th>
                         <th class="px-4 py-2">
                             <SortButton
                                 label="Name"
@@ -266,6 +361,7 @@ function changeRole(member: Member, roleId: unknown) {
                         class="align-middle"
                         :data-test="`user-${owner.email}`"
                     >
+                        <td v-if="selectionOn" class="px-4 py-2"></td>
                         <td class="px-4 py-2 font-medium">
                             {{ owner.name }}
                             <Badge v-if="owner.isYou" variant="secondary">
@@ -297,6 +393,16 @@ function changeRole(member: Member, roleId: unknown) {
                         :class="{ 'text-muted-foreground': member.suspended }"
                         :data-test="`user-${member.email}`"
                     >
+                        <td v-if="selectionOn" class="px-4 py-2">
+                            <Checkbox
+                                v-if="member.editable"
+                                :model-value="selected.includes(member.id)"
+                                :aria-label="`Select ${member.name}`"
+                                @update:model-value="
+                                    (on) => toggle(member.id, on === true)
+                                "
+                            />
+                        </td>
                         <td class="px-4 py-2 font-medium">
                             <Link
                                 :href="show(member.id)"
