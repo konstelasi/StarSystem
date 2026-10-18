@@ -32,6 +32,9 @@ final class ActivityDescriber
             ActivityAction::ROLE_UPDATED => self::updated($with),
             ActivityAction::ROLE_DUPLICATED => self::copied($with),
             ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED => self::twoFactor($with),
+            ActivityAction::SESSIONS_ENDED,
+            ActivityAction::USER_SIGNED_OUT => self::devices($with),
+            ActivityAction::USER_RESET_LINK => self::resetLink($with),
             ActivityAction::ACCOUNT_UPDATED,
             ActivityAction::ACCOUNT_EMAIL_REQUESTED => self::account($with),
             default => [],
@@ -108,6 +111,26 @@ final class ActivityDescriber
         $from = self::string($with, 'from');
 
         return $from === null ? [] : ["from {$from}"];
+    }
+
+    /**
+     * @param  array<string, mixed>  $with
+     * @return list<string>
+     */
+    private static function devices(array $with): array
+    {
+        $count = $with['count'] ?? null;
+
+        return is_int($count) ? [$count === 1 ? '1 device' : "{$count} devices"] : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $with
+     * @return list<string>
+     */
+    private static function resetLink(array $with): array
+    {
+        return [($with['emailed'] ?? false) === true ? 'emailed to them' : 'link shown to the administrator'];
     }
 
     /**

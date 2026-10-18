@@ -66,6 +66,15 @@ class ActivityDescriberTest extends TestCase
         $this->assertSame(['no role has to use it now'], $this->details(ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED, ['roles' => []]));
     }
 
+    public function test_signing_out_devices_counts_them_and_a_reset_link_says_how_it_went()
+    {
+        $this->assertSame(['2 devices'], $this->details(ActivityAction::USER_SIGNED_OUT, ['count' => 2]));
+        $this->assertSame(['1 device'], $this->details(ActivityAction::SESSIONS_ENDED, ['count' => 1]));
+        $this->assertSame([], $this->details(ActivityAction::USER_SIGNED_OUT, []));
+        $this->assertSame(['emailed to them'], $this->details(ActivityAction::USER_RESET_LINK, ['emailed' => true]));
+        $this->assertSame(['link shown to the administrator'], $this->details(ActivityAction::USER_RESET_LINK, ['emailed' => false]));
+    }
+
     public function test_a_copied_role_names_the_original()
     {
         $this->assertSame(['from Editor'], $this->details(ActivityAction::ROLE_DUPLICATED, ['from' => 'Editor']));

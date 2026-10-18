@@ -41,6 +41,10 @@ final class ActivityAction
 
     public const USER_RESUMED = 'user.resumed';
 
+    public const USER_SIGNED_OUT = 'user.signed_out';
+
+    public const USER_RESET_LINK = 'user.reset_link';
+
     public const INVITE_SENT = 'invite.sent';
 
     public const INVITE_RESENT = 'invite.resent';
@@ -89,6 +93,8 @@ final class ActivityAction
                 self::OWNERSHIP_TRANSFERRED => 'Handed over ownership of the installation',
                 self::USER_SUSPENDED => 'Paused someone\'s access',
                 self::USER_RESUMED => 'Resumed someone\'s access',
+                self::USER_SIGNED_OUT => 'Signed someone out of their devices',
+                self::USER_RESET_LINK => 'Made a password reset link for someone',
                 self::INVITE_SENT => 'Invited someone',
                 self::INVITE_RESENT => 'Sent an invitation again',
                 self::INVITE_WITHDRAWN => 'Withdrew an invitation',
