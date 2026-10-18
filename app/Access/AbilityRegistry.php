@@ -2,6 +2,7 @@
 
 namespace App\Access;
 
+use App\Models\SchemaModel;
 use App\Models\User;
 use App\Modules\ModuleLoader;
 use Illuminate\Support\Facades\Gate;
@@ -83,13 +84,24 @@ class AbilityRegistry
 
     /**
      * One gate per ability, so a route can say `can:forms.view` and code can
-     * ask `$user->can('forms.view')`. The optional model is for per-model
-     * permissions and is ignored until then.
+     * ask `$user->can('forms.view')`. A route with a model says
+     * `can:entries.update,model`, and the gate then asks about that model.
+     * Without one it asks whether the account holds the ability for any model.
      */
     public function defineGates(): void
     {
         foreach ($this->all() as $ability) {
-            Gate::define($ability, fn (User $user, mixed $model = null) => app(SiteAccess::class)->allows($user, $ability));
+            Gate::define($ability, fn (User $user, mixed $model = null) => app(SiteAccess::class)->allows($user, $ability, $this->modelId($model)));
         }
+    }
+
+    private function modelId(mixed $model): ?int
+    {
+        return match (true) {
+            $model instanceof SchemaModel => $model->id,
+            is_int($model) => $model,
+            is_string($model) && ctype_digit($model) => (int) $model,
+            default => null,
+        };
     }
 }
