@@ -19,9 +19,12 @@ use Throwable;
  * Makes a password reset link for a member, for someone who has forgotten
  * theirs and can't ask for one themselves.
  *
- * Where mail works the link is only emailed, so the administrator never
- * sees something that would let them sign in as the member. Where it
- * doesn't, the link is shown once for them to pass on, like an invitation.
+ * A reset link lets whoever opens it sign in as the account, so it only
+ * ever goes to the account's own inbox. Where mail doesn't work it is shown
+ * once to the administrator to pass on, but only for an account that
+ * belongs to this site alone. An account with access elsewhere may hold a
+ * higher role there, and an administrator here must not be able to take
+ * it over. That account's holder can use "Forgot password" themselves.
  */
 class PasswordResetLinkController extends Controller
 {
@@ -38,33 +41,46 @@ class PasswordResetLinkController extends Controller
         abort_unless($this->access->mayManage($actor, $member), 403);
 
         $user = $member->user;
-        $token = Password::broker()->createToken($user);
-        $emailed = false;
+        $mail = MailSetup::configured();
 
-        if (MailSetup::configured()) {
-            try {
-                $user->sendPasswordResetNotification($token);
-                $emailed = true;
-            } catch (Throwable $e) {
-                report($e);
-            }
+        if (! $mail && $this->access->belongsToOtherSites($user)) {
+            return $this->refuse("{$user->name} also belongs to another site, and email isn't set up here to send the link to them. They can use \"Forgot password\" on the sign-in page.");
         }
 
-        $this->activity->record(ActivityAction::USER_RESET_LINK, $member, ['emailed' => $emailed]);
+        $token = Password::broker()->createToken($user);
 
-        if ($emailed) {
+        if ($mail) {
+            try {
+                $user->sendPasswordResetNotification($token);
+            } catch (Throwable $e) {
+                report($e);
+                Password::broker()->deleteToken($user);
+
+                return $this->refuse('We could not send the email, so no link was made. Try again later.');
+            }
+
+            $this->activity->record(ActivityAction::USER_RESET_LINK, $member, ['emailed' => true]);
+
             Inertia::flash('toast', ['type' => 'success', 'message' => "We emailed {$user->name} a link to choose a new password."]);
 
             return back();
         }
 
+        $this->activity->record(ActivityAction::USER_RESET_LINK, $member, ['emailed' => false]);
+
         Inertia::flash('reset', [
             'name' => $user->name,
             'email' => $user->email,
             'link' => route('password.reset', ['token' => $token, 'email' => $user->email]),
-            'mailConfigured' => MailSetup::configured(),
             'minutes' => config()->integer('auth.passwords.users.expire'),
         ]);
+
+        return back();
+    }
+
+    private function refuse(string $message): RedirectResponse
+    {
+        Inertia::flash('toast', ['type' => 'error', 'message' => $message]);
 
         return back();
     }

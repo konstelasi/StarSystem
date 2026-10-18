@@ -152,6 +152,9 @@ class UserController extends Controller
                 'suspended' => $member->suspended_at !== null,
                 'editable' => $this->mayChange($actor, $member),
                 'invitedBy' => $invitation?->inviter?->name,
+                // Whether they belong to another site too, where signing them out
+                // everywhere or making a reset link for them is not ours to do.
+                'elsewhere' => $this->access->belongsToOtherSites($user),
             ],
             // How many devices they are signed in on, or null where sessions
             // aren't kept in the database and there is no way to know.

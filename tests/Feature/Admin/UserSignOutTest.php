@@ -96,6 +96,23 @@ class UserSignOutTest extends TestCase
         $this->assertSame(['count' => 2], $row->properties);
     }
 
+    public function test_a_member_of_another_site_is_not_signed_out_from_here()
+    {
+        $ben = $this->memberAs(Role::EDITOR);
+        $other = $this->makeSite('other.example.com');
+        $this->asSite($other);
+        SiteUser::create(['user_id' => $ben->id, 'role_id' => Role::builtIn(Role::EDITOR)->id]);
+        $this->asSite($this->defaultSite());
+        $this->addSession($ben, 'phone');
+
+        $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR))
+            ->delete(route('admin.users.sessions.destroy', $this->membership($ben)->id))
+            ->assertRedirect();
+
+        $this->assertSame(['phone'], $this->sessionsOf($ben));
+        $this->assertSame(0, Activity::query()->count());
+    }
+
     public function test_when_sessions_are_not_in_the_database_it_says_so_and_changes_nothing()
     {
         $ben = $this->memberAs(Role::EDITOR);

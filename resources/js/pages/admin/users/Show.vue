@@ -43,6 +43,8 @@ type Member = {
     suspended: boolean;
     editable: boolean;
     invitedBy: string | null;
+    /** Whether they belong to another site too. */
+    elsewhere: boolean;
 };
 
 type Row = {
@@ -346,7 +348,9 @@ const sentence = (row: Row) =>
                     >
                         <Button
                             variant="secondary"
-                            :disabled="busy || devices === 0"
+                            :disabled="
+                                busy || devices === 0 || member.elsewhere
+                            "
                             @click="
                                 act((options) =>
                                     router.delete(
@@ -360,8 +364,11 @@ const sentence = (row: Row) =>
                             Sign out of every device
                         </Button>
                         <p class="text-sm text-muted-foreground">
-                            Ends all their sessions, on every site they belong
-                            to. They can sign in again unless they are paused.
+                            {{
+                                member.elsewhere
+                                    ? "They belong to another site too, and a session isn't tied to one, so this would sign them out there as well. Pause them to lock them out of this site."
+                                    : 'Ends all their sessions. They can sign in again unless they are paused.'
+                            }}
                         </p>
                     </div>
 
@@ -371,7 +378,9 @@ const sentence = (row: Row) =>
                     >
                         <Button
                             variant="secondary"
-                            :disabled="busy"
+                            :disabled="
+                                busy || (member.elsewhere && !mailConfigured)
+                            "
                             @click="
                                 act((options) =>
                                     router.post(
@@ -389,7 +398,9 @@ const sentence = (row: Row) =>
                             {{
                                 mailConfigured
                                     ? 'We email them a link to choose a new password.'
-                                    : "Email isn't set up here, so you get a link to pass on yourself."
+                                    : member.elsewhere
+                                      ? "Email isn't set up here, and they belong to another site too, so only they can reset their password. They can use Forgot password on the sign-in page."
+                                      : "Email isn't set up here, so you get a link to pass on yourself."
                             }}
                         </p>
                     </div>

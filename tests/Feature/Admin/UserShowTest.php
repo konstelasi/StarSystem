@@ -159,6 +159,22 @@ class UserShowTest extends TestCase
         $this->open($admin, $ben)->assertInertia(fn (Assert $page) => $page->where('devices', null));
     }
 
+    public function test_it_says_when_they_belong_to_another_site_too()
+    {
+        $admin = $this->memberAs(Role::ADMINISTRATOR);
+        $ben = $this->memberAs(Role::EDITOR);
+
+        $this->open($admin, $ben)->assertInertia(fn (Assert $page) => $page->where('member.elsewhere', false));
+
+        $other = $this->makeSite('other.example.com');
+        $this->asSite($other);
+        SiteUser::create(['user_id' => $ben->id, 'role_id' => Role::builtIn(Role::EDITOR)->id]);
+        $this->asSite($this->defaultSite());
+        app(SiteAccess::class)->forget();
+
+        $this->open($admin, $ben)->assertInertia(fn (Assert $page) => $page->where('member.elsewhere', true));
+    }
+
     public function test_a_paused_member_shows_as_paused()
     {
         $admin = $this->memberAs(Role::ADMINISTRATOR);

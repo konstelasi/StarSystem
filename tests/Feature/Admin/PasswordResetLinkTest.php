@@ -11,6 +11,7 @@ use App\Models\SiteUser;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Tests\Concerns\CrossSite;
@@ -83,7 +84,6 @@ class PasswordResetLinkTest extends TestCase
         $reset = $response->viewData('page')['flash']['reset'];
         $this->assertSame($ben->email, $reset['email']);
         $this->assertSame($ben->name, $reset['name']);
-        $this->assertFalse($reset['mailConfigured']);
         $this->assertSame(config('auth.passwords.users.expire'), $reset['minutes']);
         $this->assertStringStartsWith(url('/reset-password/'), $reset['link']);
 
@@ -96,7 +96,7 @@ class PasswordResetLinkTest extends TestCase
         $this->get($reset['link'])->assertOk();
     }
 
-    public function test_a_failed_email_falls_back_to_showing_the_link()
+    public function test_a_failed_email_makes_no_link_and_leaves_no_token_behind()
     {
         config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => '127.0.0.1', 'mail.mailers.smtp.port' => 1]);
         $ben = $this->memberAs(Role::EDITOR);
@@ -106,9 +106,51 @@ class PasswordResetLinkTest extends TestCase
             ->followingRedirects()
             ->post(route('admin.users.reset-link', $this->membership($ben)->id));
 
-        $reset = $response->viewData('page')['flash']['reset'];
-        $this->assertTrue($reset['mailConfigured']);
-        $this->assertSame($ben->email, $reset['email']);
+        $flash = $response->viewData('page')['flash'];
+        $this->assertArrayNotHasKey('reset', $flash);
+        $this->assertSame('error', $flash['toast']['type']);
+        $this->assertSame(0, DB::table('password_reset_tokens')->where('email', $ben->email)->count());
+        $this->assertSame(0, Activity::query()->count());
+    }
+
+    public function test_without_mail_a_member_of_another_site_gets_no_link_for_anyone_to_pass_on()
+    {
+        $ben = $this->memberAs(Role::EDITOR);
+        $other = $this->makeSite('other.example.com');
+        $this->asSite($other);
+        SiteUser::create(['user_id' => $ben->id, 'role_id' => Role::builtIn(Role::ADMINISTRATOR)->id]);
+        $this->asSite($this->defaultSite());
+        $membership = $this->membership($ben);
+
+        $response = $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR))
+            ->from(route('admin.users.index'))
+            ->followingRedirects()
+            ->post(route('admin.users.reset-link', $membership->id));
+
+        $flash = $response->viewData('page')['flash'];
+        $this->assertArrayNotHasKey('reset', $flash);
+        $this->assertSame('error', $flash['toast']['type']);
+        $this->assertStringContainsString('another site', $flash['toast']['message']);
+        $this->assertSame(0, DB::table('password_reset_tokens')->where('email', $ben->email)->count());
+        $this->assertSame(0, Activity::query()->count());
+    }
+
+    public function test_with_working_mail_a_member_of_another_site_still_gets_the_email()
+    {
+        $this->realMail();
+        $ben = $this->memberAs(Role::EDITOR);
+        $other = $this->makeSite('other.example.com');
+        $this->asSite($other);
+        SiteUser::create(['user_id' => $ben->id, 'role_id' => Role::builtIn(Role::ADMINISTRATOR)->id]);
+        $this->asSite($this->defaultSite());
+
+        $response = $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR))
+            ->from(route('admin.users.index'))
+            ->followingRedirects()
+            ->post(route('admin.users.reset-link', $this->membership($ben)->id));
+
+        Notification::assertSentTo($ben, ResetPassword::class);
+        $this->assertArrayNotHasKey('reset', $response->viewData('page')['flash'] ?? []);
     }
 
     public function test_it_is_logged_with_whether_it_was_emailed_and_never_with_the_link()

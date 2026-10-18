@@ -17,9 +17,11 @@ use Inertia\Inertia;
  * Signs a member out of every device, for a phone that was lost or an
  * account that may have been used by someone else.
  *
- * Sessions aren't tied to a site, so this ends the account's sessions on
- * every site it belongs to. To lock someone out of this site alone, pause
- * them instead.
+ * Sessions aren't tied to a site, so this is only for an account that
+ * belongs to this one. Ending the sessions of an account with access
+ * elsewhere would sign it out of those sites too, which is not for
+ * another site's administrator to do. Pause them to lock them out of this
+ * site alone.
  */
 class UserSessionController extends Controller
 {
@@ -35,6 +37,14 @@ class UserSessionController extends Controller
         $actor = $request->user();
 
         abort_unless($this->access->mayManage($actor, $member), 403);
+
+        // A session isn't tied to a site, so ending them all would sign the
+        // person out of their other sites as well. Pausing is the tool here.
+        if ($this->access->belongsToOtherSites($member->user)) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => "{$member->user->name} also belongs to another site, and a session isn't tied to one, so signing them out here would sign them out there too. Pause them to lock them out of this site."]);
+
+            return back();
+        }
 
         if (! $this->sessions->available()) {
             Inertia::flash('toast', ['type' => 'error', 'message' => 'Sessions are not kept in the database on this install, so they can\'t be ended from here. Pause the person to lock them out of this site now.']);

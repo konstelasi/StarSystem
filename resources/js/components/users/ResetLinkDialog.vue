@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Copy } from '@lucide/vue';
-import { computed } from 'vue';
 import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,20 +17,12 @@ export type ResetLink = {
     name: string;
     email: string;
     link: string;
-    mailConfigured: boolean;
     minutes: number;
 };
 
 const props = defineProps<{ reset: ResetLink | null }>();
 
 const open = defineModel<boolean>('open', { default: false });
-
-// The link is shown once, so the dialog says plainly why it is shown at all.
-const message = computed(() =>
-    props.reset?.mailConfigured
-        ? 'The email could not be sent. Send them this link yourself.'
-        : "Email isn't set up on this install, so send them this link yourself.",
-);
 
 async function copy() {
     try {
@@ -49,7 +40,8 @@ async function copy() {
             <DialogHeader class="space-y-3">
                 <DialogTitle>Reset link for {{ reset?.name }}</DialogTitle>
                 <DialogDescription>
-                    {{ message }} Whoever opens it can choose a new password for
+                    Email isn't set up on this install, so send them this link
+                    yourself. Whoever opens it can choose a new password for
                     {{ reset?.email }}, so pass it on only to them. It works for
                     {{ reset?.minutes }} minutes and is shown only now.
                 </DialogDescription>

@@ -87,6 +87,19 @@ class SiteAccess
     }
 
     /**
+     * Whether the account has a membership of any other site. What an
+     * administrator does to an account here must not reach into those sites,
+     * where the account may hold a higher role than theirs.
+     */
+    public function belongsToOtherSites(User $user): bool
+    {
+        return SiteUser::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->where('tenant_id', '!=', $this->site->tenantId())
+            ->exists();
+    }
+
+    /**
      * Whether $actor may change, pause or remove this membership. Never their
      * own, never the install owner's, and never one that holds a role with an
      * ability the actor lacks, since that would let them reach above
