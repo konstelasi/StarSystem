@@ -12,6 +12,7 @@ use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
 use App\Sites\CurrentSite;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,6 +27,8 @@ use Inertia\Response;
  */
 class UserController extends Controller
 {
+    private const PAGE_SIZE = 25;
+
     public function __construct(
         private readonly SiteAccess $access,
         private readonly CurrentSite $site,
@@ -38,36 +41,43 @@ class UserController extends Controller
         /** @var User $actor */
         $actor = $request->user();
 
-        $members = SiteUser::query()->with(['user', 'role'])->get()->sortBy(fn (SiteUser $member) => mb_strtolower($member->user->name));
+        $filters = $this->filters($request);
+        $filtered = $filters['q'] !== null || $filters['role'] !== null || $filters['status'] !== null;
 
-        $rows = $members->map(fn (SiteUser $member) => [
+        $page = $this->query($filters)->paginate(self::PAGE_SIZE);
+
+        $rows = $page->getCollection()->map(fn (SiteUser $member) => [
             'id' => $member->id,
             'name' => $member->user->name,
             'email' => $member->user->email,
             'role' => ['id' => $member->role->id, 'name' => $member->role->name],
             'isYou' => $member->user_id === $actor->id,
             'isOwner' => $member->user->is_install_owner,
+            'twoFactor' => $member->user->hasEnabledTwoFactorAuthentication(),
+            'lastSeenAt' => $member->last_seen_at?->toIso8601String(),
+            'joinedAt' => $member->created_at?->toIso8601String(),
+            'suspended' => $member->suspended_at !== null,
             // What the page may offer for this row. The server decides again
             // when the action arrives.
             'editable' => $this->mayChange($actor, $member),
         ])->values();
 
         // The install owner uses every site without a membership, so they
-        // are listed even where they have no row.
-        $owners = User::query()
-            ->where('is_install_owner', true)
-            ->whereNotIn('id', $members->pluck('user_id'))
-            ->orderBy('name')
-            ->get()
-            ->map(fn (User $owner) => [
-                'id' => null,
-                'name' => $owner->name,
-                'email' => $owner->email,
-                'role' => null,
-                'isYou' => $owner->id === $actor->id,
-                'isOwner' => true,
-                'editable' => false,
-            ]);
+        // are listed even where they have no row. Only at the top of an
+        // unfiltered list, since they belong to no page of members.
+        $owners = $filtered || $page->currentPage() > 1
+            ? collect()
+            : User::query()
+                ->where('is_install_owner', true)
+                ->whereNotIn('id', SiteUser::query()->select('user_id'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $owner) => [
+                    'name' => $owner->name,
+                    'email' => $owner->email,
+                    'isYou' => $owner->id === $actor->id,
+                    'twoFactor' => $owner->hasEnabledTwoFactorAuthentication(),
+                ]);
 
         $invites = SiteInvite::query()->with('role')->whereNull('accepted_at')->orderBy('email')->get()
             ->map(fn (SiteInvite $invite) => [
@@ -80,17 +90,21 @@ class UserController extends Controller
             ])->values();
 
         return Inertia::render('admin/users/Index', [
-            'members' => $rows->concat($owners)->values(),
+            'members' => $rows,
+            'owners' => $owners->values(),
+            'filters' => $filters,
+            'pagination' => [
+                'page' => $page->currentPage(),
+                'pages' => $page->lastPage(),
+                'total' => $page->total(),
+                'from' => $page->firstItem() ?? 0,
+                'to' => $page->lastItem() ?? 0,
+            ],
             'invites' => $invites,
             'mailConfigured' => $this->invitations->mailConfigured(),
             // Who the install owner may hand ownership to: the other
             // Administrators of this site. Nobody else sees the list.
-            'candidates' => $actor->is_install_owner
-                ? $members
-                    ->filter(fn (SiteUser $member) => $member->user_id !== $actor->id && $member->role->isAdministrator())
-                    ->map(fn (SiteUser $member) => ['id' => $member->id, 'name' => $member->user->name, 'email' => $member->user->email])
-                    ->values()
-                : [],
+            'candidates' => $actor->is_install_owner ? $this->candidates($actor) : [],
             'roles' => Role::available()->orderBy('id')->get()->map(fn (Role $role) => [
                 'id' => $role->id,
                 'name' => $role->name,
@@ -151,5 +165,80 @@ class UserController extends Controller
     private function mayChange(User $actor, SiteUser $member): bool
     {
         return $this->access->mayManage($actor, $member);
+    }
+
+    /**
+     * The search, role and status filters and the sort, as asked for in the
+     * address. Anything that makes no sense is ignored, because it comes from
+     * a link and there is nothing to correct.
+     *
+     * @return array{q: string|null, role: int|null, status: string|null, sort: string}
+     */
+    private function filters(Request $request): array
+    {
+        $q = trim((string) $request->query('q', ''));
+        $status = $request->query('status');
+        $sort = $request->query('sort');
+
+        return [
+            'q' => $q === '' ? null : mb_substr($q, 0, 100),
+            'role' => $request->integer('role') ?: null,
+            'status' => in_array($status, ['active', 'paused', 'no-two-factor'], true) ? $status : null,
+            'sort' => in_array($sort, ['name', '-name', 'joined', '-joined', 'seen', '-seen'], true) ? $sort : 'name',
+        ];
+    }
+
+    /**
+     * @param  array{q: string|null, role: int|null, status: string|null, sort: string}  $filters
+     * @return Builder<SiteUser>
+     */
+    private function query(array $filters): Builder
+    {
+        $query = SiteUser::query()
+            ->select('ss_site_users.*')
+            ->join('users', 'users.id', '=', 'ss_site_users.user_id')
+            ->with(['user', 'role']);
+
+        if ($filters['q'] !== null) {
+            $like = '%'.addcslashes($filters['q'], '%_\\').'%';
+
+            $query->where(fn (Builder $inner) => $inner->where('users.name', 'like', $like)->orWhere('users.email', 'like', $like));
+        }
+
+        if ($filters['role'] !== null) {
+            $query->where('ss_site_users.role_id', $filters['role']);
+        }
+
+        match ($filters['status']) {
+            'active' => $query->whereNull('ss_site_users.suspended_at'),
+            'paused' => $query->whereNotNull('ss_site_users.suspended_at'),
+            'no-two-factor' => $query->whereNull('users.two_factor_confirmed_at'),
+            default => null,
+        };
+
+        $direction = str_starts_with($filters['sort'], '-') ? 'desc' : 'asc';
+        $column = match (ltrim($filters['sort'], '-')) {
+            'joined' => 'ss_site_users.created_at',
+            'seen' => 'ss_site_users.last_seen_at',
+            default => 'users.name',
+        };
+
+        return $query->orderBy($column, $direction)->orderBy('users.name')->orderBy('ss_site_users.id');
+    }
+
+    /**
+     * The other Administrators of this site, for the owner to pick from.
+     *
+     * @return list<array{id: int, name: string, email: string}>
+     */
+    private function candidates(User $actor): array
+    {
+        $members = SiteUser::query()->with(['user', 'role'])->where('user_id', '!=', $actor->id)->get();
+
+        return array_values($members
+            ->filter(fn (SiteUser $member) => $member->role->isAdministrator())
+            ->sortBy(fn (SiteUser $member) => mb_strtolower($member->user->name))
+            ->map(fn (SiteUser $member) => ['id' => $member->id, 'name' => $member->user->name, 'email' => $member->user->email])
+            ->all());
     }
 }

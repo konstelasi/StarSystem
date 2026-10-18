@@ -95,7 +95,7 @@ class UserControllerTest extends TestCase
             );
     }
 
-    public function test_the_install_owner_is_listed_even_without_a_membership_and_cannot_be_edited()
+    public function test_the_install_owner_is_listed_even_without_a_membership_apart_from_the_members()
     {
         $owner = User::factory()->installOwner()->create(['name' => 'Zed']);
         SiteUser::query()->where('user_id', $owner->id)->delete();
@@ -103,10 +103,26 @@ class UserControllerTest extends TestCase
         $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR, 'Ada'))
             ->get(route('admin.users.index'))
             ->assertInertia(fn (Assert $page) => $page
+                ->has('members', 1)
+                ->where('members.0.name', 'Ada')
+                ->has('owners', 1)
+                ->where('owners.0.name', 'Zed')
+                ->where('owners.0.email', $owner->email)
+                ->where('owners.0.isYou', false)
+            );
+    }
+
+    public function test_an_owner_with_a_membership_is_a_member_and_cannot_be_edited()
+    {
+        $owner = User::factory()->installOwner()->create(['name' => 'Zed']);
+
+        $this->actingConfirmed($this->memberAs(Role::ADMINISTRATOR, 'Ada'))
+            ->get(route('admin.users.index'))
+            ->assertInertia(fn (Assert $page) => $page
                 ->has('members', 2)
+                ->has('owners', 0)
                 ->where('members.1.name', 'Zed')
                 ->where('members.1.isOwner', true)
-                ->where('members.1.id', null)
                 ->where('members.1.editable', false)
             );
     }

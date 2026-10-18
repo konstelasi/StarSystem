@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { KeyRound, Mail, UserPlus } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { KeyRound, Mail, ShieldCheck, UserPlus, Users } from '@lucide/vue';
+import { computed, ref, watch } from 'vue';
+import Pager from '@/components/Pager.vue';
+import SortButton from '@/components/SortButton.vue';
+import UserFilters from '@/components/users/UserFilters.vue';
+import type { UserFilterValues } from '@/components/users/UserFilters.vue';
 import InviteLinkDialog from '@/components/users/InviteLinkDialog.vue';
 import type { InviteLink } from '@/components/users/InviteLinkDialog.vue';
 import InviteUserDialog from '@/components/users/InviteUserDialog.vue';
@@ -11,6 +15,12 @@ import PageBody from '@/components/PageBody.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import {
     Select,
     SelectContent,
@@ -24,14 +34,25 @@ import { index, update } from '@/routes/admin/users';
 import { destroy as withdraw, resend } from '@/routes/admin/users/invites';
 
 type Member = {
-    /** The membership's id. Null for an install owner without a row. */
-    id: number | null;
+    id: number;
     name: string;
     email: string;
-    role: { id: number; name: string } | null;
+    role: { id: number; name: string };
     isYou: boolean;
     isOwner: boolean;
+    twoFactor: boolean;
+    lastSeenAt: string | null;
+    joinedAt: string | null;
+    suspended: boolean;
     editable: boolean;
+};
+
+/** The install owner, who uses every site without a membership. */
+type Owner = {
+    name: string;
+    email: string;
+    isYou: boolean;
+    twoFactor: boolean;
 };
 
 type RoleOption = { id: number; name: string; assignable: boolean };
@@ -45,8 +66,17 @@ type Invite = {
     manageable: boolean;
 };
 
-defineProps<{
+const props = defineProps<{
     members: Member[];
+    owners: Owner[];
+    filters: UserFilterValues;
+    pagination: {
+        page: number;
+        pages: number;
+        total: number;
+        from: number;
+        to: number;
+    };
     roles: RoleOption[];
     invites: Invite[];
     /** The Administrators the install owner may hand ownership to. */
@@ -81,8 +111,54 @@ watch(
     { immediate: true },
 );
 
+const filtered = computed(
+    () =>
+        props.filters.q !== null ||
+        props.filters.role !== null ||
+        props.filters.status !== null,
+);
+
+/** A new visit with the filters changed, back on the first page. */
+function apply(change: Partial<UserFilterValues>) {
+    visit({ ...props.filters, ...change }, 1);
+}
+
+function goTo(page: number) {
+    visit(props.filters, page);
+}
+
+function visit(values: UserFilterValues, pageNumber: number) {
+    const data: Record<string, string | number> = {};
+
+    if (values.q !== null) {
+        data.q = values.q;
+    }
+
+    if (values.role !== null) {
+        data.role = values.role;
+    }
+
+    if (values.status !== null) {
+        data.status = values.status;
+    }
+
+    if (values.sort !== 'name') {
+        data.sort = values.sort;
+    }
+
+    if (pageNumber > 1) {
+        data.page = pageNumber;
+    }
+
+    router.get(index().url, data, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
 function changeRole(member: Member, roleId: unknown) {
-    if (member.id === null || roleId === String(member.role?.id)) {
+    if (roleId === String(member.role.id)) {
         return;
     }
 
@@ -124,21 +200,101 @@ function changeRole(member: Member, roleId: unknown) {
             </template>
         </PageHeader>
 
-        <div class="data-table rounded-lg border">
+        <UserFilters :filters="filters" :roles="roles" @change="apply" />
+
+        <Card v-if="members.length === 0 && owners.length === 0">
+            <CardHeader class="items-center text-center">
+                <Users class="size-8 text-muted-foreground" />
+                <CardTitle>
+                    {{ filtered ? 'No one matches' : 'No one here yet' }}
+                </CardTitle>
+                <CardDescription>
+                    {{
+                        filtered
+                            ? 'Try another name, or clear the filters.'
+                            : 'Invite someone to get started.'
+                    }}
+                </CardDescription>
+                <Button
+                    v-if="filtered"
+                    variant="secondary"
+                    class="mt-2"
+                    @click="apply({ q: null, role: null, status: null })"
+                >
+                    Clear the filters
+                </Button>
+            </CardHeader>
+        </Card>
+
+        <div v-else class="data-table rounded-lg border">
             <table class="w-full text-sm">
                 <thead>
                     <tr>
-                        <th class="px-4 py-2">Name</th>
+                        <th class="px-4 py-2">
+                            <SortButton
+                                label="Name"
+                                column="name"
+                                :sort="filters.sort"
+                                @sort="apply({ sort: $event })"
+                            />
+                        </th>
                         <th class="px-4 py-2 max-sm:hidden">Email</th>
                         <th class="px-4 py-2">Role</th>
+                        <th class="px-4 py-2 max-md:hidden">
+                            <SortButton
+                                label="Last seen"
+                                column="seen"
+                                :sort="filters.sort"
+                                @sort="apply({ sort: $event })"
+                            />
+                        </th>
+                        <th class="px-4 py-2 max-lg:hidden">
+                            <SortButton
+                                label="Joined"
+                                column="joined"
+                                :sort="filters.sort"
+                                @sort="apply({ sort: $event })"
+                            />
+                        </th>
                         <th class="px-4 py-2"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr
-                        v-for="member in members"
-                        :key="member.id ?? `owner-${member.email}`"
+                        v-for="owner in owners"
+                        :key="`owner-${owner.email}`"
                         class="align-middle"
+                        :data-test="`user-${owner.email}`"
+                    >
+                        <td class="px-4 py-2 font-medium">
+                            {{ owner.name }}
+                            <Badge v-if="owner.isYou" variant="secondary">
+                                You
+                            </Badge>
+                        </td>
+                        <td class="px-4 py-2 max-sm:hidden">
+                            {{ owner.email }}
+                        </td>
+                        <td class="px-4 py-2">
+                            <Badge variant="outline">Owner</Badge>
+                        </td>
+                        <td
+                            class="px-4 py-2 text-muted-foreground max-md:hidden"
+                        >
+                            Not tracked
+                        </td>
+                        <td
+                            class="px-4 py-2 text-muted-foreground max-lg:hidden"
+                        >
+                            Not tracked
+                        </td>
+                        <td class="px-4 py-2"></td>
+                    </tr>
+                    <tr
+                        v-for="member in members"
+                        :key="member.id"
+                        class="align-middle"
+                        :class="{ 'text-muted-foreground': member.suspended }"
                         :data-test="`user-${member.email}`"
                     >
                         <td class="px-4 py-2 font-medium">
@@ -146,6 +302,18 @@ function changeRole(member: Member, roleId: unknown) {
                             <Badge v-if="member.isYou" variant="secondary">
                                 You
                             </Badge>
+                            <Badge
+                                v-if="member.suspended"
+                                variant="outline"
+                                class="text-destructive"
+                            >
+                                Paused
+                            </Badge>
+                            <ShieldCheck
+                                v-if="member.twoFactor"
+                                class="ml-1 inline size-4 align-text-bottom text-muted-foreground"
+                                aria-label="Two-factor sign-in is on"
+                            />
                         </td>
                         <td class="px-4 py-2 max-sm:hidden">
                             {{ member.email }}
@@ -158,7 +326,7 @@ function changeRole(member: Member, roleId: unknown) {
                                 v-else-if="
                                     member.editable && can('users.update')
                                 "
-                                :model-value="String(member.role?.id)"
+                                :model-value="String(member.role.id)"
                                 @update:model-value="
                                     (value) => changeRole(member, value)
                                 "
@@ -180,15 +348,41 @@ function changeRole(member: Member, roleId: unknown) {
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <span v-else>{{ member.role?.name }}</span>
+                            <span v-else>{{ member.role.name }}</span>
+                        </td>
+                        <td
+                            class="px-4 py-2 text-muted-foreground max-md:hidden"
+                            :title="
+                                member.lastSeenAt
+                                    ? new Date(
+                                          member.lastSeenAt,
+                                      ).toLocaleString()
+                                    : undefined
+                            "
+                        >
+                            {{
+                                member.lastSeenAt
+                                    ? relativeTime(member.lastSeenAt)
+                                    : 'Never'
+                            }}
+                        </td>
+                        <td
+                            class="px-4 py-2 text-muted-foreground max-lg:hidden"
+                            :title="
+                                member.joinedAt
+                                    ? new Date(member.joinedAt).toLocaleString()
+                                    : undefined
+                            "
+                        >
+                            {{
+                                member.joinedAt
+                                    ? relativeTime(member.joinedAt)
+                                    : 'Unknown'
+                            }}
                         </td>
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <RemoveUserDialog
-                                v-if="
-                                    member.id !== null &&
-                                    member.editable &&
-                                    can('users.remove')
-                                "
+                                v-if="member.editable && can('users.remove')"
                                 :member="{ id: member.id, name: member.name }"
                             />
                         </td>
@@ -196,6 +390,16 @@ function changeRole(member: Member, roleId: unknown) {
                 </tbody>
             </table>
         </div>
+
+        <Pager
+            :page="pagination.page"
+            :pages="pagination.pages"
+            :from="pagination.from"
+            :to="pagination.to"
+            :total="pagination.total"
+            noun="people"
+            @go="goTo"
+        />
 
         <section v-if="invites.length > 0" class="grid gap-3">
             <h2 class="text-base">Waiting to join</h2>
