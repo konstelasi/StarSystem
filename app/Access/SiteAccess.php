@@ -29,9 +29,21 @@ class SiteAccess
         private readonly AbilityRegistry $registry,
     ) {}
 
+    /**
+     * Whether the account holds the ability, or its own-entries form. That
+     * makes this the question for a route, which can't know which entry is
+     * coming. A page that does know the entry asks mayOnEntry() as well.
+     */
     public function allows(User $user, string $ability): bool
     {
-        return $user->is_install_owner || in_array($ability, $this->abilities($user), true);
+        if ($user->is_install_owner) {
+            return true;
+        }
+
+        $held = $this->abilities($user);
+
+        return in_array($ability, $held, true)
+            || (isset(Ability::OWN[$ability]) && in_array(Ability::OWN[$ability], $held, true));
     }
 
     /**

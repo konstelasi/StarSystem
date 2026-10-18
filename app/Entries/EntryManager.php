@@ -7,6 +7,7 @@ use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\StarDust\StarDustService;
 use Carbon\CarbonImmutable;
 use StarDust\Exception\InvalidCursorException;
+use StarDust\Filter\Ast\AndNode;
 use StarDust\Filter\Ast\LeafNode;
 use StarDust\Read\Cursor;
 use StarDust\Read\Entry;
@@ -173,30 +174,43 @@ class EntryManager
      *
      * StarDust refuses a filter on a field it hasn't finished indexing,
      * which the trash field is from a model's first entry until the next
-     * tick. Until then the page is read unfiltered and the other kind of
-     * entry dropped here, so a page can come back short; the cursor still
-     * moves on correctly.
+     * tick, and the creator field is from the first entry anyone made. Until
+     * then the page is read without that filter and the rows it would have
+     * removed are dropped here, so a page can come back short; the cursor
+     * still moves on correctly. $createdBy asks for one person's entries.
      *
      * @throws InvalidCursorException when $cursor isn't one StarDust issued
      */
-    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false): EntryPage
+    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false, ?int $createdBy = null): EntryPage
     {
         $indexed = $this->trashIndexed($model);
+        $authorIndexed = $createdBy === null || $this->createdByIndexed($model);
+
+        $filters = array_values(array_filter([
+            $indexed ? LeafNode::local(self::TRASH_FIELD, $trashed ? 'gt' : 'eq', 0) : null,
+            $createdBy !== null && $authorIndexed ? LeafNode::local(self::CREATED_BY_FIELD, 'eq', $createdBy) : null,
+        ]));
 
         $page = $this->stardust->listEntries(
             $model->stardust_model_id,
-            filter: $indexed ? LeafNode::local(self::TRASH_FIELD, $trashed ? 'gt' : 'eq', 0) : null,
+            filter: match (count($filters)) {
+                0 => null,
+                1 => $filters[0],
+                default => new AndNode($filters),
+            },
             sort: SortSpec::byId(SortDirection::Desc),
             pageSize: self::PAGE_SIZE,
             cursor: $cursor === null ? null : new Cursor($cursor),
         );
 
-        if ($indexed) {
+        if ($indexed && $authorIndexed) {
             return $page;
         }
 
+        // Whatever StarDust couldn't filter yet is dropped here instead.
         return new EntryPage(
-            array_values(array_filter($page->rows, fn (Entry $entry) => $this->isTrashed($entry) === $trashed)),
+            array_values(array_filter($page->rows, fn (Entry $entry) => ($indexed || $this->isTrashed($entry) === $trashed)
+                && ($authorIndexed || $this->createdBy($entry) === $createdBy))),
             $page->nextCursor,
             $page->pageSize,
         );
@@ -215,6 +229,14 @@ class EntryManager
             filter: LeafNode::local(self::TRASH_FIELD, 'between', [1, $cutoff]),
             pageSize: $limit,
         )->rows;
+    }
+
+    /**
+     * Whether StarDust can filter on the creator field yet.
+     */
+    public function createdByIndexed(SchemaModel $model): bool
+    {
+        return $this->stardust->describeModel($model->stardust_model_id)?->field(self::CREATED_BY_FIELD)->isIndexed ?? false;
     }
 
     /**

@@ -15,7 +15,16 @@ import type { ModelSchemaJson } from '@/types/schema';
 const props = defineProps<{
     model: { id: number; label: string };
     schema: ModelSchemaJson;
-    entry: { id: number; created_at: string };
+    entry: {
+        id: number;
+        created_at: string;
+        /** Who made it: a name, a former member, or unknown for an old entry. */
+        author: { state: 'known' | 'former' | 'unknown'; name: string | null };
+        /** Who saved it last, when that is known. */
+        saved_by: string | null;
+        /** Whether this account may save changes to this entry. */
+        can_update: boolean;
+    };
     values: Record<string, unknown>;
 }>();
 
@@ -32,28 +41,48 @@ setLayoutProps({
 
 const { can } = useAbilities();
 
+const canUpdate = props.entry.can_update;
+
 const { values, errors, processing, updateValue, submit } = useEntryForm(
     props.schema,
     props.values,
 );
 
 const created = new Date(props.entry.created_at).toLocaleString();
+
+/** "Created 5 Oct, 10:20 by Ada. Last saved by Ben." */
+const description = (() => {
+    const { author, saved_by: savedBy } = props.entry;
+    const by =
+        author.state === 'known'
+            ? ` by ${author.name}`
+            : author.state === 'former'
+              ? ' by a former member'
+              : '';
+
+    return `Created ${created}${by}.${savedBy ? ` Last saved by ${savedBy}.` : ''}`;
+})();
 </script>
 
 <template>
     <Head :title="`Edit ${model.label}`" />
 
     <PageBody>
-        <PageHeader
-            :title="`Edit ${model.label}`"
-            :description="`Created ${created}`"
-        />
+        <PageHeader :title="`Edit ${model.label}`" :description="description" />
+
+        <p
+            v-if="!canUpdate"
+            class="rounded-lg border px-4 py-3 text-sm text-muted-foreground"
+        >
+            You can look at this entry but not change it. Your role lets you
+            change only the entries you created.
+        </p>
 
         <EntryForm
             :schema="schema"
             :values="values"
             :errors="errors"
-            :disabled="processing || !can('entries.update')"
+            :disabled="processing || !canUpdate"
             :builder-href="
                 can('models.update') ? builder(model.id).url : undefined
             "
@@ -62,7 +91,7 @@ const created = new Date(props.entry.created_at).toLocaleString();
 
         <div class="flex gap-2">
             <Button
-                v-if="can('entries.update')"
+                v-if="canUpdate"
                 :disabled="processing"
                 @click="
                     submit(
@@ -77,7 +106,7 @@ const created = new Date(props.entry.created_at).toLocaleString();
             </Button>
             <Button variant="secondary" as-child>
                 <Link :href="index(model.id)">{{
-                    can('entries.update') ? 'Cancel' : 'Back'
+                    canUpdate ? 'Cancel' : 'Back'
                 }}</Link>
             </Button>
         </div>

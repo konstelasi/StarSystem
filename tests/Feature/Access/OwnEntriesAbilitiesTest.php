@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\SiteUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CrossSite;
 use Tests\TestCase;
@@ -67,6 +68,16 @@ class OwnEntriesAbilitiesTest extends TestCase
             $this->assertContains($full, Ability::all());
             $this->assertContains($own, Ability::all());
         }
+    }
+
+    public function test_a_route_for_an_ability_is_open_to_a_role_holding_only_its_own_form()
+    {
+        $contributor = $this->memberWith([Ability::ENTRIES_VIEW, Ability::ENTRIES_UPDATE_OWN]);
+
+        $this->assertTrue(Gate::forUser($contributor)->allows(Ability::ENTRIES_UPDATE));
+        $this->assertFalse(Gate::forUser($contributor)->allows(Ability::ENTRIES_TRASH));
+        $this->assertFalse(Gate::forUser($contributor)->allows(Ability::ENTRIES_DELETE));
+        $this->assertTrue(Gate::forUser($contributor)->allows(Ability::ENTRIES_UPDATE_OWN));
     }
 
     public function test_the_full_ability_covers_every_entry_whoever_made_it_and_even_none()

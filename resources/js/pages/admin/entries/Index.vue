@@ -41,6 +41,10 @@ type EntryRow = {
     file_names: Record<string, string>;
     created_at: string;
     trashed_at: string | null;
+    /** Who made it: a name, a former member, or unknown for an old entry. */
+    author: { state: 'known' | 'former' | 'unknown'; name: string | null };
+    /** What this account may do to this one entry. */
+    can: { update: boolean; trash: boolean; restore: boolean; delete: boolean };
 };
 
 const props = defineProps<{
@@ -50,6 +54,8 @@ const props = defineProps<{
     /** The list's fields, as full specs so each value shows by its type. */
     columns: FieldSpecJson[];
     entries: EntryRow[];
+    /** Whether the list is only the signed-in account's own entries. */
+    mine: boolean;
     nextCursor: string | null;
     /** How long an entry stays in the trash before it is deleted for good. */
     trashDays: number;
@@ -79,6 +85,24 @@ function loadMore() {
             loadingMore.value = false;
         },
     });
+}
+
+/** Shows all entries again, or only the ones this account made. */
+function showMine(only: boolean) {
+    router.get(
+        (inTrash.value ? trash(props.model.id) : index(props.model.id)).url,
+        only ? { mine: 1 } : {},
+        { preserveScroll: true, preserveState: true, replace: true },
+    );
+}
+
+/** How the list words who made an entry. */
+function authorText(author: EntryRow['author']): string {
+    if (author.state === 'known') {
+        return author.name ?? '';
+    }
+
+    return author.state === 'former' ? 'Former member' : 'Unknown';
 }
 
 /** The entry whose action is running, to disable its buttons. */
@@ -176,6 +200,23 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
             </template>
         </PageHeader>
 
+        <div v-if="hasFields" class="flex flex-wrap items-center gap-1">
+            <Button
+                size="sm"
+                :variant="mine ? 'ghost' : 'secondary'"
+                @click="showMine(false)"
+            >
+                {{ inTrash ? 'Everything in the trash' : 'All entries' }}
+            </Button>
+            <Button
+                size="sm"
+                :variant="mine ? 'secondary' : 'ghost'"
+                @click="showMine(true)"
+            >
+                Only mine
+            </Button>
+        </div>
+
         <Card v-if="!hasFields && !inTrash">
             <CardHeader class="items-center text-center">
                 <Blocks class="size-8 text-muted-foreground" />
@@ -199,9 +240,18 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                     class="size-8 text-muted-foreground"
                 />
                 <CardTitle>
-                    {{ inTrash ? 'The trash is empty' : 'No entries yet' }}
+                    {{
+                        mine
+                            ? 'None of these are yours'
+                            : inTrash
+                              ? 'The trash is empty'
+                              : 'No entries yet'
+                    }}
                 </CardTitle>
-                <CardDescription v-if="!inTrash">
+                <CardDescription v-if="mine">
+                    Show all entries to see what others have made.
+                </CardDescription>
+                <CardDescription v-else-if="!inTrash">
                     Create the first one to get started.
                 </CardDescription>
             </CardHeader>
@@ -222,6 +272,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                         >
                             {{ column.label }}
                         </th>
+                        <th class="px-4 py-2 max-md:hidden">Made by</th>
                         <th class="px-4 py-2 max-sm:hidden">
                             {{ inTrash ? 'Trashed' : 'Created' }}
                         </th>
@@ -275,6 +326,15 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                 {{ cell(entry, column) }}
                             </span>
                         </td>
+                        <td
+                            class="px-4 py-2 whitespace-nowrap max-md:hidden"
+                            :class="{
+                                'text-muted-foreground':
+                                    entry.author.state !== 'known',
+                            }"
+                        >
+                            {{ authorText(entry.author) }}
+                        </td>
                         <td class="px-4 py-2 whitespace-nowrap max-sm:hidden">
                             <template v-if="inTrash && entry.trashed_at">
                                 <span :title="formatTime(entry.trashed_at)">
@@ -288,7 +348,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                         <td class="px-4 py-1 text-right whitespace-nowrap">
                             <template v-if="inTrash">
                                 <Button
-                                    v-if="can('entries.restore')"
+                                    v-if="entry.can.restore"
                                     variant="ghost"
                                     size="sm"
                                     :disabled="busy === entry.id"
@@ -306,14 +366,14 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                                     <span class="max-sm:sr-only">Restore</span>
                                 </Button>
                                 <DeleteEntryDialog
-                                    v-if="can('entries.delete')"
+                                    v-if="entry.can.delete"
                                     :model-id="model.id"
                                     :entry-id="entry.id"
                                     :name="entryName(entry)"
                                 />
                             </template>
                             <Button
-                                v-else-if="can('entries.trash')"
+                                v-else-if="entry.can.trash"
                                 variant="ghost"
                                 size="sm"
                                 :disabled="busy === entry.id"

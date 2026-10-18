@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Access\Ability;
+use App\Access\SiteAccess;
 use App\Entries\EntryManager;
 use App\Files\File;
 use App\Http\Controllers\Controller;
 use App\Models\SchemaField;
 use App\Models\SchemaModel;
+use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
 use App\Schema\SchemaManager;
@@ -28,6 +31,7 @@ class EntryController extends Controller
     public function __construct(
         private readonly EntryManager $entries,
         private readonly SchemaManager $schema,
+        private readonly SiteAccess $access,
     ) {}
 
     public function index(Request $request, SchemaModel $model): Response
@@ -44,9 +48,10 @@ class EntryController extends Controller
      * The toast offers Undo, since the entry is only one click from coming
      * back.
      */
-    public function moveToTrash(SchemaModel $model, int $entry): RedirectResponse
+    public function moveToTrash(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
+        $this->authorize($request, Ability::ENTRIES_TRASH, $found);
 
         if (! $this->entries->isTrashed($found)) {
             $this->entries->trash($model, $found);
@@ -65,9 +70,10 @@ class EntryController extends Controller
      * Back to wherever the restore came from: the trash, or the list when
      * it was the Undo of a move.
      */
-    public function restore(SchemaModel $model, int $entry): RedirectResponse
+    public function restore(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
+        $this->authorize($request, Ability::ENTRIES_RESTORE, $found);
 
         if ($this->entries->isTrashed($found)) {
             $this->entries->restore($model, $found);
@@ -82,9 +88,10 @@ class EntryController extends Controller
      * Deletes a trashed entry for good, with StarDust's own delete, which
      * has no restore. An active entry has to go through the trash first.
      */
-    public function destroy(SchemaModel $model, int $entry): RedirectResponse
+    public function destroy(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
+        $this->authorize($request, Ability::ENTRIES_DELETE, $found);
 
         if (! $this->entries->isTrashed($found)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => 'Move it to the trash first.']);
@@ -110,8 +117,11 @@ class EntryController extends Controller
 
         $cursor = $request->query('cursor');
 
+        // "Only mine" asks for the entries the signed-in account made.
+        $mine = $request->boolean('mine');
+
         try {
-            $page = $this->entries->page($model, is_string($cursor) ? $cursor : null, $trashed);
+            $page = $this->entries->page($model, is_string($cursor) ? $cursor : null, $trashed, $mine ? $request->user()?->id : null);
         } catch (InvalidCursorException) {
             abort(404);
         }
@@ -119,6 +129,7 @@ class EntryController extends Controller
         // Full field specs, so the list can show each value by its type.
         $specs = collect(ModelSchema::fromModel($model)->fields)->keyBy(fn (FieldSpec $spec) => $spec->key);
         $fileNames = $this->fileNames($columns, $page->rows);
+        $authors = $this->authorNames($page->rows);
 
         return Inertia::render('admin/entries/Index', [
             'model' => ['id' => $model->id, 'label' => $model->label],
@@ -133,7 +144,12 @@ class EntryController extends Controller
                 'file_names' => (object) Arr::only($fileNames, $this->fileUuids($columns, $entry)),
                 'created_at' => $entry->createdAt->format(DATE_ATOM),
                 'trashed_at' => $this->entries->trashedAt($entry)?->format(DATE_ATOM),
+                'author' => $this->author($this->entries->createdBy($entry), $authors),
+                // What this account may do to this entry, which depends on who
+                // made it. The server asks again when the action arrives.
+                'can' => $this->can($request, $entry),
             ])->values()),
+            'mine' => $mine,
             'nextCursor' => $page->nextCursor?->opaque,
             'trashDays' => config()->integer('starsystem.entries.trash_days'),
         ]);
@@ -163,7 +179,7 @@ class EntryController extends Controller
      * form turns them into what each input expects (see formValue() in
      * resources/js/fields).
      */
-    public function edit(SchemaModel $model, int $entry): Response|RedirectResponse
+    public function edit(Request $request, SchemaModel $model, int $entry): Response|RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
 
@@ -171,17 +187,30 @@ class EntryController extends Controller
             return $this->restoreFirst($model);
         }
 
+        $savedBy = $this->entries->updatedBy($found);
+        $names = $this->userNames([$this->entries->createdBy($found), $savedBy]);
+
         return Inertia::render('admin/entries/Edit', [
             'model' => ['id' => $model->id, 'label' => $model->label],
             'schema' => $this->schema->export($model),
-            'entry' => ['id' => $found->id, 'created_at' => $found->createdAt->format(DATE_ATOM)],
+            'entry' => [
+                'id' => $found->id,
+                'created_at' => $found->createdAt->format(DATE_ATOM),
+                'author' => $this->author($this->entries->createdBy($found), $names),
+                'saved_by' => $savedBy === null ? null : ($names[$savedBy] ?? null),
+                // Whether this account may save changes to this entry.
+                'can_update' => $this->access->mayOnEntry($this->user($request), Ability::ENTRIES_UPDATE, $this->entries->createdBy($found)),
+            ],
             'values' => (object) Arr::only($found->fields, $model->fields->pluck('key')->all()),
         ]);
     }
 
     public function update(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
-        if ($this->entries->isTrashed($this->entryOr404($model, $entry))) {
+        $found = $this->entryOr404($model, $entry);
+        $this->authorize($request, Ability::ENTRIES_UPDATE, $found);
+
+        if ($this->entries->isTrashed($found)) {
             return $this->restoreFirst($model);
         }
 
@@ -201,6 +230,88 @@ class EntryController extends Controller
         Inertia::flash('toast', ['type' => 'info', 'message' => 'Restore this entry to edit it.']);
 
         return to_route('admin.models.entries.trash', $model);
+    }
+
+    /**
+     * Refuses the action unless this account may do it to this entry: it
+     * holds the ability for every entry, or its own form for one it made.
+     */
+    private function authorize(Request $request, string $ability, Entry $entry): void
+    {
+        abort_unless($this->access->mayOnEntry($this->user($request), $ability, $this->entries->createdBy($entry)), 403);
+    }
+
+    /**
+     * @return array{update: bool, trash: bool, restore: bool, delete: bool}
+     */
+    private function can(Request $request, Entry $entry): array
+    {
+        $user = $this->user($request);
+        $author = $this->entries->createdBy($entry);
+
+        return [
+            'update' => $this->access->mayOnEntry($user, Ability::ENTRIES_UPDATE, $author),
+            'trash' => $this->access->mayOnEntry($user, Ability::ENTRIES_TRASH, $author),
+            'restore' => $this->access->mayOnEntry($user, Ability::ENTRIES_RESTORE, $author),
+            'delete' => $this->access->mayOnEntry($user, Ability::ENTRIES_DELETE, $author),
+        ];
+    }
+
+    /**
+     * The names of the accounts that made these entries, by user id. An
+     * account that has since been deleted is missing.
+     *
+     * @param  list<Entry>  $entries
+     * @return array<int, string>
+     */
+    private function authorNames(array $entries): array
+    {
+        return $this->userNames(array_map(fn (Entry $entry) => $this->entries->createdBy($entry), $entries));
+    }
+
+    /**
+     * The names of these accounts by user id, ignoring ids that are null.
+     *
+     * @param  list<int|null>  $ids
+     * @return array<int, string>
+     */
+    private function userNames(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids)));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var array<int, string> */
+        return User::query()->whereIn('id', $ids)->pluck('name', 'id')->all();
+    }
+
+    /**
+     * Who made an entry, for the page to word: a name; a former member,
+     * whose account is gone; or unknown, for an entry written before
+     * authors were kept.
+     *
+     * @param  array<int, string>  $names
+     * @return array{state: 'known'|'former'|'unknown', name: string|null}
+     */
+    private function author(?int $id, array $names): array
+    {
+        if ($id === null) {
+            return ['state' => 'unknown', 'name' => null];
+        }
+
+        return isset($names[$id])
+            ? ['state' => 'known', 'name' => $names[$id]]
+            : ['state' => 'former', 'name' => null];
+    }
+
+    private function user(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
     }
 
     /**
