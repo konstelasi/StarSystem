@@ -35,6 +35,62 @@ class SiteAccess
     }
 
     /**
+     * Whether the account may do this to an entry whose author is $authorId:
+     * it holds the ability for every entry, or holds its own-entries form and
+     * made this one. An entry with no author is nobody's own.
+     */
+    public function mayOnEntry(User $user, string $ability, ?int $authorId): bool
+    {
+        if ($user->is_install_owner) {
+            return true;
+        }
+
+        $held = $this->abilities($user);
+
+        if (in_array($ability, $held, true)) {
+            return true;
+        }
+
+        $own = Ability::OWN[$ability] ?? null;
+
+        return $own !== null
+            && $authorId !== null
+            && $authorId === $user->id
+            && in_array($own, $held, true);
+    }
+
+    /**
+     * What the account holds counted the way handing out is: an ability for
+     * every entry also stands for its own-entries form, so whoever may edit
+     * all entries may give a role the right to edit only a person's own.
+     *
+     * @return list<string>
+     */
+    public function effective(User $user): array
+    {
+        $abilities = $this->abilities($user);
+
+        foreach (Ability::OWN as $full => $own) {
+            if (in_array($full, $abilities, true)) {
+                $abilities[] = $own;
+            }
+        }
+
+        return array_values(array_unique($abilities));
+    }
+
+    /**
+     * Which of $abilities the actor doesn't effectively hold.
+     *
+     * @param  list<string>  $abilities
+     * @return list<string>
+     */
+    public function lacks(User $actor, array $abilities): array
+    {
+        return $actor->is_install_owner ? [] : array_values(array_diff($abilities, $this->effective($actor)));
+    }
+
+    /**
      * Every ability the account holds on the current site.
      *
      * @return list<string>
@@ -66,7 +122,7 @@ class SiteAccess
     {
         // Only abilities that exist now count. A role may still hold one of a
         // module that is switched off, which nobody can use and so nobody lacks.
-        return $actor->is_install_owner || array_diff($this->registry->known($role->abilities()), $this->abilities($actor)) === [];
+        return $this->lacks($actor, $this->registry->known($role->abilities())) === [];
     }
 
     /**

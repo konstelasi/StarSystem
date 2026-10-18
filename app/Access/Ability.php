@@ -23,11 +23,19 @@ final class Ability
 
     public const ENTRIES_UPDATE = 'entries.update';
 
+    public const ENTRIES_UPDATE_OWN = 'entries.update_own';
+
     public const ENTRIES_TRASH = 'entries.trash';
+
+    public const ENTRIES_TRASH_OWN = 'entries.trash_own';
 
     public const ENTRIES_RESTORE = 'entries.restore';
 
+    public const ENTRIES_RESTORE_OWN = 'entries.restore_own';
+
     public const ENTRIES_DELETE = 'entries.delete';
+
+    public const ENTRIES_DELETE_OWN = 'entries.delete_own';
 
     public const MODELS_VIEW = 'models.view';
 
@@ -76,6 +84,19 @@ final class Ability
     public const ACTIVITY_VIEW = 'activity.view';
 
     /**
+     * The form of an ability that covers only the entries the account
+     * created, for each ability that has one. Holding the full ability covers
+     * every entry, so it also covers its own form. Holding only the own form
+     * covers an entry only when its author is that account.
+     */
+    public const OWN = [
+        self::ENTRIES_UPDATE => self::ENTRIES_UPDATE_OWN,
+        self::ENTRIES_TRASH => self::ENTRIES_TRASH_OWN,
+        self::ENTRIES_RESTORE => self::ENTRIES_RESTORE_OWN,
+        self::ENTRIES_DELETE => self::ENTRIES_DELETE_OWN,
+    ];
+
+    /**
      * The abilities by area, each with the short label the roles page shows.
      *
      * @return array<string, array<string, string>>
@@ -87,9 +108,13 @@ final class Ability
                 self::ENTRIES_VIEW => 'See entries and open them',
                 self::ENTRIES_CREATE => 'Create entries',
                 self::ENTRIES_UPDATE => 'Edit entries',
+                self::ENTRIES_UPDATE_OWN => 'Edit entries they created',
                 self::ENTRIES_TRASH => 'Move entries to the trash',
+                self::ENTRIES_TRASH_OWN => 'Move entries they created to the trash',
                 self::ENTRIES_RESTORE => 'Restore entries from the trash',
+                self::ENTRIES_RESTORE_OWN => 'Restore entries they created',
                 self::ENTRIES_DELETE => 'Delete entries for good',
+                self::ENTRIES_DELETE_OWN => 'Delete entries they created for good',
             ],
             'Models' => [
                 self::MODELS_VIEW => 'See the list of models',

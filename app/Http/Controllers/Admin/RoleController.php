@@ -194,7 +194,9 @@ class RoleController extends Controller
     private function form(Request $request, ?Role $role): Response
     {
         $actor = $this->actor($request);
-        $held = $this->access->abilities($actor);
+        // What the actor can give, so holding an ability for every entry also
+        // lets them give its own-entries form.
+        $held = $this->access->effective($actor);
         $selected = $this->registry->known($role?->abilities() ?? []);
 
         return Inertia::render('admin/roles/Form', [
@@ -228,7 +230,7 @@ class RoleController extends Controller
 
         $abilities = array_values(array_unique($data['abilities']));
 
-        if (array_diff($abilities, $this->access->abilities($this->actor($request))) !== []) {
+        if ($this->access->lacks($this->actor($request), $abilities) !== []) {
             throw ValidationException::withMessages(['abilities' => 'You can only give abilities you hold yourself.']);
         }
 

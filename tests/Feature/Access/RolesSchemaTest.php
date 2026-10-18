@@ -29,7 +29,7 @@ class RolesSchemaTest extends TestCase
         $editor = Role::builtIn(Role::EDITOR)->abilities();
         $viewer = Role::builtIn(Role::VIEWER)->abilities();
 
-        $this->assertCount(29, $administrator);
+        $this->assertCount(33, $administrator);
         $this->assertContains('roles.delete', $administrator);
         $this->assertContains('activity.view', $administrator);
         $this->assertContains('users.suspend', $administrator);
