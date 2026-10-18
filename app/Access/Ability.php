@@ -8,7 +8,12 @@ namespace App\Access;
  *
  * The code owns this list and the ss_role_abilities table owns who holds
  * which. Adding an action means adding it here, checking it on its route,
- * and a migration that grants it to the built-in roles that should have it.
+ * and a migration that grants it to the built-in Editor or Viewer if they
+ * should have it. The built-in Administrator holds every ability that exists
+ * and needs no migration.
+ *
+ * Modules add abilities of their own through their manifest. See
+ * AbilityRegistry for the list that includes them.
  */
 final class Ability
 {
