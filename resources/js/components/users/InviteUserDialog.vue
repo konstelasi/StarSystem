@@ -12,7 +12,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -22,6 +21,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 import { store } from '@/routes/admin/users/invites';
 
 const props = defineProps<{
@@ -62,17 +62,20 @@ function submit() {
                     <DialogDescription>
                         They get a link that works for a week and only once. If
                         they have no account yet, the link lets them make one.
+                        Add up to 20 addresses at once, one on each line or
+                        separated by commas, and they all get the role below.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div class="my-6 grid gap-4">
                     <div class="grid gap-2">
-                        <Label for="invite-email">Email</Label>
-                        <Input
+                        <Label for="invite-email">Email addresses</Label>
+                        <Textarea
                             id="invite-email"
                             v-model="form.email"
-                            type="email"
                             autocomplete="off"
+                            rows="2"
+                            placeholder="ana@example.com"
                             required
                         />
                         <InputError :message="form.errors.email" />
@@ -106,7 +109,7 @@ function submit() {
                     </DialogClose>
                     <Button type="submit" :disabled="form.processing">
                         <Spinner v-if="form.processing" />
-                        Send invitation
+                        Send invitations
                     </Button>
                 </DialogFooter>
             </form>

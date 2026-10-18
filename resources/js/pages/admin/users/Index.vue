@@ -8,6 +8,7 @@ import SortButton from '@/components/SortButton.vue';
 import UserFilters from '@/components/users/UserFilters.vue';
 import type { UserFilterValues } from '@/components/users/UserFilters.vue';
 import InviteLinkDialog from '@/components/users/InviteLinkDialog.vue';
+import InviteLinksDialog from '@/components/users/InviteLinksDialog.vue';
 import type { InviteLink } from '@/components/users/InviteLinkDialog.vue';
 import InviteUserDialog from '@/components/users/InviteUserDialog.vue';
 import RemoveUserDialog from '@/components/users/RemoveUserDialog.vue';
@@ -98,17 +99,27 @@ const inviteOpen = ref(false);
 const ownershipOpen = ref(false);
 const linkOpen = ref(false);
 const shown = ref<InviteLink | null>(null);
+const linksOpen = ref(false);
+const shownMany = ref<InviteLink[]>([]);
 
 // Sending or resending an invitation flashes its link back, once.
 const page = usePage();
 watch(
     () => page.flash,
     (flash) => {
-        const invite = (flash as { invite?: InviteLink } | undefined)?.invite;
+        const data = flash as
+            | { invite?: InviteLink; invites?: InviteLink[] }
+            | undefined;
 
-        if (invite) {
-            shown.value = invite;
+        if (data?.invite) {
+            shown.value = data.invite;
             linkOpen.value = true;
+        }
+
+        // Several invited at once: the links the email didn't reach.
+        if (data?.invites?.length) {
+            shownMany.value = data.invites;
+            linksOpen.value = true;
         }
     },
     { immediate: true },
@@ -591,6 +602,7 @@ function changeRole(member: Member, roleId: unknown) {
 
         <InviteUserDialog v-model:open="inviteOpen" :roles="roles" />
         <InviteLinkDialog v-model:open="linkOpen" :invite="shown" />
+        <InviteLinksDialog v-model:open="linksOpen" :invites="shownMany" />
         <TransferOwnershipDialog
             v-model:open="ownershipOpen"
             :candidates="candidates"
