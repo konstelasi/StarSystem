@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\PasswordResetLinkController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\TwoFactorRequirementController;
 use App\Http\Controllers\Admin\UpdateController;
+use App\Http\Controllers\Admin\UserBulkController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\UserSessionController;
 use App\Http\Controllers\Admin\UserSuspensionController;
@@ -49,6 +50,8 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
             Route::post('invites', [InviteController::class, 'store'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.store');
             Route::post('invites/{invite}/resend', [InviteController::class, 'resend'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.resend')->whereNumber('invite');
             Route::delete('invites/{invite}', [InviteController::class, 'destroy'])->middleware('can:'.Ability::USERS_INVITE)->name('invites.destroy')->whereNumber('invite');
+            Route::put('bulk', [UserBulkController::class, 'update'])->middleware('can:'.Ability::USERS_UPDATE)->name('bulk.update');
+            Route::delete('bulk', [UserBulkController::class, 'destroy'])->middleware('can:'.Ability::USERS_REMOVE)->name('bulk.destroy');
             Route::post('{member}/suspend', [UserSuspensionController::class, 'store'])->middleware('can:'.Ability::USERS_SUSPEND)->name('suspend')->whereNumber('member');
             Route::delete('{member}/suspend', [UserSuspensionController::class, 'destroy'])->middleware('can:'.Ability::USERS_SUSPEND)->name('resume')->whereNumber('member');
             Route::delete('{member}/sessions', [UserSessionController::class, 'destroy'])->middleware('can:'.Ability::USERS_SIGN_OUT)->name('sessions.destroy')->whereNumber('member');
