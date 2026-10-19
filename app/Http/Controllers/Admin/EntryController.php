@@ -51,7 +51,7 @@ class EntryController extends Controller
     public function moveToTrash(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
-        $this->authorize($request, Ability::ENTRIES_TRASH, $found);
+        $this->authorize($request, $model, Ability::ENTRIES_TRASH, $found);
 
         if (! $this->entries->isTrashed($found)) {
             $this->entries->trash($model, $found);
@@ -73,7 +73,7 @@ class EntryController extends Controller
     public function restore(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
-        $this->authorize($request, Ability::ENTRIES_RESTORE, $found);
+        $this->authorize($request, $model, Ability::ENTRIES_RESTORE, $found);
 
         if ($this->entries->isTrashed($found)) {
             $this->entries->restore($model, $found);
@@ -91,7 +91,7 @@ class EntryController extends Controller
     public function destroy(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
-        $this->authorize($request, Ability::ENTRIES_DELETE, $found);
+        $this->authorize($request, $model, Ability::ENTRIES_DELETE, $found);
 
         if (! $this->entries->isTrashed($found)) {
             Inertia::flash('toast', ['type' => 'error', 'message' => 'Move it to the trash first.']);
@@ -147,7 +147,7 @@ class EntryController extends Controller
                 'author' => $this->author($this->entries->createdBy($entry), $authors),
                 // What this account may do to this entry, which depends on who
                 // made it. The server asks again when the action arrives.
-                'can' => $this->can($request, $entry),
+                'can' => $this->can($request, $model, $entry),
             ])->values()),
             'mine' => $mine,
             'nextCursor' => $page->nextCursor?->opaque,
@@ -199,7 +199,7 @@ class EntryController extends Controller
                 'author' => $this->author($this->entries->createdBy($found), $names),
                 'saved_by' => $savedBy === null ? null : ($names[$savedBy] ?? null),
                 // Whether this account may save changes to this entry.
-                'can_update' => $this->access->mayOnEntry($this->user($request), Ability::ENTRIES_UPDATE, $this->entries->createdBy($found)),
+                'can_update' => $this->access->mayOnEntry($this->user($request), Ability::ENTRIES_UPDATE, $this->entries->createdBy($found), $model->id),
             ],
             'values' => (object) Arr::only($found->fields, $model->fields->pluck('key')->all()),
         ]);
@@ -208,7 +208,7 @@ class EntryController extends Controller
     public function update(Request $request, SchemaModel $model, int $entry): RedirectResponse
     {
         $found = $this->entryOr404($model, $entry);
-        $this->authorize($request, Ability::ENTRIES_UPDATE, $found);
+        $this->authorize($request, $model, Ability::ENTRIES_UPDATE, $found);
 
         if ($this->entries->isTrashed($found)) {
             return $this->restoreFirst($model);
@@ -234,26 +234,27 @@ class EntryController extends Controller
 
     /**
      * Refuses the action unless this account may do it to this entry: it
-     * holds the ability for every entry, or its own form for one it made.
+     * holds the ability for every entry of this model, or its own form for
+     * one it made.
      */
-    private function authorize(Request $request, string $ability, Entry $entry): void
+    private function authorize(Request $request, SchemaModel $model, string $ability, Entry $entry): void
     {
-        abort_unless($this->access->mayOnEntry($this->user($request), $ability, $this->entries->createdBy($entry)), 403);
+        abort_unless($this->access->mayOnEntry($this->user($request), $ability, $this->entries->createdBy($entry), $model->id), 403);
     }
 
     /**
      * @return array{update: bool, trash: bool, restore: bool, delete: bool}
      */
-    private function can(Request $request, Entry $entry): array
+    private function can(Request $request, SchemaModel $model, Entry $entry): array
     {
         $user = $this->user($request);
         $author = $this->entries->createdBy($entry);
 
         return [
-            'update' => $this->access->mayOnEntry($user, Ability::ENTRIES_UPDATE, $author),
-            'trash' => $this->access->mayOnEntry($user, Ability::ENTRIES_TRASH, $author),
-            'restore' => $this->access->mayOnEntry($user, Ability::ENTRIES_RESTORE, $author),
-            'delete' => $this->access->mayOnEntry($user, Ability::ENTRIES_DELETE, $author),
+            'update' => $this->access->mayOnEntry($user, Ability::ENTRIES_UPDATE, $author, $model->id),
+            'trash' => $this->access->mayOnEntry($user, Ability::ENTRIES_TRASH, $author, $model->id),
+            'restore' => $this->access->mayOnEntry($user, Ability::ENTRIES_RESTORE, $author, $model->id),
+            'delete' => $this->access->mayOnEntry($user, Ability::ENTRIES_DELETE, $author, $model->id),
         ];
     }
 

@@ -20,13 +20,13 @@ Route::middleware(['auth', 'site.member', 'verified'])
 
         // Opening the builder is for changing a model, so it needs the same
         // ability as saving.
-        Route::middleware('can:'.Ability::MODELS_UPDATE)->group(function () {
+        Route::middleware('can:'.Ability::MODELS_UPDATE.',model')->group(function () {
             Route::get('{model}/builder', [ModelBuilderController::class, 'show'])->name('builder')->whereNumber('model');
             Route::post('{model}/builder/preview', [ModelBuilderController::class, 'preview'])->name('builder.preview')->whereNumber('model');
             Route::post('{model}/builder/save', [ModelBuilderController::class, 'save'])->name('builder.save')->whereNumber('model');
             Route::post('{model}/builder/retry', [ModelBuilderController::class, 'retry'])->name('builder.retry')->whereNumber('model');
         });
 
-        Route::get('{model}/export', [ModelTransferController::class, 'export'])->middleware('can:'.Ability::MODELS_EXPORT)->name('export')->whereNumber('model');
+        Route::get('{model}/export', [ModelTransferController::class, 'export'])->middleware('can:'.Ability::MODELS_EXPORT.',model')->name('export')->whereNumber('model');
         Route::post('{model}/duplicate', [ModelTransferController::class, 'duplicate'])->middleware('can:'.Ability::MODELS_CREATE)->name('duplicate')->whereNumber('model');
     });
