@@ -84,7 +84,9 @@ const description = (() => {
             :errors="errors"
             :disabled="processing || !canUpdate"
             :builder-href="
-                can('models.update') ? builder(model.id).url : undefined
+                can('models.update', model.id)
+                    ? builder(model.id).url
+                    : undefined
             "
             @update:values="updateValue"
         />

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Access\Ability;
 use App\Access\SiteAccess;
 use App\Health\TickStatus;
 use App\Models\SchemaModel;
@@ -47,6 +48,7 @@ class HandleInertiaRequests extends Middleware
                 'installOwner' => $request->user()?->is_install_owner === true,
                 'role' => fn () => $this->roleName($request),
                 'abilities' => fn () => $this->abilities($request),
+                'modelAbilities' => fn () => $this->modelAbilities($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'backgroundWork' => fn () => $this->backgroundWork($request),
@@ -87,6 +89,21 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
+     * What the account may do to particular models only, by model id, on top
+     * of the abilities above. An object, so an empty one stays `{}` in JSON.
+     */
+    private function modelAbilities(Request $request): object
+    {
+        $user = $request->user();
+
+        if ($user === null || ! app(CurrentSite::class)->has()) {
+            return (object) [];
+        }
+
+        return (object) app(SiteAccess::class)->modelAbilities($user);
+    }
+
+    /**
      * Set when StarDust's background work is late, for the banner on every
      * admin page. Null for guests, so public pages never query for it.
      *
@@ -104,17 +121,21 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * The current site's models, for the sidebar to list under Content and
-     * under each model group. Models being deleted are left out. Empty for
-     * guests, so public pages never query for it.
+     * The current site's models the account may view, for the sidebar to
+     * list under Content and under each model group. Models being deleted
+     * are left out. Empty for guests, so public pages never query for it.
      *
      * @return list<array{id: int, label: string, group: string|null}>
      */
     private function navModels(Request $request): array
     {
-        if ($request->user() === null || ! app(CurrentSite::class)->has()) {
+        $user = $request->user();
+
+        if ($user === null || ! app(CurrentSite::class)->has()) {
             return [];
         }
+
+        $access = app(SiteAccess::class);
 
         $models = SchemaModel::query()
             ->where('status', SchemaModel::ACTIVE)
@@ -125,6 +146,10 @@ class HandleInertiaRequests extends Middleware
         $rows = [];
 
         foreach ($models as $model) {
+            if (! $access->allows($user, Ability::ENTRIES_VIEW, $model->id)) {
+                continue;
+            }
+
             $rows[] = ['id' => $model->id, 'label' => $model->label, 'group' => $model->group];
         }
 

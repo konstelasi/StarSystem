@@ -53,9 +53,8 @@ const isModelsPage = (path: string) =>
     path.startsWith(models().url) && !/\/entries(\/|$)/.test(path);
 
 const groups = computed<NavGroup[]>(() => {
-    const navModels = can('entries.view')
-        ? ((page.props.navModels as NavModel[] | undefined) ?? [])
-        : [];
+    // The server lists only the models this account may view.
+    const navModels = (page.props.navModels as NavModel[] | undefined) ?? [];
     const named = new Map<string, NavItem[]>();
 
     for (const model of navModels) {

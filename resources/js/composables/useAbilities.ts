@@ -14,7 +14,16 @@ export function useAbilities() {
     );
     const installOwner = computed(() => page.props.auth.installOwner === true);
 
-    const can = (ability: string) => abilities.value.has(ability);
+    /**
+     * With a model, whether the account holds the ability for every model or
+     * for that one. Without, whether it holds it for every model.
+     */
+    const can = (ability: string, modelId?: number) =>
+        abilities.value.has(ability) ||
+        (modelId !== undefined &&
+            (page.props.auth.modelAbilities?.[modelId] ?? []).includes(
+                ability,
+            ));
 
     return { can, installOwner };
 }

@@ -10,6 +10,7 @@ use App\Models\SchemaModel;
 use App\Models\SiteUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CrossSite;
 use Tests\Concerns\ManagesTestModels;
 use Tests\Concerns\UsesStarDust;
@@ -226,5 +227,39 @@ class ModelGrantRoutesTest extends TestCase
 
         $this->page($nobody, 'admin.models.entries.index', $this->articles)->assertForbidden();
         $this->page($nobody, 'admin.models.builder', $this->articles)->assertForbidden();
+    }
+
+    public function test_the_sidebar_lists_only_the_models_the_account_may_view()
+    {
+        $reader = $this->member([Ability::MODELS_VIEW], ['articles' => [Ability::ENTRIES_VIEW]]);
+
+        $this->actingAs($reader)
+            ->get($this->url('admin.models.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('navModels', 1)
+                ->where('navModels.0.label', 'Articles')
+                ->where('auth.modelAbilities', [$this->articles->id => [Ability::ENTRIES_VIEW]])
+            );
+    }
+
+    public function test_the_sidebar_lists_every_model_to_an_account_that_may_view_all()
+    {
+        $reader = $this->member([Ability::MODELS_VIEW, Ability::ENTRIES_VIEW]);
+
+        $this->actingAs($reader)
+            ->get($this->url('admin.models.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('navModels', 2)
+                ->where('auth.modelAbilities', [])
+            );
+    }
+
+    public function test_an_account_with_nothing_for_entries_gets_no_models_in_the_sidebar()
+    {
+        $nobody = $this->member([Ability::MODELS_VIEW]);
+
+        $this->actingAs($nobody)
+            ->get($this->url('admin.models.index'))
+            ->assertInertia(fn (Assert $page) => $page->has('navModels', 0));
     }
 }

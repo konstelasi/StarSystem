@@ -190,7 +190,7 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                             Trash
                         </Link>
                     </Button>
-                    <Button v-if="can('entries.create')" as-child>
+                    <Button v-if="can('entries.create', model.id)" as-child>
                         <Link :href="create(model.id)">
                             <PlusCircle />
                             New entry
@@ -225,7 +225,11 @@ function swatch(entry: EntryRow, column: FieldSpecJson): string | null {
                     Entries are filled in through the model's fields. Add some
                     first.
                 </CardDescription>
-                <Button v-if="can('models.update')" as-child class="mt-2">
+                <Button
+                    v-if="can('models.update', model.id)"
+                    as-child
+                    class="mt-2"
+                >
                     <Link :href="builder(model.id)"
                         >Add fields in the builder</Link
                     >

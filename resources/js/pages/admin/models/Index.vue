@@ -156,7 +156,7 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <template v-if="model.status !== 'deleting'">
                                 <Button
-                                    v-if="can('entries.view')"
+                                    v-if="can('entries.view', model.id)"
                                     as-child
                                     variant="ghost"
                                     size="sm"
@@ -169,7 +169,7 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                     </Link>
                                 </Button>
                                 <Button
-                                    v-if="can('models.update')"
+                                    v-if="can('models.update', model.id)"
                                     as-child
                                     variant="ghost"
                                     size="sm"
@@ -180,7 +180,7 @@ const existingSlugs = computed(() => props.models.map((model) => model.slug));
                                     </Link>
                                 </Button>
                                 <Button
-                                    v-if="can('models.export')"
+                                    v-if="can('models.export', model.id)"
                                     as-child
                                     variant="ghost"
                                     size="sm"

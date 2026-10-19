@@ -18,6 +18,8 @@ export type Auth = {
     role: string | null;
     /** What the account may do on this site. */
     abilities: string[];
+    /** What it may do to particular models only, by model id. */
+    modelAbilities: Record<number, string[]>;
 };
 
 export type TwoFactorConfigContent = {
