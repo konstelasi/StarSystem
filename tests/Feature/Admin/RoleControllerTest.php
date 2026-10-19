@@ -191,7 +191,7 @@ class RoleControllerTest extends TestCase
         $row = Activity::query()->sole();
         $this->assertSame(ActivityAction::ROLE_UPDATED, $row->action);
         $this->assertSame('Copy editor', $row->subject_label);
-        $this->assertSame([
+        $this->assertEquals([
             'renamed_from' => 'Proofreader',
             'added' => [Ability::ENTRIES_UPDATE],
             'removed' => [Ability::MEDIA_VIEW],

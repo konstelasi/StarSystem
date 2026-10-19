@@ -42,7 +42,8 @@ class ActivityLogTest extends TestCase
         $this->assertSame($actor->id, $row->actor_id);
         $this->assertSame('Rina', $row->actor_name);
         $this->assertSame('user.role_changed', $row->action);
-        $this->assertSame(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
+        // MySQL 8 re-sorts the keys of a JSON column, so compare without key order.
+        $this->assertEquals(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
         $this->assertNotNull($row->created_at);
     }
 

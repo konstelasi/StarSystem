@@ -85,7 +85,7 @@ class UserBulkTest extends TestCase
         $row = Activity::query()->sole();
         $this->assertSame(ActivityAction::USER_ROLE_CHANGED, $row->action);
         $this->assertSame($ben->email, $row->subject_label);
-        $this->assertSame(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
+        $this->assertEquals(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
         $this->assertSame($admin->id, $row->actor_id);
     }
 

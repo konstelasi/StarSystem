@@ -124,7 +124,7 @@ class EmailChangeTest extends TestCase
         $this->assertNotNull($user->email_verified_at);
 
         $row = Activity::query()->where('action', ActivityAction::ACCOUNT_UPDATED)->sole();
-        $this->assertSame(['changed' => ['email'], 'email_from' => 'old@example.com', 'email_to' => 'new@example.com'], $row->properties);
+        $this->assertEquals(['changed' => ['email'], 'email_from' => 'old@example.com', 'email_to' => 'new@example.com'], $row->properties);
     }
 
     public function test_a_link_works_once()
@@ -276,7 +276,7 @@ class EmailChangeTest extends TestCase
 
         $row = Activity::query()->sole();
         $this->assertSame(ActivityAction::ACCOUNT_UPDATED, $row->action);
-        $this->assertSame(['changed' => ['email'], 'email_from' => 'old@example.com', 'email_to' => 'new@example.com'], $row->properties);
+        $this->assertEquals(['changed' => ['email'], 'email_from' => 'old@example.com', 'email_to' => 'new@example.com'], $row->properties);
     }
 
     public function test_the_profile_page_says_which_address_is_waiting()

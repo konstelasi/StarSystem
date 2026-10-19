@@ -194,7 +194,7 @@ class UserControllerTest extends TestCase
         $this->assertSame('user', $row->subject_type);
         $this->assertSame($ben->id, $row->subject_id);
         $this->assertSame($ben->email, $row->subject_label);
-        $this->assertSame(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
+        $this->assertEquals(['from' => 'Editor', 'to' => 'Viewer'], $row->properties);
     }
 
     public function test_choosing_the_role_someone_already_holds_logs_nothing()
