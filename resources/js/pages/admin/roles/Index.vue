@@ -16,6 +16,8 @@ type RoleRow = {
     system: boolean;
     people: number;
     abilities: number;
+    /** How many models it holds something for, beyond its abilities. */
+    models: number;
     editable: boolean;
     duplicable: boolean;
     mine: boolean;
@@ -84,6 +86,13 @@ const { can } = useAbilities();
                         </td>
                         <td class="px-4 py-2 tabular-nums max-sm:hidden">
                             {{ role.abilities }}
+                            <div
+                                v-if="role.models > 0"
+                                class="text-xs text-muted-foreground"
+                            >
+                                More on {{ role.models }}
+                                {{ role.models === 1 ? 'model' : 'models' }}
+                            </div>
                         </td>
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <Button as-child variant="ghost" size="sm">
