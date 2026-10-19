@@ -71,12 +71,19 @@ final class ActivityDescriber
     private static function created(array $with): array
     {
         $count = count(self::strings($with, 'abilities'));
+        $models = count(self::maps($with, 'models'));
 
-        return [match ($count) {
+        $lines = [match ($count) {
             0 => 'with no abilities',
             1 => 'with 1 ability',
             default => "with {$count} abilities",
         }];
+
+        if ($models > 0) {
+            $lines[] = $models === 1 ? 'and grants for 1 model' : "and grants for {$models} models";
+        }
+
+        return $lines;
     }
 
     /**
@@ -96,6 +103,16 @@ final class ActivityDescriber
 
             if ($abilities !== []) {
                 $lines[] = $key.' '.self::sentence(array_map(self::abilityLabel(...), $abilities));
+            }
+        }
+
+        foreach (self::maps($with, 'models') as $label => $change) {
+            foreach (['added', 'removed'] as $key) {
+                $abilities = self::strings($change, $key);
+
+                if ($abilities !== []) {
+                    $lines[] = $key.' '.self::sentence(array_map(self::abilityLabel(...), $abilities))." on {$label}";
+                }
             }
         }
 
@@ -196,6 +213,26 @@ final class ActivityDescriber
     private static function string(array $with, string $key): ?string
     {
         return isset($with[$key]) && is_string($with[$key]) && $with[$key] !== '' ? $with[$key] : null;
+    }
+
+    /**
+     * The nested arrays under a key, such as the changes by model name.
+     *
+     * @param  array<string, mixed>  $with
+     * @return array<string, array<string, mixed>>
+     */
+    private static function maps(array $with, string $key): array
+    {
+        $value = $with[$key] ?? [];
+        $maps = [];
+
+        foreach (is_array($value) ? $value : [] as $name => $inner) {
+            if (is_array($inner)) {
+                $maps[(string) $name] = $inner;
+            }
+        }
+
+        return $maps;
     }
 
     /**
