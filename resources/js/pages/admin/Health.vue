@@ -192,8 +192,8 @@ const formatTime = (iso: string) => new Date(iso).toLocaleString();
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="text-sm text-muted-foreground">
-                    Entries StarDust couldn't index. They stay readable, but
-                    filters miss them until they're replayed.
+                    Entries StarDust couldn't index, counted across all sites.
+                    They stay readable, but filters miss them.
                 </CardContent>
             </Card>
 
