@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Update\FeedSignature;
 use Build\ReleaseBuilder;
 use Closure;
 use PHPUnit\Framework\TestCase;
@@ -30,10 +31,20 @@ class ReleaseBuilderTest extends TestCase
      */
     private static array $cleanup = [];
 
+    /**
+     * The public half of the key the shared release was signed with.
+     */
+    private static string $publicKey;
+
     public static function setUpBeforeClass(): void
     {
-        self::$release = (new ReleaseBuilder(self::repo(), 'HEAD', self::assets(), self::fakeVendor()))
-            ->build(self::tempDir());
+        $keys = sodium_crypto_sign_keypair();
+        self::$publicKey = base64_encode(sodium_crypto_sign_publickey($keys));
+
+        self::$release = (new ReleaseBuilder(
+            self::repo(), 'HEAD', self::assets(), self::fakeVendor(),
+            signingKey: base64_encode(sodium_crypto_sign_secretkey($keys)),
+        ))->build(self::tempDir());
 
         $zip = new ZipArchive;
         $zip->open(self::$release['zip']);
@@ -74,6 +85,22 @@ class ReleaseBuilderTest extends TestCase
         $this->assertSame(basename(self::$release['zip']), $feed['zip']);
         $this->assertSame(self::$release['sha256'], $feed['sha256']);
         $this->assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', $feed['published_at']);
+    }
+
+    public function test_release_json_is_signed_with_the_given_key(): void
+    {
+        $feed = json_decode((string) file_get_contents(self::$release['feed']), true);
+
+        $this->assertTrue(FeedSignature::verify($feed, self::$publicKey));
+        $this->assertFalse(FeedSignature::verify($feed, FeedSignature::PUBLIC_KEY));
+    }
+
+    public function test_release_json_has_no_signature_without_a_key(): void
+    {
+        $release = (new ReleaseBuilder(self::repo(), 'HEAD', self::assets(), self::fakeVendor()))->build(self::tempDir());
+        $feed = json_decode((string) file_get_contents($release['feed']), true);
+
+        $this->assertArrayNotHasKey('signature', $feed);
     }
 
     public function test_everything_sits_under_one_folder(): void

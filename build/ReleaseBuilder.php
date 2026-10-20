@@ -2,6 +2,7 @@
 
 namespace Build;
 
+use App\Update\FeedSignature;
 use Closure;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
@@ -68,6 +69,7 @@ final class ReleaseBuilder
      * @param  string|null  $assets  The built front-end, public/build by default.
      * @param  (Closure(string): void)|null  $installVendor  Fills vendor/ in the given folder.
      * @param  string  $downloadBase  Where the zip will be downloadable from, for release.json.
+     * @param  string|null  $signingKey  Base64 of the release key's secret half. Without it release.json carries no signature, which installs refuse.
      */
     public function __construct(
         private readonly string $repo,
@@ -75,6 +77,7 @@ final class ReleaseBuilder
         private readonly ?string $assets = null,
         ?Closure $installVendor = null,
         private readonly string $downloadBase = '',
+        private readonly ?string $signingKey = null,
     ) {
         $this->installVendor = $installVendor ?? $this->composerInstall(...);
     }
@@ -116,12 +119,18 @@ final class ReleaseBuilder
             // The updater's feed. Without a download base the zip's URL is
             // relative, and the updater resolves it against the feed's own.
             $feed = dirname($zip).DIRECTORY_SEPARATOR.'release.json';
-            file_put_contents($feed, json_encode([
+            $fields = [
                 'version' => $version,
                 'zip' => $this->downloadBase.$name,
                 'sha256' => $hash,
                 'published_at' => gmdate('Y-m-d\TH:i:s\Z', $this->commitTime()),
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+            ];
+
+            if ($this->signingKey !== null) {
+                $fields['signature'] = FeedSignature::sign($fields, $this->signingKey);
+            }
+
+            file_put_contents($feed, json_encode($fields, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
 
             return ['version' => $version, 'zip' => $zip, 'sha256' => $hash, 'feed' => $feed];
         } finally {

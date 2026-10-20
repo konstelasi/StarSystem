@@ -54,7 +54,11 @@ jobs:
           npm ci
           npm run build
 
+      # The feed is signed here, so installs can tell it from a forged one.
+      # The key is only in this step's environment.
       - name: Build the release zip
+        env:
+          STARSYSTEM_RELEASE_KEY: ${{ secrets.STARSYSTEM_RELEASE_KEY }}
         run: >-
           php build/release.php HEAD --out=dist
           --download-base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/"
