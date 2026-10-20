@@ -55,7 +55,8 @@ jobs:
           npm run build
 
       # The feed is signed here, so installs can tell it from a forged one.
-      # The key is only in this step's environment.
+      # The key is only in this step's environment, and the build keeps it
+      # from Composer, which runs the scripts of every dependency.
       - name: Build the release zip
         env:
           STARSYSTEM_RELEASE_KEY: ${{ secrets.STARSYSTEM_RELEASE_KEY }}

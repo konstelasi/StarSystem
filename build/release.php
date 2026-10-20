@@ -11,7 +11,8 @@
 |
 | release.json is signed with the key in STARSYSTEM_RELEASE_KEY (base64 of
 | the 64-byte secret key). Installs refuse an unsigned feed, so without the
-| key the build stops, unless --unsigned asks for a local test build.
+| key the build stops, unless --unsigned asks for a local test build. The
+| key is kept from `composer install`, so no dependency's script can read it.
 |
 | Run `npm run build` first: the zip takes its front-end from public/build.
 */
@@ -38,12 +39,12 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
-$signingKey = trim((string) getenv('STARSYSTEM_RELEASE_KEY'));
+$signingKey = trim((string) getenv(ReleaseBuilder::KEY_ENV));
 
 if ($unsigned) {
     $signingKey = '';
 } elseif ($signingKey === '') {
-    fwrite(STDERR, 'No signing key. Set STARSYSTEM_RELEASE_KEY, or pass --unsigned for a local test build.'.PHP_EOL);
+    fwrite(STDERR, 'No signing key. Set '.ReleaseBuilder::KEY_ENV.', or pass --unsigned for a local test build.'.PHP_EOL);
     exit(1);
 }
 

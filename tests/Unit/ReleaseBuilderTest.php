@@ -171,6 +171,25 @@ class ReleaseBuilderTest extends TestCase
         }
     }
 
+    public function test_the_release_key_is_hidden_from_a_child_process_given_the_child_environment(): void
+    {
+        $name = ReleaseBuilder::KEY_ENV;
+        $show = [PHP_BINARY, '-r', 'echo getenv("'.$name.'") === false ? "hidden" : "visible";'];
+
+        putenv("{$name}=secret");
+        $_SERVER[$name] = 'secret';
+
+        try {
+            // Without the env array the child inherits the key, which shows
+            // the second assertion is not passing for lack of a key to hide.
+            $this->assertSame('visible', (new Process($show))->mustRun()->getOutput());
+            $this->assertSame('hidden', (new Process($show, null, ReleaseBuilder::childEnvironment()))->mustRun()->getOutput());
+        } finally {
+            putenv($name);
+            unset($_SERVER[$name]);
+        }
+    }
+
     public function test_an_unclassified_top_level_entry_stops_the_build(): void
     {
         $repo = self::tempDir();

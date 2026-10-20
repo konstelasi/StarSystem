@@ -27,6 +27,11 @@ final class ReleaseBuilder
     public const ROOT = 'starsystem';
 
     /**
+     * The environment variable that holds the release key's secret half.
+     */
+    public const KEY_ENV = 'STARSYSTEM_RELEASE_KEY';
+
+    /**
      * Tracked top-level entries that a release ships.
      */
     public const SHIP = [
@@ -204,11 +209,25 @@ final class ReleaseBuilder
         }
     }
 
+    /**
+     * What a process started during the build must be given as its env.
+     * Composer runs the install scripts and plugins of every dependency, and
+     * a child process inherits the release key from this one unless told
+     * otherwise. False removes the variable, where null would set it to "".
+     *
+     * @return array<string, false>
+     */
+    public static function childEnvironment(): array
+    {
+        return [self::KEY_ENV => false];
+    }
+
     private function composerInstall(string $app): void
     {
         $process = new Process(
             ['composer', 'install', '--no-dev', '--no-interaction', '--no-progress', '--prefer-dist', '--optimize-autoloader'],
             $app,
+            self::childEnvironment(),
             timeout: 900,
         );
 
