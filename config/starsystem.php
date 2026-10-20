@@ -1,5 +1,7 @@
 <?php
 
+use App\Update\FeedSignature;
+
 return [
 
     /*
@@ -57,10 +59,15 @@ return [
     | with every release. GitHub's "latest" address always serves the newest
     | one. Set it to an empty value to turn update checks off.
     |
+    | A feed is only believed when it is signed with the release key. The
+    | public key is built in. A copy of StarSystem that publishes its own
+    | releases sets its own, and an empty key refuses every feed.
+    |
     */
 
     'updates' => [
         'feed' => env('STARSYSTEM_UPDATE_FEED', 'https://github.com/damarbob/StarSystem/releases/latest/download/release.json'),
+        'public_key' => env('STARSYSTEM_UPDATE_KEY', FeedSignature::PUBLIC_KEY),
     ],
 
 ];

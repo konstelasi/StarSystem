@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\SignsFeeds;
 use Tests\TestCase;
 
 /**
@@ -18,12 +19,15 @@ use Tests\TestCase;
 class UpdateControllerTest extends TestCase
 {
     use RefreshDatabase;
+    use SignsFeeds;
 
     private string $base;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->useReleaseKey();
 
         $this->base = sys_get_temp_dir().'/starsystem-update-ctrl-'.bin2hex(random_bytes(6));
         mkdir($this->base.'/root', 0775, true);
@@ -87,12 +91,12 @@ class UpdateControllerTest extends TestCase
 
     public function test_the_page_shows_the_current_version_and_what_the_feed_offers(): void
     {
-        Http::fake(['https://feed.example/release.json' => Http::response([
+        Http::fake(['https://feed.example/release.json' => Http::response($this->signedFeed([
             'version' => '1.1.0',
             'zip' => 'https://feed.example/starsystem-1.1.0.zip',
             'sha256' => str_repeat('a', 64),
             'published_at' => '2026-02-01T00:00:00Z',
-        ])]);
+        ]))]);
         config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
 
         $this->asConfirmedUser()
@@ -123,13 +127,32 @@ class UpdateControllerTest extends TestCase
             );
     }
 
-    public function test_starting_refuses_a_version_the_feed_no_longer_offers(): void
+    public function test_the_page_refuses_a_feed_that_is_not_signed(): void
     {
         Http::fake(['https://feed.example/release.json' => Http::response([
+            'version' => '1.1.0',
+            'zip' => 'https://feed.example/starsystem-1.1.0.zip',
+            'sha256' => str_repeat('a', 64),
+        ])]);
+        config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
+
+        $this->asConfirmedUser()
+            ->get(route('admin.updates'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('available', false)
+                ->where('latest.release', null)
+                ->where('latest.error', fn (string $error) => str_contains($error, 'signed'))
+            );
+    }
+
+    public function test_starting_refuses_a_version_the_feed_no_longer_offers(): void
+    {
+        Http::fake(['https://feed.example/release.json' => Http::response($this->signedFeed([
             'version' => '1.2.0',
             'zip' => 'https://feed.example/starsystem-1.2.0.zip',
             'sha256' => str_repeat('a', 64),
-        ])]);
+        ]))]);
         config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
 
         $this->asConfirmedUser()
@@ -142,11 +165,11 @@ class UpdateControllerTest extends TestCase
 
     public function test_starting_a_current_release_puts_the_update_in_running_state(): void
     {
-        Http::fake(['https://feed.example/release.json' => Http::response([
+        Http::fake(['https://feed.example/release.json' => Http::response($this->signedFeed([
             'version' => '1.1.0',
             'zip' => 'https://feed.example/starsystem-1.1.0.zip',
             'sha256' => str_repeat('a', 64),
-        ])]);
+        ]))]);
         config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
 
         $this->asConfirmedUser()
@@ -160,11 +183,11 @@ class UpdateControllerTest extends TestCase
 
     public function test_step_advances_a_running_update_and_reports_it_as_json(): void
     {
-        Http::fake(['https://feed.example/release.json' => Http::response([
+        Http::fake(['https://feed.example/release.json' => Http::response($this->signedFeed([
             'version' => '1.1.0',
             'zip' => 'https://feed.example/nowhere.zip',
             'sha256' => str_repeat('a', 64),
-        ])]);
+        ]))]);
         config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
 
         $this->asConfirmedUser()->post(route('admin.updates.start'), ['version' => '1.1.0']);

@@ -12,10 +12,18 @@ use Throwable;
  * The newest published release, from the release.json the release
  * workflow publishes. The answer is cached, so the admin page doesn't
  * reach out on every visit.
+ *
+ * A feed is only believed when its signature checks out against the
+ * release key, because its checksum would otherwise come from the same
+ * place as the zip it vouches for.
  */
 class ReleaseFeed
 {
-    public const CACHE_KEY = 'starsystem.updates.feed';
+    /**
+     * Not the key earlier versions cached under, whose answers were never
+     * checked and so mustn't be read as if they had been.
+     */
+    public const CACHE_KEY = 'starsystem.updates.feed.signed';
 
     public const CACHE_HOURS = 12;
 
@@ -62,14 +70,33 @@ class ReleaseFeed
 
         try {
             $response = Http::timeout(15)->connectTimeout(10)->acceptJson()->get($url)->throw();
+            $feed = $response->json();
 
-            return ['release' => Release::fromFeed($response->json(), $url)->toArray(), 'error' => null, 'checkedAt' => $now];
+            $this->assertSigned($feed);
+
+            return ['release' => Release::fromFeed($feed, $url)->toArray(), 'error' => null, 'checkedAt' => $now];
         } catch (UpdateException $e) {
             return ['release' => null, 'error' => $e->getMessage(), 'checkedAt' => $now];
         } catch (Throwable $e) {
             Log::warning('StarSystem update check failed.', ['exception' => $e]);
 
             return ['release' => null, 'error' => 'StarSystem couldn\'t reach the update feed. Try again later.', 'checkedAt' => $now];
+        }
+    }
+
+    /**
+     * A feed that isn't an array is left for Release::fromFeed to describe.
+     */
+    private function assertSigned(mixed $feed): void
+    {
+        $key = config('starsystem.updates.public_key');
+
+        if (! is_string($key) || $key === '') {
+            throw new UpdateException('This install has no release key, so it can\'t tell a real update feed from a forged one.');
+        }
+
+        if (is_array($feed) && ! FeedSignature::verify($feed, $key)) {
+            throw new UpdateException('The update feed isn\'t signed with StarSystem\'s release key, so it was ignored. Nothing was changed.');
         }
     }
 }
