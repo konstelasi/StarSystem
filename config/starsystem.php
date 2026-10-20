@@ -61,7 +61,8 @@ return [
     |
     | A feed is only believed when it is signed with the release key. The
     | public key is built in. A copy of StarSystem that publishes its own
-    | releases sets its own, and an empty key refuses every feed.
+    | releases changes the built-in key, and an install that follows another
+    | feed sets STARSYSTEM_UPDATE_KEY. An empty key refuses every feed.
     |
     */
 

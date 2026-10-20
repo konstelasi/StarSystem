@@ -47,7 +47,7 @@ DB_PORT=33080 php artisan test  # the same suite against MySQL
 
 `build/release.php` packages one commit into a zip a shared-host owner can upload. The zip holds `vendor/` installed with `--no-dev` and the built front end, and the script writes a `release.json` feed entry with the version, the zip's URL and its checksum. Pushing a `v*` tag that matches `VERSION` builds it and publishes it as a GitHub release through `.github/workflows/release.yml`.
 
-The `release.json` is signed with an Ed25519 key, and an install refuses a feed that isn't, so someone who replaces the feed can't hand it a different zip. The public half of the key is `FeedSignature::PUBLIC_KEY` in `app/Update/FeedSignature.php`. The secret half is the repository secret `STARSYSTEM_RELEASE_KEY`, which the release workflow passes to `build/release.php`, and the build stops without it. `--unsigned` makes a local test build that no install will accept.
+The `release.json` is signed with an Ed25519 key, and an install refuses a feed that isn't, so someone who replaces the feed can't hand it a different zip. The public half of the key is `FeedSignature::PUBLIC_KEY` in `app/Update/FeedSignature.php`. The secret half is the repository secret `STARSYSTEM_RELEASE_KEY`, which the release workflow passes to `build/release.php`, and the build stops without it. The build keeps the secret from `composer install`, so no dependency's script can read it. `--unsigned` makes a local test build that no install will accept.
 
 To make a new key pair, run this from the repository root. It prints the secret and then the public key.
 
@@ -55,4 +55,4 @@ To make a new key pair, run this from the repository root. It prints the secret 
 php -r 'require "vendor/autoload.php"; $k = sodium_crypto_sign_keypair(); echo base64_encode(sodium_crypto_sign_secretkey($k)), PHP_EOL, base64_encode(sodium_crypto_sign_publickey($k)), PHP_EOL;'
 ```
 
-To change the key, publish a release signed with the old key that carries the new public key, then replace the secret. An install that updates to that release checks the next feed with the new key. A copy of StarSystem that publishes its own releases sets `STARSYSTEM_UPDATE_KEY` to its own public key.
+To change the key, publish a release signed with the old key that carries the new public key, then replace the secret. An install that updates to that release checks the next feed with the new key. A copy of StarSystem that publishes its own releases puts its own public key in `FeedSignature::PUBLIC_KEY`, so every release it ships already carries it. An install that follows some other feed sets `STARSYSTEM_UPDATE_FEED` and `STARSYSTEM_UPDATE_KEY` in its `.env`.
