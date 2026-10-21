@@ -4,16 +4,20 @@ import type { LinkLabel } from '@/types/schema';
 
 export type EntryFormContext = {
     /**
-     * How the server named each entry the form links to, by entry id as a
-     * string. Ids the person picks in this session aren't in it.
+     * How the server named each entry the form links to, by relation field
+     * key and then entry id as a string. By field, since two fields linking
+     * to one model can name its entries by different fields. Ids the person
+     * picks in this session aren't in it.
      */
-    links: Ref<Record<string, LinkLabel>>;
+    links: Ref<Record<string, Record<string, LinkLabel>>>;
 };
 
 export const entryFormKey: InjectionKey<EntryFormContext> =
     Symbol('entry-form');
 
-export function provideEntryForm(links: Ref<Record<string, LinkLabel>>) {
+export function provideEntryForm(
+    links: Ref<Record<string, Record<string, LinkLabel>>>,
+) {
     provide(entryFormKey, { links });
 }
 

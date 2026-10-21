@@ -39,8 +39,8 @@ type EntryRow = {
     values: Record<string, unknown>;
     /** Names of the files this row's file columns point at, by uuid. */
     file_names: Record<string, string>;
-    /** How the entries this row's relation columns link to read, by entry id. */
-    links: Record<string, LinkLabel>;
+    /** How the entries this row links to read, by field key, then entry id. */
+    links: Record<string, Record<string, LinkLabel>>;
     created_at: string;
     trashed_at: string | null;
     /** Who made it: a name, a former member, or unknown for an old entry. */
@@ -155,7 +155,7 @@ function entryName(entry: EntryRow): string | null {
 function cell(entry: EntryRow, column: FieldSpecJson): string {
     return cellText(column, entry.values[column.key], {
         files: entry.file_names,
-        links: entry.links,
+        links: entry.links[column.key],
     });
 }
 

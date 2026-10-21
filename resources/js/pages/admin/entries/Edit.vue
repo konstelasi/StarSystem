@@ -26,8 +26,8 @@ const props = defineProps<{
         can_update: boolean;
     };
     values: Record<string, unknown>;
-    /** How the entries this one links to read, by entry id. */
-    links: Record<string, LinkLabel>;
+    /** How the entries this one links to read, by field key, then entry id. */
+    links: Record<string, Record<string, LinkLabel>>;
 }>();
 
 setLayoutProps({

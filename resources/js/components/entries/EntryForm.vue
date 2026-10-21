@@ -21,8 +21,8 @@ const props = withDefaults(
         disabled?: boolean;
         /** Where to add fields, for the message a fieldless model shows. */
         builderHref?: string;
-        /** How the entries this one links to read, by entry id. */
-        links?: Record<string, LinkLabel>;
+        /** How the entries this one links to read, by field key, then entry id. */
+        links?: Record<string, Record<string, LinkLabel>>;
     }>(),
     { links: () => ({}) },
 );

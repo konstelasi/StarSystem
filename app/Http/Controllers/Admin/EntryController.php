@@ -191,7 +191,10 @@ class EntryController extends Controller
                 // Per row rather than per page, so "Load more" brings the
                 // names of the files it appends.
                 'file_names' => (object) Arr::only($fileNames, $this->fileUuids($columns, $entry)),
-                'links' => (object) Arr::only($links, EntryLinks::idsIn($relations, $entry, EntryLinks::PER_CELL)),
+                // By field, since two fields can name one entry differently.
+                'links' => (object) $relations->mapWithKeys(fn (SchemaField $field) => [
+                    $field->key => (object) Arr::only($links[$field->key] ?? [], EntryLinks::idsIn($field, $entry, EntryLinks::PER_CELL)),
+                ])->all(),
                 'created_at' => $entry->createdAt->format(DATE_ATOM),
                 'trashed_at' => $this->entries->trashedAt($entry)?->format(DATE_ATOM),
                 'author' => $this->author($this->entries->createdBy($entry), $authors),
@@ -253,7 +256,10 @@ class EntryController extends Controller
             ],
             'values' => (object) Arr::only($found->fields, $model->fields->pluck('key')->all()),
             // Every linked entry of the form, not just the first few of a cell.
-            'links' => (object) $this->links->labels($model->fields->where('type', 'relation'), [$found], $this->user($request), null),
+            'links' => (object) array_map(
+                fn (array $names) => (object) $names,
+                $this->links->labels($model->fields->where('type', 'relation'), [$found], $this->user($request), null),
+            ),
         ]);
     }
 

@@ -60,15 +60,16 @@ class EntryRelationTest extends TestCase
         $list = $this->actingAs($reader)
             ->get($this->url('admin.models.entries.index', ['model' => $this->posts->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("entries.0.links.{$ada}.label", "Entry {$ada}")
-                ->where("entries.0.links.{$ada}.state", 'hidden')
+                ->where("entries.0.links.author.{$ada}.label", "Entry {$ada}")
+                ->where("entries.0.links.author.{$ada}.state", 'hidden')
             );
 
         $edit = $this->actingAs($reader)
             ->get($this->url('admin.models.entries.edit', ['model' => $this->posts->id, 'entry' => $entryId]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("links.{$ada}.label", "Entry {$ada}")
-                ->where("links.{$ada}.state", 'hidden')
+                ->where("links.author.{$ada}.label", "Entry {$ada}")
+                ->where("links.author.{$ada}.state", 'hidden')
+                ->where("links.tags.{$ada}.state", 'hidden')
             );
 
         // Only the id reaches them, never the name.
@@ -80,8 +81,8 @@ class EntryRelationTest extends TestCase
         $this->actingAs($sighted)
             ->get($this->url('admin.models.entries.edit', ['model' => $this->posts->id, 'entry' => $entryId]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("links.{$ada}.label", 'Ada Lovelace')
-                ->where("links.{$ada}.state", 'ok')
+                ->where("links.author.{$ada}.label", 'Ada Lovelace')
+                ->where("links.author.{$ada}.state", 'ok')
             );
     }
 
@@ -253,8 +254,8 @@ class EntryRelationTest extends TestCase
             ->get($this->url('admin.models.entries.edit', ['model' => $this->posts->id, 'entry' => $entryId]))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('values.tags', $ada)
-                ->where("links.{$ada}.label", 'Ada Lovelace')
-                ->where("links.{$ada}.state", 'ok')
+                ->where("links.tags.{$ada}.label", 'Ada Lovelace')
+                ->where("links.tags.{$ada}.state", 'ok')
             );
 
         // The form sends it back as a list of one.

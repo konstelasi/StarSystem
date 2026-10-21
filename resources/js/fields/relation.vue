@@ -89,7 +89,7 @@ function chipFor(id: number): Chip {
         return { id, label: name, state: 'ok' };
     }
 
-    const known = context?.links.value[String(id)];
+    const known = context?.links.value[props.field.key]?.[String(id)];
 
     return known ? { id, ...known } : { id, label: `Entry ${id}`, state: 'ok' };
 }

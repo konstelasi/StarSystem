@@ -113,22 +113,22 @@ final class EntryLinks
     }
 
     /**
-     * How each linked entry reads, by entry id. Entry ids are one sequence
-     * across models, so one list can name the entries of several.
+     * How each linked entry reads, by relation field key and then entry id.
+     * Each field names its entries by its own naming field, so two fields
+     * that link to one model can name the same entry differently.
      *
-     * A model several fields link to names its entries by the first of
-     * those fields' naming field. An entry of a model $viewer can't view is
-     * not read at all.
+     * A linked model is still read once, for the ids of every field that
+     * links to it. An entry of a model $viewer can't view is not read at all.
      *
      * @param  iterable<SchemaField>  $fields  The relation fields to resolve. Others are skipped.
      * @param  list<Entry>  $rows
      * @param  int|null  $perCell  Most ids to name from each field of a row, or all when null.
-     * @return array<int, array{label: string, state: 'ok'|'trashed'|'missing'|'hidden'}>
+     * @return array<string, array<int, array{label: string, state: 'ok'|'trashed'|'missing'|'hidden'}>>
      */
     public function labels(iterable $fields, array $rows, User $viewer, ?int $perCell = self::PER_CELL): array
     {
+        $byField = [];
         $wanted = [];
-        $namers = [];
 
         foreach ($fields as $field) {
             $link = RelationType::link($field->settings);
@@ -137,41 +137,47 @@ final class EntryLinks
                 continue;
             }
 
-            $namers[$link['model']] ??= $link['label_field'];
+            $ids = [];
 
             foreach ($rows as $row) {
-                foreach (self::idsIn([$field], $row, $perCell) as $id) {
+                foreach (self::idsIn($field, $row, $perCell) as $id) {
+                    $ids[$id] = $id;
                     $wanted[$link['model']][$id] = $id;
                 }
             }
+
+            if ($ids !== []) {
+                $byField[$field->key] = ['model' => $link['model'], 'label_field' => $link['label_field'], 'ids' => array_values($ids)];
+            }
         }
 
-        if ($wanted === []) {
+        if ($byField === []) {
             return [];
         }
 
-        $keys = SchemaField::query()->whereIn('id', array_values(array_filter($namers)))->pluck('key', 'id')->all();
-        $labels = [];
+        $keys = SchemaField::query()->whereIn('id', array_values(array_filter(array_column($byField, 'label_field'))))->pluck('key', 'id')->all();
+
+        // Null for a model $viewer can't view.
+        $found = [];
 
         foreach ($wanted as $modelId => $ids) {
-            $ids = array_values($ids);
+            $found[$modelId] = $this->access->allows($viewer, Ability::ENTRIES_VIEW, $modelId)
+                ? $this->read([$modelId => array_values($ids)])[$modelId]
+                : null;
+        }
 
-            if (! $this->access->allows($viewer, Ability::ENTRIES_VIEW, $modelId)) {
-                foreach ($ids as $id) {
-                    $labels[$id] = ['label' => "Entry {$id}", 'state' => 'hidden'];
-                }
+        $labels = [];
 
-                continue;
-            }
-
-            $found = $this->read([$modelId => $ids])[$modelId];
-            $key = isset($namers[$modelId]) ? ($keys[$namers[$modelId]] ?? null) : null;
+        foreach ($byField as $fieldKey => ['model' => $modelId, 'label_field' => $labelField, 'ids' => $ids]) {
+            $entries = $found[$modelId];
+            $key = $labelField === null ? null : ($keys[$labelField] ?? null);
 
             foreach ($ids as $id) {
-                $labels[$id] = match (true) {
-                    ! isset($found[$id]) => ['label' => 'Deleted entry', 'state' => 'missing'],
-                    $this->entries->isTrashed($found[$id]) => ['label' => self::text($found[$id], $key).' (in trash)', 'state' => 'trashed'],
-                    default => ['label' => self::text($found[$id], $key), 'state' => 'ok'],
+                $labels[$fieldKey][$id] = match (true) {
+                    $entries === null => ['label' => "Entry {$id}", 'state' => 'hidden'],
+                    ! isset($entries[$id]) => ['label' => 'Deleted entry', 'state' => 'missing'],
+                    $this->entries->isTrashed($entries[$id]) => ['label' => self::text($entries[$id], $key).' (in trash)', 'state' => 'trashed'],
+                    default => ['label' => self::text($entries[$id], $key), 'state' => 'ok'],
                 };
             }
         }
@@ -180,27 +186,16 @@ final class EntryLinks
     }
 
     /**
-     * The ids a row holds in these relation fields, at most $perCell from
-     * each, or all of them when null.
+     * The ids a row holds in a relation field, at most $perCell of them, or
+     * all of them when null.
      *
-     * @param  iterable<SchemaField>  $fields  Others than relation fields are skipped.
      * @return list<int>
      */
-    public static function idsIn(iterable $fields, Entry $row, ?int $perCell = null): array
+    public static function idsIn(SchemaField $field, Entry $row, ?int $perCell = null): array
     {
-        $ids = [];
+        $ids = RelationType::ids($row->fields[$field->key] ?? null);
 
-        foreach ($fields as $field) {
-            if ($field->type !== 'relation') {
-                continue;
-            }
-
-            $own = RelationType::ids($row->fields[$field->key] ?? null);
-
-            array_push($ids, ...($perCell === null ? $own : array_slice($own, 0, $perCell)));
-        }
-
-        return array_values(array_unique($ids));
+        return $perCell === null ? $ids : array_slice($ids, 0, $perCell);
     }
 
     /**

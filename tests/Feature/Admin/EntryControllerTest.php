@@ -398,10 +398,12 @@ class EntryControllerTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("entries.0.links.{$ada}.label", 'Ada')
-                ->where("entries.0.links.{$ada}.state", 'ok')
-                ->where("entries.0.links.{$grace}.label", 'Grace')
-                ->has('entries.0.links', 2)
+                ->where("entries.0.links.author.{$ada}.label", 'Ada')
+                ->where("entries.0.links.author.{$ada}.state", 'ok')
+                ->where("entries.0.links.tags.{$ada}.label", 'Ada')
+                ->where("entries.0.links.tags.{$grace}.label", 'Grace')
+                ->has('entries.0.links.author', 1)
+                ->has('entries.0.links.tags', 2)
             );
 
         // A model without relation columns has nothing to name.
@@ -420,8 +422,8 @@ class EntryControllerTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("entries.0.links.{$grace}.label", 'Grace (in trash)')
-                ->where("entries.0.links.{$grace}.state", 'trashed')
+                ->where("entries.0.links.author.{$grace}.label", 'Grace (in trash)')
+                ->where("entries.0.links.author.{$grace}.state", 'trashed')
             );
     }
 
@@ -437,8 +439,8 @@ class EntryControllerTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("entries.0.links.{$grace}.label", 'Deleted entry')
-                ->where("entries.0.links.{$grace}.state", 'missing')
+                ->where("entries.0.links.author.{$grace}.label", 'Deleted entry')
+                ->where("entries.0.links.author.{$grace}.state", 'missing')
             );
     }
 
@@ -453,8 +455,8 @@ class EntryControllerTest extends TestCase
             ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where("entries.0.links.{$ada}.label", 'Deleted entry')
-                ->where("entries.0.links.{$ada}.state", 'missing')
+                ->where("entries.0.links.author.{$ada}.label", 'Deleted entry')
+                ->where("entries.0.links.author.{$ada}.state", 'missing')
             );
     }
 
@@ -467,10 +469,10 @@ class EntryControllerTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
             ->assertInertia(function (Assert $page) use ($ids) {
-                $page->has('entries.0.links', 5)->where('entries.0.values.tags', $ids);
+                $page->has('entries.0.links.tags', 5)->where('entries.0.values.tags', $ids);
 
                 foreach (array_slice($ids, 0, 5) as $id) {
-                    $page->where("entries.0.links.{$id}.state", 'ok');
+                    $page->where("entries.0.links.tags.{$id}.state", 'ok');
                 }
             });
     }
@@ -490,8 +492,8 @@ class EntryControllerTest extends TestCase
         $response = $this->actingAs(User::factory()->create())
             ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("entries.0.links.{$secret}.label", 'Deleted entry')
-                ->where("entries.0.links.{$secret}.state", 'missing')
+                ->where("entries.0.links.author.{$secret}.label", 'Deleted entry')
+                ->where("entries.0.links.author.{$secret}.state", 'missing')
             );
 
         $this->assertStringNotContainsString('Secret', (string) $response->getContent());
@@ -507,12 +509,49 @@ class EntryControllerTest extends TestCase
             ->get($this->url('admin.models.entries.edit', ['model' => $posts->id, 'entry' => $entryId]))
             ->assertInertia(function (Assert $page) use ($ids) {
                 // Every link of the form, not the first few of a cell.
-                $page->has('links', 7)->where('values.author', $ids[0]);
+                $page->where('values.author', $ids[0])
+                    ->has('links.author', 1)
+                    ->where("links.author.{$ids[0]}.label", 'Author 1')
+                    ->has('links.tags', 7);
 
                 foreach ($ids as $position => $id) {
-                    $page->where("links.{$id}.label", 'Author '.($position + 1));
+                    $page->where("links.tags.{$id}.label", 'Author '.($position + 1));
                 }
             });
+    }
+
+    public function test_two_fields_to_one_model_name_entries_by_their_own_field()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        $link = fn (string $key) => ['link' => ['model' => $authors->id, 'label_field' => $this->fieldId($authors, $key)], 'multiple' => false];
+
+        // Both link to Authors. The author is named by the title, the reviewer by the body.
+        $schema = ModelSchema::fromModel($posts);
+        $result = app(SchemaManager::class)->save($posts, $schema->withFields([
+            ...$schema->fields,
+            new FieldSpec((string) Str::uuid(), 'author', 'Author', 'relation', $link('title'), shownInList: true),
+            new FieldSpec((string) Str::uuid(), 'reviewer', 'Reviewer', 'relation', $link('body'), shownInList: true),
+        ]));
+        $this->assertTrue($result->succeeded(), (string) $result->error());
+
+        $ada = app(EntryManager::class)->create($authors, ['title' => 'Ada', 'body' => 'ada@example.com']);
+        $entryId = app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $ada, 'reviewer' => $ada]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("entries.0.links.author.{$ada}.label", 'Ada')
+                ->where("entries.0.links.reviewer.{$ada}.label", 'ada@example.com')
+            );
+
+        $this->actingAs($user)
+            ->get($this->url('admin.models.entries.edit', ['model' => $posts->id, 'entry' => $entryId]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("links.author.{$ada}.label", 'Ada')
+                ->where("links.reviewer.{$ada}.label", 'ada@example.com')
+            );
     }
 
     public function test_lookup_needs_view_on_that_model()
