@@ -4,6 +4,11 @@ namespace Tests\Feature\Admin;
 
 use App\Models\SchemaModel;
 use App\Models\User;
+use App\Schema\FieldSpec;
+use App\Schema\FieldTypes\Core\RelationType;
+use App\Schema\FieldTypes\FieldTypeRegistry;
+use App\Schema\ModelSchema;
+use App\Schema\SaveResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -21,6 +26,7 @@ class ModelControllerTest extends TestCase
         parent::setUp();
 
         config(['starsystem.multisite' => true]);
+        app(FieldTypeRegistry::class)->register(new RelationType);
     }
 
     public function test_guests_are_redirected_to_the_login_page()
@@ -243,5 +249,91 @@ class ModelControllerTest extends TestCase
             ->assertNotFound();
 
         $this->assertSame(SchemaModel::ACTIVE, $model->refresh()->status);
+    }
+
+    public function test_a_model_another_model_links_to_is_not_deleted()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        $this->link($posts, $authors);
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.destroy', ['model' => $authors->id]))
+            ->assertRedirect($this->url('admin.models.index'))
+            ->assertInertiaFlash('toast.type', 'error')
+            ->assertInertiaFlash('toast.message', 'Other models link to this one: Posts through Author. Remove those fields first.');
+
+        $this->assertSame(SchemaModel::ACTIVE, $authors->refresh()->status);
+        $this->assertSame(2, $authors->fields()->count());
+    }
+
+    public function test_the_message_names_at_most_three_links()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        foreach (['author', 'editor', 'reviewer', 'proofreader'] as $key) {
+            $this->link($posts, $authors, $key);
+        }
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.destroy', ['model' => $authors->id]))
+            ->assertInertiaFlash('toast.message', 'Other models link to this one: Posts through Author, Posts through Editor, Posts through Reviewer. Remove those fields first.');
+
+        $this->assertSame(SchemaModel::ACTIVE, $authors->refresh()->status);
+    }
+
+    public function test_a_self_link_does_not_stop_a_delete()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $this->link($authors, $authors, 'mentor');
+
+        $this->actingAs(User::factory()->create())
+            ->delete($this->url('admin.models.destroy', ['model' => $authors->id]))
+            ->assertInertiaFlash('toast.type', 'success');
+
+        $this->assertSame(SchemaModel::DELETING, $authors->refresh()->status);
+
+        $this->drain();
+    }
+
+    public function test_a_model_can_be_deleted_once_the_link_is_removed()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        $this->link($posts, $authors);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->delete($this->url('admin.models.destroy', ['model' => $authors->id]))
+            ->assertInertiaFlash('toast.type', 'error');
+
+        $schema = ModelSchema::fromModel($posts);
+        $result = $this->manager()->save($posts, $schema->withFields(array_values(array_filter($schema->fields, fn (FieldSpec $field) => $field->type !== 'relation'))));
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+
+        $this->actingAs($user)
+            ->delete($this->url('admin.models.destroy', ['model' => $authors->id]))
+            ->assertInertiaFlash('toast.type', 'success');
+
+        $this->assertSame(SchemaModel::DELETING, $authors->refresh()->status);
+
+        $this->drain();
+    }
+
+    /**
+     * Adds a relation field to $from that links to $to, naming its entries
+     * by their title.
+     */
+    private function link(SchemaModel $from, SchemaModel $to, string $key = 'author'): void
+    {
+        $schema = ModelSchema::fromModel($from);
+        $title = (string) $to->fields()->where('key', 'title')->value('id');
+
+        $result = $this->manager()->save($from, $schema->withFields([
+            ...$schema->fields,
+            new FieldSpec((string) Str::uuid(), $key, Str::headline($key), 'relation', ['link' => ['model' => $to->id, 'label_field' => $title]]),
+        ]));
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
     }
 }

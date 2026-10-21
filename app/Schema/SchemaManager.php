@@ -3,8 +3,10 @@
 namespace App\Schema;
 
 use App\Models\SchemaChange;
+use App\Models\SchemaField;
 use App\Models\SchemaModel;
 use App\Models\User;
+use App\Schema\FieldTypes\Core\RelationType;
 use App\Schema\Operations\Operation;
 use App\StarDust\StarDustService;
 use Closure;
@@ -237,10 +239,17 @@ class SchemaManager
      * entries and released the slug.
      *
      * @throws SchemaException when StarDust refuses, e.g. a field is still
-     *                         being renamed
+     *                         being renamed, or when another model's relation
+     *                         field links to this one
      */
     public function deleteModel(SchemaModel $model): void
     {
+        $links = $this->linksTo($model);
+
+        if ($links !== []) {
+            throw new SchemaException(SchemaException::text('Other models link to this one: :list. Remove those fields first.', ['list' => implode(', ', array_slice($links, 0, 3))]));
+        }
+
         if ($model->isDeleting()) {
             throw new SchemaException(SchemaException::text('This model is already being deleted.'));
         }
@@ -310,6 +319,35 @@ class SchemaManager
         $schema = ModelSchema::fromModel($source)->withFreshUuids()->withSlug($slug)->withLabel($label);
 
         return $this->createModel($schema);
+    }
+
+    /**
+     * The relation fields of other models that link to this one, each as
+     * "Posts through Author". A model's link to itself doesn't count, since
+     * it goes with the model.
+     *
+     * @return list<string>
+     */
+    private function linksTo(SchemaModel $model): array
+    {
+        $fields = SchemaField::query()
+            ->where('type', 'relation')
+            ->where('model_id', '!=', $model->id)
+            ->orderBy('model_id')
+            ->orderBy('position')
+            ->orderBy('key')
+            ->get()
+            ->filter(fn (SchemaField $field) => RelationType::link($field->settings)['model'] === $model->id);
+
+        if ($fields->isEmpty()) {
+            return [];
+        }
+
+        $labels = SchemaModel::query()->whereIn('id', $fields->pluck('model_id')->unique())->pluck('label', 'id');
+
+        return array_values($fields
+            ->map(fn (SchemaField $field) => ($labels[$field->model_id] ?? 'Another model')." through {$field->label}")
+            ->all());
     }
 
     private function plan(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null, ?User $by = null): DiffResult
