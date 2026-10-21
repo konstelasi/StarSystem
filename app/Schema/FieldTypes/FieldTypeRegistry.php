@@ -29,11 +29,10 @@ use InvalidArgumentException;
 class FieldTypeRegistry
 {
     /**
-     * Keys held for types that arrive with entries: a relation to another
-     * model's entries, and a repeater of nested fields. Nothing else may
-     * take them in the meantime.
+     * Keys held for a type that arrives later: a repeater of nested fields.
+     * Nothing else may take it in the meantime.
      */
-    public const RESERVED = ['relation', 'repeater'];
+    public const RESERVED = ['repeater'];
 
     /** @var array<string, FieldType> */
     private array $types = [];

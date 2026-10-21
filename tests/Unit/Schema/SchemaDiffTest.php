@@ -260,7 +260,7 @@ class SchemaDiffTest extends TestCase
     public function test_unknown_and_reserved_types_are_refused()
     {
         $this->assertRefused($this->diff($this->current(), $this->change(self::BODY, ['type' => 'hologram'])), self::BODY, 'unknown field type');
-        $this->assertRefused($this->diff($this->current(), $this->change(self::BODY, ['type' => 'relation'])), self::BODY, 'not available yet');
+        $this->assertRefused($this->diff($this->current(), $this->change(self::BODY, ['type' => 'repeater'])), self::BODY, 'not available yet');
     }
 
     public function test_settings_are_checked()

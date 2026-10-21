@@ -3,6 +3,7 @@
 namespace Tests\Unit\Schema;
 
 use App\Hooks\Hook;
+use App\Schema\FieldTypes\Core\RelationType;
 use App\Schema\FieldTypes\Core\TextType;
 use App\Schema\FieldTypes\FieldType;
 use App\Schema\FieldTypes\FieldTypeRegistry;
@@ -21,7 +22,7 @@ class FieldTypesTest extends TestCase
         );
     }
 
-    public function test_relation_and_repeater_are_reserved()
+    public function test_repeater_is_reserved()
     {
         foreach (FieldTypeRegistry::RESERVED as $key) {
             $type = $this->fakeType($key);
@@ -63,7 +64,7 @@ class FieldTypesTest extends TestCase
     public function test_a_type_from_the_filter_is_dropped_instead_of_crashing_on_a_reserved_or_taken_key()
     {
         Hook::addFilter('schema.field_types', function (array $types) {
-            $types['relation'] = $this->fakeType('relation');
+            $types['repeater'] = $this->fakeType('repeater');
             $types['text'] = $this->fakeType('text');
 
             return $types;
@@ -71,7 +72,7 @@ class FieldTypesTest extends TestCase
 
         $registry = $this->registry();
 
-        $this->assertFalse($registry->has('relation'));
+        $this->assertFalse($registry->has('repeater'));
         $this->assertInstanceOf(TextType::class, $registry->get('text'));
     }
 
@@ -238,6 +239,197 @@ class FieldTypesTest extends TestCase
             ['min' => 0, 'max' => 50, 'step' => 1],
             $this->registry()->get('range')->resolveSettings(['max' => 50, 'colour' => 'red']),
         );
+    }
+
+    public function test_a_relation_describes_itself_to_the_builder()
+    {
+        $descriptor = (new RelationType)->toArray();
+
+        $this->assertSame(['relation', 'Relation', 'link-2', 'choice'], [$descriptor['key'], $descriptor['label'], $descriptor['icon'], $descriptor['category']]);
+        $this->assertSame(['link' => 'model_link', 'multiple' => 'boolean'], array_column($descriptor['settings'], 'input', 'key'));
+        $this->assertSame(['model' => null, 'label_field' => null], $descriptor['settings'][0]['default']);
+        $this->assertSame(['declaredType' => 'int', 'canFilter' => true], $descriptor['storage']);
+    }
+
+    public function test_a_relation_stores_a_whole_number_and_only_a_single_link_can_be_filtered()
+    {
+        $type = new RelationType;
+
+        $this->assertSame(['declaredType' => 'int', 'canFilter' => true], $type->storage($type->resolveSettings([])));
+        $this->assertSame(['declaredType' => 'int', 'canFilter' => false], $type->storage($type->resolveSettings(['multiple' => true])));
+    }
+
+    #[DataProvider('relationNormalizeCases')]
+    public function test_a_relation_is_normalized_to_ids(mixed $value, bool $multiple, mixed $expected)
+    {
+        $type = new RelationType;
+
+        $this->assertSame($expected, $type->normalize($value, $type->resolveSettings(['multiple' => $multiple])));
+    }
+
+    /**
+     * @return array<string, array{mixed, bool, mixed}>
+     */
+    public static function relationNormalizeCases(): array
+    {
+        return [
+            'null' => [null, false, null],
+            'empty text' => ['', false, null],
+            'an id' => [12, false, 12],
+            'an id as text' => ['12', false, 12],
+            'not an id' => ['abc', false, null],
+            'zero' => [0, false, null],
+            'a list on a single link keeps the first id' => [[3, 7], false, 3],
+            'nothing on a link to several' => [null, true, null],
+            'an empty list' => [[], true, null],
+            'a list' => [[3, 7], true, [3, 7]],
+            'a list without repeats' => [['3', 7, 3], true, [3, 7]],
+            'a lone id is a list of one' => [12, true, [12]],
+        ];
+    }
+
+    public function test_relation_rules_have_the_agreed_shape()
+    {
+        $type = new RelationType;
+
+        $this->assertSame(['' => ['nullable', 'integer', 'min:1']], $type->rules($type->resolveSettings([]), false));
+        $this->assertSame(['' => ['required', 'integer', 'min:1']], $type->rules($type->resolveSettings([]), true));
+        $this->assertSame(
+            ['' => ['nullable', 'array', 'list', 'max:50'], '.*' => ['integer', 'min:1']],
+            $type->rules($type->resolveSettings(['multiple' => true]), false),
+        );
+    }
+
+    #[DataProvider('relationRuleCases')]
+    public function test_relation_rules(bool $multiple, bool $required, mixed $value, bool $passes)
+    {
+        $type = new RelationType;
+        $rules = [];
+        foreach ($type->rules($type->resolveSettings(['multiple' => $multiple]), $required) as $suffix => $list) {
+            $rules['value'.$suffix] = $list;
+        }
+
+        $validator = validator(['value' => $value], $rules);
+
+        $this->assertSame($passes, $validator->passes(), json_encode($validator->errors()->all()) ?: '');
+    }
+
+    /**
+     * @return array<string, array{bool, bool, mixed, bool}>
+     */
+    public static function relationRuleCases(): array
+    {
+        return [
+            'an id' => [false, false, 5, true],
+            'an id as text' => [false, false, '5', true],
+            'none' => [false, false, null, true],
+            'none when required' => [false, true, null, false],
+            'zero' => [false, false, 0, false],
+            'a word' => [false, false, 'five', false],
+            'a list on a single link' => [false, false, [5], false],
+            'ids' => [true, false, [3, 7], true],
+            'no ids' => [true, false, null, true],
+            'no ids when required' => [true, true, [], false],
+            'a lone id on a link to several' => [true, false, 5, false],
+            'a bad id in a list' => [true, false, [3, 0], false],
+            'fifty ids' => [true, false, range(1, 50), true],
+            'fifty one ids' => [true, false, range(1, 51), false],
+        ];
+    }
+
+    public function test_a_relation_keeps_the_linked_model_as_a_number()
+    {
+        $type = new RelationType;
+        $uuid = '3f0c9a2e-5b1d-4c8e-9a47-6d2e1f0b8c35';
+
+        $this->assertSame(
+            ['link' => ['model' => 7, 'label_field' => $uuid], 'multiple' => false],
+            $type->resolveSettings(['link' => ['model' => '7', 'label_field' => $uuid], 'colour' => 'red']),
+        );
+        $this->assertSame(['link' => ['model' => null, 'label_field' => null], 'multiple' => false], $type->resolveSettings([]));
+        $this->assertSame('posts', $type->resolveSettings(['link' => ['model' => 'posts']])['link']['model']);
+        $this->assertSame('posts', $type->resolveSettings(['link' => 'posts'])['link']);
+    }
+
+    public function test_a_relation_link_is_checked()
+    {
+        $type = new RelationType;
+        $uuid = '3f0c9a2e-5b1d-4c8e-9a47-6d2e1f0b8c35';
+        $message = 'The link must name a model and one of its fields.';
+        $errors = fn (mixed $link) => $type->settingErrors($type->resolveSettings(['link' => $link]));
+
+        $this->assertSame([], $errors(['model' => 7, 'label_field' => $uuid]));
+        $this->assertSame([], $errors(['model' => '7', 'label_field' => $uuid]));
+        $this->assertSame([], $errors(['model' => null, 'label_field' => null]));
+        $this->assertSame([], $errors([]));
+        $this->assertSame([$message], $errors(['model' => 0, 'label_field' => null]));
+        $this->assertSame([$message], $errors(['model' => 'posts', 'label_field' => null]));
+        $this->assertSame([$message], $errors(['model' => 7, 'label_field' => 'title']));
+        $this->assertSame([$message], $errors(['model' => 7, 'label_field' => 12]));
+        $this->assertCount(1, $errors('posts'));
+    }
+
+    public function test_link_reads_raw_or_resolved_settings()
+    {
+        $uuid = '3f0c9a2e-5b1d-4c8e-9a47-6d2e1f0b8c35';
+        $none = ['model' => null, 'label_field' => null];
+
+        $this->assertSame(['model' => 7, 'label_field' => $uuid], RelationType::link(['link' => ['model' => '7', 'label_field' => $uuid]]));
+        $this->assertSame($none, RelationType::link(null));
+        $this->assertSame($none, RelationType::link([]));
+        $this->assertSame($none, RelationType::link(['link' => 'posts']));
+        $this->assertSame($none, RelationType::link(['link' => ['model' => 0, 'label_field' => '']]));
+    }
+
+    public function test_ids_reads_a_stored_or_submitted_value()
+    {
+        $this->assertSame([], RelationType::ids(null));
+        $this->assertSame([], RelationType::ids(''));
+        $this->assertSame([], RelationType::ids([]));
+        $this->assertSame([], RelationType::ids('x'));
+        $this->assertSame([12], RelationType::ids(12));
+        $this->assertSame([12], RelationType::ids('12'));
+        $this->assertSame([3, 7], RelationType::ids([3, '7', 3, 0, -2, 'x', null, 1.5]));
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $settings
+     */
+    #[DataProvider('canLabelCases')]
+    public function test_which_fields_can_name_an_entry(string $type, ?array $settings, bool $can)
+    {
+        $this->assertSame($can, RelationType::canLabel($type, $settings));
+    }
+
+    /**
+     * @return array<string, array{string, array<string, mixed>|null, bool}>
+     */
+    public static function canLabelCases(): array
+    {
+        return [
+            'text' => ['text', [], true],
+            'textarea' => ['textarea', null, true],
+            'email' => ['email', [], true],
+            'url' => ['url', [], true],
+            'hidden' => ['hidden', [], true],
+            'number' => ['number', [], true],
+            'radio' => ['radio', [], true],
+            'single select' => ['select', ['multiple' => false], true],
+            'select without settings' => ['select', null, true],
+            'select with several choices' => ['select', ['multiple' => true], false],
+            'checkboxes' => ['checkboxes', [], false],
+            'rich text' => ['rich_text', [], false],
+            'datetime' => ['datetime', [], false],
+            'file' => ['file', [], false],
+            'relation' => ['relation', [], false],
+        ];
+    }
+
+    public function test_every_type_that_can_name_an_entry_is_a_core_type()
+    {
+        foreach (RelationType::LABEL_TYPES as $key) {
+            $this->assertTrue($this->registry()->has($key), "[{$key}] is not a core field type.");
+        }
     }
 
     private function registry(): FieldTypeRegistry
