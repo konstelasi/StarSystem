@@ -35,7 +35,7 @@ Then open the app in your browser. With no `.env` yet, or one with no `APP_KEY`,
 
 ## Sending mail
 
-Mail is optional. Invitations, password-reset links and email changes use it when it's set up, and a host with no outgoing mail still works. Without it, the invitation dialog shows the link so you can pass it on yourself, and an email change takes effect at once instead of waiting for a confirmation link. StarSystem counts mail as set up once `MAIL_MAILER` is anything other than `log` or `array`.
+Mail is optional. Invitations, password-reset links and email changes use it when it's set up, and a host with no outgoing mail still works. Without it, the invitation dialog shows the link so you can pass it on yourself, and an email change takes effect at once instead of waiting for a confirmation link. StarSystem counts mail as set up once `MAIL_MAILER` is anything other than `log` or `array`. With mail set up, an account whose address was never confirmed has to open a link sent to it before it can use the admin, which only happens to an address changed while mail was off. Without mail nobody is asked to confirm.
 
 Set these in `.env` to send through an SMTP server.
 
