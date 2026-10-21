@@ -39,8 +39,11 @@ class SchemaManager
     /**
      * Creates a model and its fields. Nothing is written when the schema
      * has errors.
+     *
+     * $by is who is creating it. A link to a model they can't view entries
+     * of is an error, and without one that isn't asked.
      */
-    public function createModel(ModelSchema $schema): SaveResult
+    public function createModel(ModelSchema $schema, ?User $by = null): SaveResult
     {
         $this->forgetPurgedModels();
 
@@ -51,7 +54,7 @@ class SchemaManager
             $plan = $plan->withError(null, $taken);
         }
 
-        foreach ($this->relations->errors(null, $schema) as $error) {
+        foreach ($this->relations->errors(null, $schema, $by) as $error) {
             $plan = $plan->withError($error['field_uuid'], $error['message']);
         }
 
@@ -289,28 +292,30 @@ class SchemaManager
 
     /**
      * Creates a model from export JSON. Fields get new UUIDs, because field
-     * ids are global and the source may be this very install.
+     * ids are global and the source may be this very install. $by is who is
+     * importing it, as for createModel().
      *
      * @param  array<array-key, mixed>|string  $json
      *
      * @throws InvalidSchemaException
      */
-    public function import(array|string $json, ?string $slug = null, ?string $label = null): SaveResult
+    public function import(array|string $json, ?string $slug = null, ?string $label = null, ?User $by = null): SaveResult
     {
         $schema = ModelSchema::fromJson($json)->withFreshUuids();
         $schema = $slug === null ? $schema : $schema->withSlug($slug);
         $schema = $label === null ? $schema : $schema->withLabel($label);
 
-        return $this->createModel($schema);
+        return $this->createModel($schema, $by);
     }
 
     /**
      * Copies a model's fields into a new model under a new slug and label.
-     * Fields get new UUIDs, the same as import().
+     * Fields get new UUIDs, the same as import(), and $by is who is copying
+     * it.
      *
      * @throws SchemaException when the source model is being deleted
      */
-    public function duplicate(SchemaModel $source, string $slug, string $label): SaveResult
+    public function duplicate(SchemaModel $source, string $slug, string $label, ?User $by = null): SaveResult
     {
         if ($source->isDeleting()) {
             throw new SchemaException(SchemaException::text('This model is being deleted.'));
@@ -318,7 +323,7 @@ class SchemaManager
 
         $schema = ModelSchema::fromModel($source)->withFreshUuids()->withSlug($slug)->withLabel($label);
 
-        return $this->createModel($schema);
+        return $this->createModel($schema, $by);
     }
 
     /**

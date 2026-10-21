@@ -43,7 +43,7 @@ class ModelTransferController extends Controller
         $data = $request->validated();
 
         try {
-            $result = $this->schema->import((string) $request->file('file')?->get(), $data['slug'] ?? null, $data['label'] ?? null);
+            $result = $this->schema->import((string) $request->file('file')?->get(), $data['slug'] ?? null, $data['label'] ?? null, $request->user());
         } catch (InvalidSchemaException $e) {
             throw ValidationException::withMessages(['file' => $e->getMessage()]);
         }
@@ -62,7 +62,7 @@ class ModelTransferController extends Controller
         $data = $request->validated();
 
         try {
-            $result = $this->schema->duplicate($model, $data['slug'], $data['label']);
+            $result = $this->schema->duplicate($model, $data['slug'], $data['label'], $request->user());
         } catch (SchemaException $e) {
             Inertia::flash('toast', ['type' => 'error', 'message' => $e->getMessage()]);
 

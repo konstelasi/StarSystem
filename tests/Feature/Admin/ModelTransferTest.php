@@ -2,7 +2,11 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Access\Ability;
+use App\Access\SiteAccess;
+use App\Models\Role;
 use App\Models\SchemaModel;
+use App\Models\SiteUser;
 use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\ModelSchema;
@@ -204,6 +208,89 @@ class ModelTransferTest extends TestCase
                 'label' => 'Articles Copy',
             ])
             ->assertNotFound();
+    }
+
+    public function test_an_import_cannot_link_to_a_model_the_importer_cannot_view()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $message = '"Author": your role can\'t view Authors entries, so it can\'t link to them.';
+
+        // May import models, but holds nothing on Authors.
+        $this->actingAs($this->member([Ability::MODELS_IMPORT]))
+            ->post($this->url('admin.models.import'), ['file' => $this->linkingFile($authors)])
+            ->assertSessionHasErrors(['file' => $message]);
+        $this->assertFalse(SchemaModel::where('slug', 'posts')->exists());
+
+        // Someone who can see Authors' entries as well may link to them.
+        $this->actingAs($this->member([Ability::MODELS_IMPORT], ['authors' => [Ability::ENTRIES_VIEW]]))
+            ->post($this->url('admin.models.import'), ['file' => $this->linkingFile($authors)])
+            ->assertSessionHasNoErrors();
+        $this->assertTrue(SchemaModel::where('slug', 'posts')->exists());
+    }
+
+    public function test_a_copy_cannot_link_to_a_model_the_copier_cannot_view()
+    {
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->manager()->createModel(new ModelSchema('posts', 'Posts', fields: [
+            new FieldSpec((string) Str::uuid(), 'author', 'Author', 'relation', $this->linkTo($authors)),
+        ]))->model;
+        $this->assertNotNull($posts);
+        $message = '"Author": your role can\'t view Authors entries, so it can\'t link to them.';
+
+        $this->actingAs($this->member([Ability::MODELS_CREATE]))
+            ->post($this->url('admin.models.duplicate', ['model' => $posts->id]), ['slug' => 'posts_copy', 'label' => 'Posts Copy'])
+            ->assertSessionHasErrors(['slug' => $message]);
+        $this->assertFalse(SchemaModel::where('slug', 'posts_copy')->exists());
+
+        $this->actingAs($this->member([Ability::MODELS_CREATE], ['authors' => [Ability::ENTRIES_VIEW]]))
+            ->post($this->url('admin.models.duplicate', ['model' => $posts->id]), ['slug' => 'posts_copy', 'label' => 'Posts Copy'])
+            ->assertSessionHasNoErrors();
+        $this->assertTrue(SchemaModel::where('slug', 'posts_copy')->exists());
+    }
+
+    /**
+     * A file for a Posts model with a relation to $target.
+     */
+    private function linkingFile(SchemaModel $target): UploadedFile
+    {
+        $schema = (new ModelSchema('posts', 'Posts', fields: [
+            new FieldSpec((string) Str::uuid(), 'author', 'Author', 'relation', $this->linkTo($target)),
+        ]))->toJson();
+
+        return UploadedFile::fake()->createWithContent('schema.json', (string) json_encode($schema));
+    }
+
+    /**
+     * The settings of a relation to $target, naming its entries by its title.
+     *
+     * @return array<string, mixed>
+     */
+    private function linkTo(SchemaModel $target): array
+    {
+        return ['link' => ['model' => $target->id, 'label_field' => (string) $target->fields()->where('key', 'title')->value('id')], 'multiple' => false];
+    }
+
+    /**
+     * A member whose role holds $global for every model and $scoped for the
+     * models named by slug.
+     *
+     * @param  list<string>  $global
+     * @param  array<string, list<string>>  $scoped
+     */
+    private function member(array $global, array $scoped = []): User
+    {
+        static $n = 0;
+        $role = Role::create(['tenant_id' => $this->site->id, 'name' => 'Custom '.++$n]);
+        $role->syncAbilities($global);
+        $role->syncModelAbilities(collect($scoped)->mapWithKeys(fn (array $abilities, string $slug) => [
+            SchemaModel::query()->where('slug', $slug)->value('id') => $abilities,
+        ])->all());
+
+        $user = User::factory()->create();
+        SiteUser::query()->where('user_id', $user->id)->update(['role_id' => $role->id]);
+        app(SiteAccess::class)->forget();
+
+        return $user;
     }
 
     private function schemaFile(string $slug, string $label): UploadedFile
