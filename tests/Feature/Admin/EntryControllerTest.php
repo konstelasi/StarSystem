@@ -7,6 +7,8 @@ use App\Files\FileStore;
 use App\Models\SchemaModel;
 use App\Models\User;
 use App\Schema\FieldSpec;
+use App\Schema\FieldTypes\Core\RelationType;
+use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SchemaManager;
 use App\Sites\CurrentSite;
@@ -33,6 +35,7 @@ class EntryControllerTest extends TestCase
         parent::setUp();
 
         config(['starsystem.multisite' => true]);
+        app(FieldTypeRegistry::class)->register(new RelationType);
     }
 
     /**
@@ -382,6 +385,158 @@ class EntryControllerTest extends TestCase
                 ->where('entries.0.id', $entryId)
                 ->where('entries.0.file_names', [$ours->uuid => 'team-photo.png'])
             );
+    }
+
+    public function test_the_list_names_linked_entries()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $ada = app(EntryManager::class)->create($authors, ['title' => 'Ada']);
+        $grace = app(EntryManager::class)->create($authors, ['title' => 'Grace']);
+        app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $ada, 'tags' => [$ada, $grace]]);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("entries.0.links.{$ada}.label", 'Ada')
+                ->where("entries.0.links.{$ada}.state", 'ok')
+                ->where("entries.0.links.{$grace}.label", 'Grace')
+                ->has('entries.0.links', 2)
+            );
+
+        // A model without relation columns has nothing to name.
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $authors->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('entries.0.links', []));
+    }
+
+    public function test_a_trashed_linked_entry_is_marked()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $grace = app(EntryManager::class)->create($authors, ['title' => 'Grace']);
+        app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $grace]);
+        app(EntryManager::class)->trash($authors, app(EntryManager::class)->get($authors, $grace));
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("entries.0.links.{$grace}.label", 'Grace (in trash)')
+                ->where("entries.0.links.{$grace}.state", 'trashed')
+            );
+    }
+
+    public function test_a_deleted_linked_entry_is_shown_as_deleted()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $grace = app(EntryManager::class)->create($authors, ['title' => 'Grace']);
+        app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $grace]);
+        $entry = app(EntryManager::class)->get($authors, $grace);
+        app(EntryManager::class)->trash($authors, $entry);
+        app(EntryManager::class)->delete($authors, $entry);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("entries.0.links.{$grace}.label", 'Deleted entry')
+                ->where("entries.0.links.{$grace}.state", 'missing')
+            );
+    }
+
+    public function test_links_to_a_model_being_deleted_are_shown_as_deleted()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $ada = app(EntryManager::class)->create($authors, ['title' => 'Ada']);
+        app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $ada]);
+        $authors->update(['status' => SchemaModel::DELETING]);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("entries.0.links.{$ada}.label", 'Deleted entry')
+                ->where("entries.0.links.{$ada}.state", 'missing')
+            );
+    }
+
+    public function test_a_cell_resolves_at_most_five_links()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $ids = array_map(fn (int $n) => app(EntryManager::class)->create($authors, ['title' => "Author {$n}"]), range(1, 7));
+        app(EntryManager::class)->create($posts, ['title' => 'Hello', 'tags' => $ids]);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertInertia(function (Assert $page) use ($ids) {
+                $page->has('entries.0.links', 5)->where('entries.0.values.tags', $ids);
+
+                foreach (array_slice($ids, 0, 5) as $id) {
+                    $page->where("entries.0.links.{$id}.state", 'ok');
+                }
+            });
+    }
+
+    public function test_another_sites_entry_is_never_named()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+        app(CurrentSite::class)->set($other);
+        $theirAuthors = $this->create('authors', 'Authors');
+        $secret = app(EntryManager::class)->create($theirAuthors, ['title' => 'Secret']);
+        app(CurrentSite::class)->set($this->site);
+
+        app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $secret]);
+
+        $response = $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.index', ['model' => $posts->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("entries.0.links.{$secret}.label", 'Deleted entry')
+                ->where("entries.0.links.{$secret}.state", 'missing')
+            );
+
+        $this->assertStringNotContainsString('Secret', (string) $response->getContent());
+    }
+
+    public function test_the_edit_page_names_linked_entries()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $ids = array_map(fn (int $n) => app(EntryManager::class)->create($authors, ['title' => "Author {$n}"]), range(1, 7));
+        $entryId = app(EntryManager::class)->create($posts, ['title' => 'Hello', 'author' => $ids[0], 'tags' => $ids]);
+
+        $this->actingAs(User::factory()->create())
+            ->get($this->url('admin.models.entries.edit', ['model' => $posts->id, 'entry' => $entryId]))
+            ->assertInertia(function (Assert $page) use ($ids) {
+                // Every link of the form, not the first few of a cell.
+                $page->has('links', 7)->where('values.author', $ids[0]);
+
+                foreach ($ids as $position => $id) {
+                    $page->where("links.{$id}.label", 'Author '.($position + 1));
+                }
+            });
+    }
+
+    /**
+     * Authors and Posts, both with a title and a body. A post links to one
+     * author (the list shows it) and to several tags, which are authors too.
+     * Authors are named by their title.
+     *
+     * @return array{SchemaModel, SchemaModel}
+     */
+    private function authorsAndPosts(): array
+    {
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        $title = (string) $authors->fields()->where('key', 'title')->value('id');
+        $link = fn (bool $multiple) => ['link' => ['model' => $authors->id, 'label_field' => $title], 'multiple' => $multiple];
+
+        $schema = ModelSchema::fromModel($posts);
+        $result = app(SchemaManager::class)->save($posts, $schema->withFields([
+            ...$schema->fields,
+            new FieldSpec((string) Str::uuid(), 'author', 'Author', 'relation', $link(false), shownInList: true),
+            new FieldSpec((string) Str::uuid(), 'tags', 'Tags', 'relation', $link(true), shownInList: true),
+        ]));
+        $this->assertTrue($result->succeeded(), (string) $result->error());
+
+        return [$authors, $posts];
     }
 
     /**

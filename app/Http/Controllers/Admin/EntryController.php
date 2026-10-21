@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Access\Ability;
 use App\Access\SiteAccess;
+use App\Entries\EntryLinks;
 use App\Entries\EntryManager;
 use App\Files\File;
 use App\Http\Controllers\Controller;
@@ -11,6 +12,7 @@ use App\Models\SchemaField;
 use App\Models\SchemaModel;
 use App\Models\User;
 use App\Schema\FieldSpec;
+use App\Schema\FieldTypes\Core\RelationType;
 use App\Schema\ModelSchema;
 use App\Schema\SchemaManager;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use StarDust\Exception\InvalidCursorException;
@@ -32,6 +35,7 @@ class EntryController extends Controller
         private readonly EntryManager $entries,
         private readonly SchemaManager $schema,
         private readonly SiteAccess $access,
+        private readonly EntryLinks $links,
     ) {}
 
     public function index(Request $request, SchemaModel $model): Response
@@ -131,6 +135,11 @@ class EntryController extends Controller
         $fileNames = $this->fileNames($columns, $page->rows);
         $authors = $this->authorNames($page->rows);
 
+        // Only the list's own relation columns are named, and only the first
+        // few links of each cell.
+        $relations = $columns->where('type', 'relation');
+        $links = $this->links->labels($relations, $page->rows, $this->user($request));
+
         return Inertia::render('admin/entries/Index', [
             'model' => ['id' => $model->id, 'label' => $model->label],
             'view' => $trashed ? 'trash' : 'active',
@@ -142,6 +151,7 @@ class EntryController extends Controller
                 // Per row rather than per page, so "Load more" brings the
                 // names of the files it appends.
                 'file_names' => (object) Arr::only($fileNames, $this->fileUuids($columns, $entry)),
+                'links' => (object) Arr::only($links, EntryLinks::idsIn($relations, $entry, EntryLinks::PER_CELL)),
                 'created_at' => $entry->createdAt->format(DATE_ATOM),
                 'trashed_at' => $this->entries->trashedAt($entry)?->format(DATE_ATOM),
                 'author' => $this->author($this->entries->createdBy($entry), $authors),
@@ -202,6 +212,8 @@ class EntryController extends Controller
                 'can_update' => $this->access->mayOnEntry($this->user($request), Ability::ENTRIES_UPDATE, $this->entries->createdBy($found), $model->id),
             ],
             'values' => (object) Arr::only($found->fields, $model->fields->pluck('key')->all()),
+            // Every linked entry of the form, not just the first few of a cell.
+            'links' => (object) $this->links->labels($model->fields->where('type', 'relation'), [$found], $this->user($request), null),
         ]);
     }
 
@@ -214,7 +226,7 @@ class EntryController extends Controller
             return $this->restoreFirst($model);
         }
 
-        $this->entries->update($model, $entry, $this->validated($request, $model), $request->user()?->id);
+        $this->entries->update($model, $entry, $this->validated($request, $model, $found), $request->user()?->id);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Entry saved.']);
 
@@ -325,18 +337,73 @@ class EntryController extends Controller
     }
 
     /**
+     * The values to save, checked. $stored is the entry being edited, which
+     * an update replaces whole.
+     *
+     * A link to a model this account can't view is left as it is: whatever
+     * the request says about it is ignored and the stored value stays. A
+     * required one can't be filled in, so a new entry is refused.
+     *
      * @return array<string, mixed>
      */
-    private function validated(Request $request, SchemaModel $model): array
+    private function validated(Request $request, SchemaModel $model, ?Entry $stored = null): array
     {
+        $hidden = $this->links->hiddenKeys($model, $this->user($request));
+
         $rules = [];
         foreach ($this->entries->rulesFor($model) as $key => $fieldRules) {
-            $rules["fields.{$key}"] = $fieldRules;
+            if (! in_array(explode('.', $key)[0], $hidden, true)) {
+                $rules["fields.{$key}"] = $fieldRules;
+            }
         }
 
-        $validated = Validator::make($request->all(), $rules)->validate();
+        $input = $request->all();
+        foreach ($hidden as $key) {
+            Arr::forget($input, "fields.{$key}");
+        }
 
-        return $this->entries->normalizeFields($model, $validated['fields'] ?? []);
+        $validated = Validator::make($input, $rules)->validate();
+        $fields = $this->entries->normalizeFields($model, $validated['fields'] ?? []);
+
+        if ($stored === null) {
+            $this->refuseRequiredHidden($model, $hidden);
+        } else {
+            foreach ($hidden as $key) {
+                if (($stored->fields[$key] ?? null) !== null) {
+                    $fields[$key] = $stored->fields[$key];
+                }
+            }
+        }
+
+        $errors = $this->links->check($model, $fields, $stored);
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $fields;
+    }
+
+    /**
+     * A new entry can't fill in a required link its author can't see the
+     * entries of. An existing one that is already empty stays empty.
+     *
+     * @param  list<string>  $hidden
+     */
+    private function refuseRequiredHidden(SchemaModel $model, array $hidden): void
+    {
+        $messages = [];
+
+        foreach ($model->fields->whereIn('key', $hidden)->where('required', true) as $field) {
+            $target = RelationType::link($field->settings)['model'];
+            $title = $target === null ? null : SchemaModel::query()->find($target)->label ?? null;
+
+            $messages["fields.{$field->key}"] = 'You need View entries on '.($title ?? 'the linked model')." to fill in {$field->label}.";
+        }
+
+        if ($messages !== []) {
+            throw ValidationException::withMessages($messages);
+        }
     }
 
     /**
