@@ -201,6 +201,37 @@ class UpdateControllerTest extends TestCase
             ->assertJsonPath('busy', false);
     }
 
+    public function test_step_reports_how_far_the_download_got(): void
+    {
+        $this->app->instance(Updater::class, new Updater(
+            $this->base.'/root',
+            $this->base.'/work',
+            app(TickPause::class),
+            sliceSeconds: 0.0,
+        ));
+
+        Http::fake([
+            'https://feed.example/release.json' => Http::response($this->signedFeed([
+                'version' => '1.1.0',
+                'zip' => 'https://feed.example/starsystem-1.1.0.zip',
+                'sha256' => hash('sha256', 'abcdef'),
+            ])),
+            'https://feed.example/starsystem-1.1.0.zip' => Http::response('ab', 206, ['Content-Range' => 'bytes 0-1/6']),
+        ]);
+        config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
+
+        $this->asConfirmedUser()->post(route('admin.updates.start'), ['version' => '1.1.0']);
+
+        $user = User::factory()->installOwner()->create();
+
+        $this->actingAs($user)
+            ->post(route('admin.updates.step'))
+            ->assertOk()
+            ->assertJsonPath('state.step', 'download')
+            ->assertJsonPath('state.downloaded', 2)
+            ->assertJsonPath('state.download_size', 6);
+    }
+
     private function asConfirmedUser(): static
     {
         $this->actingAs(User::factory()->installOwner()->create());

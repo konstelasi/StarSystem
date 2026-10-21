@@ -108,7 +108,7 @@ class UpdateController extends Controller
     private function present(?array $state): ?array
     {
         return $state === null ? null : [
-            ...Arr::only($state, ['status', 'mode', 'step', 'from', 'waiting', 'error', 'failed_step', 'rollback_error', 'started_at', 'finished_at']),
+            ...Arr::only($state, ['status', 'mode', 'step', 'from', 'waiting', 'downloaded', 'download_size', 'error', 'failed_step', 'rollback_error', 'started_at', 'finished_at']),
             'to' => $state['to']['version'] ?? null,
         ];
     }

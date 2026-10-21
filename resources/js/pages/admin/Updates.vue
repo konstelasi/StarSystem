@@ -26,6 +26,8 @@ type UpdateState = {
     from: string;
     to: string | null;
     waiting: string | null;
+    downloaded?: number | null;
+    download_size?: number | null;
     error: string | null;
     failed_step: string | null;
     rollback_error: string | null;
@@ -153,6 +155,7 @@ onMounted(() => {
 });
 
 const formatTime = (iso: string) => new Date(iso).toLocaleString();
+const megabytes = (bytes: number) => (bytes / 1048576).toFixed(1);
 const updateError = computed(
     () => (page.props.errors as Record<string, string>).update,
 );
@@ -266,6 +269,29 @@ const updateError = computed(
                             >
                                 Waiting for background work that's already
                                 running to finish.
+                            </p>
+                            <p
+                                v-if="
+                                    name === 'download' &&
+                                    stepStatus(name) === 'current' &&
+                                    state.download_size
+                                "
+                                class="text-muted-foreground"
+                            >
+                                Downloaded
+                                {{ megabytes(state.downloaded ?? 0) }} of
+                                {{ megabytes(state.download_size) }} MB.
+                            </p>
+                            <p
+                                v-if="
+                                    name === 'download' &&
+                                    stepStatus(name) === 'current' &&
+                                    state.waiting === 'download'
+                                "
+                                class="text-muted-foreground"
+                            >
+                                The download was interrupted, so StarSystem is
+                                trying again.
                             </p>
                         </div>
                     </li>
