@@ -322,6 +322,27 @@ class UpdaterTest extends TestCase
         $this->assertFileDoesNotExist("{$this->work}/release.zip.part");
     }
 
+    public function test_a_zip_changed_after_download_is_not_unpacked(): void
+    {
+        Http::fake(['https://example.com/starsystem-1.1.0.zip' => Http::response($this->releaseZip('1.1.0'))]);
+
+        $updater = $this->updater();
+        $updater->start($this->release('1.1.0'));
+        $updater->step();
+
+        $this->assertSame('extract', $updater->state()['step']);
+        file_put_contents("{$this->work}/release.zip", $this->releaseZip('1.2.0'));
+
+        $updater->step();
+
+        $final = $updater->state();
+        $this->assertSame('failed', $final['status']);
+        $this->assertSame('extract', $final['failed_step']);
+        $this->assertStringContainsString('changed on disk', $final['error']);
+        $this->assertDirectoryDoesNotExist("{$this->work}/staging");
+        $this->assertSame("1.0.0\n", file_get_contents("{$this->root}/VERSION"));
+    }
+
     private function drive(Updater $updater, int $max = 50): void
     {
         for ($i = 0; $i < $max; $i++) {

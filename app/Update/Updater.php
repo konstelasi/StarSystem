@@ -441,6 +441,12 @@ class Updater
      */
     private function extract(array &$state): bool
     {
+        // The zip waits on disk between requests, so check it is still the
+        // release the download verified before unpacking more of it.
+        if (! hash_equals((string) $state['to']['sha256'], (string) @hash_file('sha256', $this->zipPath()))) {
+            throw new UpdateException('The downloaded release changed on disk before it was unpacked. Nothing was changed.');
+        }
+
         $package = new ReleasePackage($this->zipPath());
         $staging = $this->work.'/staging';
 
