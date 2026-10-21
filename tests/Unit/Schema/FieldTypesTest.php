@@ -17,7 +17,7 @@ class FieldTypesTest extends TestCase
     public function test_the_core_types_are_registered_in_palette_order()
     {
         $this->assertSame(
-            ['text', 'textarea', 'rich_text', 'email', 'url', 'number', 'range', 'select', 'radio', 'checkbox', 'checkboxes', 'datetime', 'file', 'color', 'code', 'hidden'],
+            ['text', 'textarea', 'rich_text', 'email', 'url', 'number', 'range', 'select', 'radio', 'checkbox', 'checkboxes', 'datetime', 'file', 'relation', 'color', 'code', 'hidden'],
             array_keys($this->registry()->all()),
         );
     }

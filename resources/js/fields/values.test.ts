@@ -1,5 +1,5 @@
 import { expect, test } from 'vite-plus/test';
-import { formValue } from '@/fields/values';
+import { formValue, initialValue } from '@/fields/values';
 import type { FieldSpecJson } from '@/types/schema';
 
 function field(
@@ -41,6 +41,23 @@ test('a stored date-only value keeps just the date', () => {
 test('a missing value starts empty, as in a new entry', () => {
     expect(formValue(field('text'), undefined)).toBe('');
     expect(formValue(field('checkboxes'), null)).toEqual([]);
+});
+
+test('a relation starts empty as one id or a list, by its setting', () => {
+    expect(initialValue(field('relation'))).toBeNull();
+    expect(initialValue(field('relation', { multiple: true }))).toEqual([]);
+    expect(formValue(field('relation'), null)).toBeNull();
+    expect(formValue(field('relation', { multiple: true }), undefined)).toEqual(
+        [],
+    );
+});
+
+test('a lone id becomes a list once a relation allows several', () => {
+    expect(formValue(field('relation', { multiple: true }), 12)).toEqual([12]);
+    expect(formValue(field('relation', { multiple: true }), [3, 7])).toEqual([
+        3, 7,
+    ]);
+    expect(formValue(field('relation'), 12)).toBe(12);
 });
 
 test('other values pass through unchanged', () => {

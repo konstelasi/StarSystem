@@ -11,8 +11,6 @@ use App\Models\SchemaModel;
 use App\Models\SiteUser;
 use App\Models\User;
 use App\Schema\FieldSpec;
-use App\Schema\FieldTypes\Core\RelationType;
-use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SchemaManager;
 use App\Sites\CurrentSite;
@@ -39,7 +37,6 @@ class EntryControllerTest extends TestCase
         parent::setUp();
 
         config(['starsystem.multisite' => true]);
-        app(FieldTypeRegistry::class)->register(new RelationType);
     }
 
     /**

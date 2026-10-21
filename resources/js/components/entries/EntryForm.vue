@@ -1,25 +1,35 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { computed, nextTick, ref, watch } from 'vue';
+import { provideEntryForm } from '@/components/entries/entryFormContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { rendererFor } from '@/fields';
 import { errorsPerSlot, firstError } from '@/lib/entryErrors';
 import { blockName, slotName } from '@/lib/modelSchema';
-import type { FieldSpecJson, ModelSchemaJson } from '@/types/schema';
+import type { FieldSpecJson, LinkLabel, ModelSchemaJson } from '@/types/schema';
 
 /**
  * The real form editors fill in for an entry: the same field renderers the
  * builder's preview uses, keyed by the field's key (not its uuid) since
  * that's the name StarDust stores the value under.
  */
-const props = defineProps<{
-    schema: ModelSchemaJson;
-    values: Record<string, unknown>;
-    errors: Record<string, string>;
-    disabled?: boolean;
-    /** Where to add fields, for the message a fieldless model shows. */
-    builderHref?: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        schema: ModelSchemaJson;
+        values: Record<string, unknown>;
+        errors: Record<string, string>;
+        disabled?: boolean;
+        /** Where to add fields, for the message a fieldless model shows. */
+        builderHref?: string;
+        /** How the entries this one links to read, by entry id. */
+        links?: Record<string, LinkLabel>;
+    }>(),
+    { links: () => ({}) },
+);
+
+// Tells relation fields they sit in a real form, and what to call the
+// entries they link to.
+provideEntryForm(computed(() => props.links));
 
 const emit = defineEmits<{ 'update:values': [key: string, value: unknown] }>();
 

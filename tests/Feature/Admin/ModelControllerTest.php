@@ -5,8 +5,6 @@ namespace Tests\Feature\Admin;
 use App\Models\SchemaModel;
 use App\Models\User;
 use App\Schema\FieldSpec;
-use App\Schema\FieldTypes\Core\RelationType;
-use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,7 +24,6 @@ class ModelControllerTest extends TestCase
         parent::setUp();
 
         config(['starsystem.multisite' => true]);
-        app(FieldTypeRegistry::class)->register(new RelationType);
     }
 
     public function test_guests_are_redirected_to_the_login_page()

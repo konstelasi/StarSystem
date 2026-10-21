@@ -14,6 +14,7 @@ use App\Schema\FieldTypes\Core\HiddenType;
 use App\Schema\FieldTypes\Core\NumberType;
 use App\Schema\FieldTypes\Core\RadioType;
 use App\Schema\FieldTypes\Core\RangeType;
+use App\Schema\FieldTypes\Core\RelationType;
 use App\Schema\FieldTypes\Core\RichTextType;
 use App\Schema\FieldTypes\Core\SelectType;
 use App\Schema\FieldTypes\Core\TextareaType;
@@ -46,7 +47,7 @@ class FieldTypeRegistry
             new NumberType, new RangeType,
             new SelectType, new RadioType, new CheckboxType, new CheckboxesType,
             new DatetimeType,
-            new FileType,
+            new FileType, new RelationType,
             new ColorType, new CodeType, new HiddenType,
         ] as $type) {
             $registry->register($type);

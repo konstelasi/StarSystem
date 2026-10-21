@@ -9,8 +9,6 @@ use App\Models\SchemaModel;
 use App\Models\SiteUser;
 use App\Models\User;
 use App\Schema\FieldSpec;
-use App\Schema\FieldTypes\Core\RelationType;
-use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
 use App\Schema\SchemaManager;
@@ -38,7 +36,7 @@ class ModelBuilderTest extends TestCase
 
     private const CORE_TYPES = [
         'text', 'email', 'url', 'color', 'hidden', 'radio', 'select', 'number',
-        'range', 'checkbox', 'datetime', 'textarea', 'rich_text', 'code', 'checkboxes', 'file',
+        'range', 'checkbox', 'datetime', 'textarea', 'rich_text', 'code', 'checkboxes', 'file', 'relation',
     ];
 
     private const TITLE = '10000000-0000-4000-8000-000000000001';
@@ -464,7 +462,6 @@ class ModelBuilderTest extends TestCase
 
     public function test_a_link_to_a_model_the_saver_cannot_view_is_refused()
     {
-        app(FieldTypeRegistry::class)->register(new RelationType);
         $authors = $this->create('authors', 'Authors');
         $posts = $this->create('posts', 'Posts');
         $schema = app(SchemaManager::class)->export($posts);
@@ -497,7 +494,6 @@ class ModelBuilderTest extends TestCase
 
     public function test_a_link_the_saver_cannot_view_does_not_block_other_changes()
     {
-        app(FieldTypeRegistry::class)->register(new RelationType);
         $authors = $this->create('authors', 'Authors');
         $posts = $this->create('posts', 'Posts');
         $schema = app(SchemaManager::class)->export($posts);

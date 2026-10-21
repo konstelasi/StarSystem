@@ -11,6 +11,7 @@ import NumberField from '@/fields/number.vue';
 import UnknownField from '@/fields/parts/UnknownField.vue';
 import RadioField from '@/fields/radio.vue';
 import RangeField from '@/fields/range.vue';
+import RelationField from '@/fields/relation.vue';
 import RichTextField from '@/fields/rich_text.vue';
 import SelectField from '@/fields/select.vue';
 import TextField from '@/fields/text.vue';
@@ -42,6 +43,7 @@ export const fieldRenderers: Record<string, Component> = {
     code: CodeField,
     checkboxes: CheckboxesField,
     file: FileField,
+    relation: RelationField,
 };
 
 export function rendererFor(type: string): Component {

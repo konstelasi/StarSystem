@@ -4,7 +4,7 @@ A content management system built on [StarDust](https://github.com/damarbob/star
 
 ## What's here
 
-Content starts in the **model builder**, a drag-and-drop admin page where you define a model and its fields. You can add, rename, retype, promote and demote fields, and before anything is saved you see what the save will do to existing entries. Sixteen field types ship with StarSystem (text, rich text, number, date, file and more), and modules can add their own.
+Content starts in the **model builder**, a drag-and-drop admin page where you define a model and its fields. You can add, rename, retype, promote and demote fields, and before anything is saved you see what the save will do to existing entries. Seventeen field types ship with StarSystem (text, rich text, number, date, file, relation and more), and modules can add their own.
 
 Each model then gets its **entries**, the content itself. Editors create and edit them in a form built from the model's fields, and the list pages through them newest first. Deleting an entry moves it to the model's trash, where it can be restored or deleted for good. Anything left in the trash for 30 days is deleted on its own, and `STARSYSTEM_ENTRY_TRASH_DAYS` changes that.
 

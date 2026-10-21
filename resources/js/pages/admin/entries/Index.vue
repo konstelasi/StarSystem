@@ -32,13 +32,15 @@ import {
     trash,
 } from '@/routes/admin/models/entries';
 import { store as moveToTrash } from '@/routes/admin/models/entries/trash';
-import type { FieldSpecJson } from '@/types/schema';
+import type { FieldSpecJson, LinkLabel } from '@/types/schema';
 
 type EntryRow = {
     id: number;
     values: Record<string, unknown>;
     /** Names of the files this row's file columns point at, by uuid. */
     file_names: Record<string, string>;
+    /** How the entries this row's relation columns link to read, by entry id. */
+    links: Record<string, LinkLabel>;
     created_at: string;
     trashed_at: string | null;
     /** Who made it: a name, a former member, or unknown for an old entry. */
@@ -151,7 +153,10 @@ function entryName(entry: EntryRow): string | null {
 }
 
 function cell(entry: EntryRow, column: FieldSpecJson): string {
-    return cellText(column, entry.values[column.key], entry.file_names);
+    return cellText(column, entry.values[column.key], {
+        files: entry.file_names,
+        links: entry.links,
+    });
 }
 
 /** Whether a cell has no value, so the list can show it muted. */

@@ -36,7 +36,7 @@ class BuilderContractTest extends TestCase
             $this->assertIsList($type['settings']);
             foreach ($type['settings'] as $setting) {
                 $this->assertKeys(['key', 'label', 'input', 'default'], ['help', 'choices'], $setting);
-                $this->assertContains($setting['input'], ['text', 'number', 'boolean', 'select', 'options_source', 'string_list']);
+                $this->assertContains($setting['input'], ['text', 'number', 'boolean', 'select', 'options_source', 'string_list', 'model_link']);
 
                 if (isset($setting['help'])) {
                     $this->assertIsString($setting['help']);
@@ -72,6 +72,7 @@ class BuilderContractTest extends TestCase
             'code' => ['language' => 'select'],
             'checkboxes' => ['options' => 'options_source'],
             'file' => ['multiple' => 'boolean', 'accept' => 'string_list'],
+            'relation' => ['link' => 'model_link', 'multiple' => 'boolean'],
         ];
 
         $actual = [];

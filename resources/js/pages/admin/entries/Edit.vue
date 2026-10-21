@@ -10,7 +10,7 @@ import { useAbilities } from '@/composables/useAbilities';
 import { useEntryForm } from '@/composables/useEntryForm';
 import { builder, index as models } from '@/routes/admin/models';
 import { edit, index, update } from '@/routes/admin/models/entries';
-import type { ModelSchemaJson } from '@/types/schema';
+import type { LinkLabel, ModelSchemaJson } from '@/types/schema';
 
 const props = defineProps<{
     model: { id: number; label: string };
@@ -26,6 +26,8 @@ const props = defineProps<{
         can_update: boolean;
     };
     values: Record<string, unknown>;
+    /** How the entries this one links to read, by entry id. */
+    links: Record<string, LinkLabel>;
 }>();
 
 setLayoutProps({
@@ -82,6 +84,7 @@ const description = (() => {
             :schema="schema"
             :values="values"
             :errors="errors"
+            :links="links"
             :disabled="processing || !canUpdate"
             :builder-href="
                 can('models.update', model.id)

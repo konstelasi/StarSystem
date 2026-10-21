@@ -9,7 +9,6 @@ use App\Models\SchemaModel;
 use App\Models\Site;
 use App\Schema\FieldSpec;
 use App\Schema\FieldTypes\Core\RelationType;
-use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
 use App\Schema\SchemaException;
@@ -52,13 +51,6 @@ class SchemaManagerTest extends TestCase
     private const HEADLINE = '10000000-0000-4000-8000-00000000000a';
 
     private const RATING = '10000000-0000-4000-8000-00000000000b';
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        app(FieldTypeRegistry::class)->register(new RelationType);
-    }
 
     public function test_creating_a_model_registers_every_field_with_stardust()
     {
