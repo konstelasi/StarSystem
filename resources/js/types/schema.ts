@@ -30,7 +30,8 @@ export type SettingDescriptor = {
         | 'boolean'
         | 'select'
         | 'options_source'
-        | 'string_list';
+        | 'string_list'
+        | 'model_link';
     default: unknown;
     choices?: { value: string; label: string }[];
 };
@@ -38,6 +39,16 @@ export type OptionsSource =
     | { kind: 'static'; options: { value: string; label: string }[] }
     | { kind: 'model'; model: string; label_field: string }
     | { kind: 'hook'; name: string };
+
+// A relation field's `link` setting: the model it links to, as ss_models.id,
+// and the field of that model (ss_fields.id) that names its entries
+export type ModelLink = { model: number | null; label_field: string | null };
+
+// How the entry pages name a linked entry: EntryLinks::labels()
+export type LinkLabel = {
+    label: string;
+    state: 'ok' | 'trashed' | 'missing' | 'hidden';
+};
 
 // Model schema: ModelSchema::toJson(), also the JSON tab and the export format
 export type ModelSchemaJson = {
@@ -63,6 +74,17 @@ export type FieldSpecJson = {
     shown_in_list: boolean;
     layout_slot: string | null; // LayoutBlock slot id, or null = top level
     settings: Record<string, unknown>;
+};
+
+// A model a relation field can link to, with the fields that could name its
+// entries: the builder's `models` prop
+export type BuilderModel = {
+    id: number;
+    label: string;
+    fields: Pick<
+        FieldSpecJson,
+        'uuid' | 'key' | 'label' | 'type' | 'settings'
+    >[];
 };
 
 // Busy state per field, for badges: SchemaManager::states()

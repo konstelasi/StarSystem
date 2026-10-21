@@ -24,6 +24,7 @@ import type { FieldStates } from '@/lib/modelSchema';
 import { builder as builderPage, index } from '@/routes/admin/models';
 import { retry as retryRoute } from '@/routes/admin/models/builder';
 import type {
+    BuilderModel,
     FieldTypeDescriptor,
     ModelSchemaJson,
     SavePreview,
@@ -35,6 +36,7 @@ const props = defineProps<{
     schema: ModelSchemaJson;
     states: FieldStates;
     otherSlugs: string[];
+    models: BuilderModel[];
     preview?: SavePreview | null;
     /** Set while a save that stopped partway blocks saving this model. */
     unfinished: { error: string } | null;
@@ -94,6 +96,7 @@ provideBuilder({
     modelId: props.model.id,
     rev,
     otherSlugs: props.otherSlugs,
+    models: props.models,
 });
 
 const tab = ref('build');

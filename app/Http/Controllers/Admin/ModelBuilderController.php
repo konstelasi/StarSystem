@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Access\Ability;
+use App\Access\SiteAccess;
 use App\Http\Controllers\Controller;
+use App\Models\SchemaField;
 use App\Models\SchemaModel;
+use App\Models\User;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\InvalidSchemaException;
 use App\Schema\ModelSchema;
@@ -23,13 +27,14 @@ class ModelBuilderController extends Controller
     public function __construct(
         private readonly SchemaManager $schema,
         private readonly FieldTypeRegistry $fieldTypes,
+        private readonly SiteAccess $access,
     ) {}
 
     /**
      * A stale tab or the back button pointing at a model that has since
      * been deleted is a normal case, not an error page.
      */
-    public function show(SchemaModel $model): Response|RedirectResponse
+    public function show(Request $request, SchemaModel $model): Response|RedirectResponse
     {
         if ($model->isDeleting()) {
             Inertia::flash('toast', ['type' => 'error', 'message' => SchemaException::text('This model is being deleted.')]);
@@ -44,6 +49,7 @@ class ModelBuilderController extends Controller
             'schema' => fn () => $this->schema->export($model),
             'states' => fn () => $this->schema->states($model),
             'otherSlugs' => fn () => SchemaModel::query()->whereKeyNot($model->id)->pluck('slug'),
+            'models' => fn () => $this->linkableModels($this->user($request), $model),
             'unfinished' => fn () => $this->unfinished($model),
         ]);
     }
@@ -101,6 +107,44 @@ class ModelBuilderController extends Controller
         }
 
         return to_route('admin.models.builder', $model);
+    }
+
+    /**
+     * The models a relation field here can link to, by label: this one, and
+     * every other model that isn't being deleted and whose entries $user may
+     * view. Each carries its saved fields, from which the builder offers the
+     * ones that can name an entry.
+     *
+     * @return list<array{id: int, label: string, fields: list<array{uuid: string, key: string, label: string, type: string, settings: object}>}>
+     */
+    private function linkableModels(User $user, SchemaModel $current): array
+    {
+        $models = SchemaModel::query()
+            ->with('fields')
+            ->where('status', SchemaModel::ACTIVE)
+            ->orderBy('label')
+            ->get()
+            ->filter(fn (SchemaModel $model) => $model->is($current) || $this->access->allows($user, Ability::ENTRIES_VIEW, $model->id));
+
+        return array_values($models->map(fn (SchemaModel $model) => [
+            'id' => $model->id,
+            'label' => $model->label,
+            'fields' => array_values($model->fields->map(fn (SchemaField $field) => [
+                'uuid' => $field->id,
+                'key' => $field->key,
+                'label' => $field->label,
+                'type' => $field->type,
+                'settings' => (object) ($field->settings ?? []),
+            ])->all()),
+        ])->all());
+    }
+
+    private function user(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
     }
 
     /**

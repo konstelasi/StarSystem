@@ -3,6 +3,7 @@ import type {
     FieldState,
     FieldTypeDescriptor,
     LayoutBlock,
+    ModelLink,
     ModelSchemaJson,
 } from '@/types/schema';
 
@@ -168,6 +169,69 @@ export function settingDefaults(
     }
 
     return settings;
+}
+
+/**
+ * Field types whose value can name an entry in a list or a picker. Mirrors
+ * RelationType::LABEL_TYPES in PHP, so change both together.
+ */
+export const LABEL_TYPES = [
+    'text',
+    'textarea',
+    'email',
+    'url',
+    'hidden',
+    'number',
+    'radio',
+    'select',
+];
+
+type Nameable = Pick<FieldSpecJson, 'type' | 'settings'>;
+
+/** Whether a field can name an entry. A select only can with one choice. */
+export function canLabel(field: Nameable): boolean {
+    return (
+        LABEL_TYPES.includes(field.type) &&
+        !(field.type === 'select' && field.settings.multiple)
+    );
+}
+
+/** The fields of a model to offer as the one that names its entries. */
+export function labelFieldChoices<T extends Nameable>(fields: T[]): T[] {
+    return fields.filter(canLabel);
+}
+
+/** The uuid of the first field that can name entries, or null when none can. */
+export function defaultLabelField(
+    fields: (Nameable & Pick<FieldSpecJson, 'uuid'>)[],
+): string | null {
+    return labelFieldChoices(fields)[0]?.uuid ?? null;
+}
+
+/**
+ * A relation's `link` setting as a ModelLink. A value half way through an
+ * edit, or one stored by hand, reads as nothing chosen yet.
+ */
+export function toModelLink(value: unknown): ModelLink {
+    const raw: Record<string, unknown> =
+        typeof value === 'object' && value !== null && !Array.isArray(value)
+            ? (value as Record<string, unknown>)
+            : {};
+    const model =
+        typeof raw.model === 'string' && /^\d+$/.test(raw.model)
+            ? Number(raw.model)
+            : raw.model;
+
+    return {
+        model:
+            typeof model === 'number' && Number.isInteger(model) && model > 0
+                ? model
+                : null,
+        label_field:
+            typeof raw.label_field === 'string' && raw.label_field !== ''
+                ? raw.label_field
+                : null,
+    };
 }
 
 const BLOCK_KIND_LABELS: Record<LayoutBlock['kind'], string> = {

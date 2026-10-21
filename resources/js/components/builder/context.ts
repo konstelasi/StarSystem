@@ -2,7 +2,7 @@ import { inject, provide } from 'vue';
 import type { InjectionKey, Ref } from 'vue';
 import type { ModelBuilder } from '@/composables/useModelBuilder';
 import type { FieldStates } from '@/lib/modelSchema';
-import type { FieldState } from '@/types/schema';
+import type { BuilderModel, FieldState } from '@/types/schema';
 
 export type BuilderContext = {
     builder: ModelBuilder;
@@ -22,6 +22,11 @@ export type BuilderContext = {
     rev: Ref<number>;
     /** Every other model's address name, for checking a rename is free. */
     otherSlugs: string[];
+    /**
+     * The models a relation field can link to, which are the ones this person
+     * may view entries of, and this one. Each lists its saved fields.
+     */
+    models: BuilderModel[];
 };
 
 const key: InjectionKey<BuilderContext> = Symbol('model-builder');

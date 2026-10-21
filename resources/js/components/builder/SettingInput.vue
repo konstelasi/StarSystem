@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import ModelLinkEditor from '@/components/builder/ModelLinkEditor.vue';
 import OptionsSourceEditor from '@/components/builder/OptionsSourceEditor.vue';
 import StringListEditor from '@/components/builder/StringListEditor.vue';
 import { Input } from '@/components/ui/input';
@@ -109,6 +110,13 @@ function onNumber(raw: string | number) {
             :id="id"
             :model-value="asStringList(modelValue)"
             :described-by="helpId"
+            @update:model-value="emit('update:modelValue', $event)"
+        />
+
+        <ModelLinkEditor
+            v-else-if="setting.input === 'model_link'"
+            :id="id"
+            :model-value="modelValue"
             @update:model-value="emit('update:modelValue', $event)"
         />
 

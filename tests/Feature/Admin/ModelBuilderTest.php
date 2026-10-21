@@ -518,6 +518,36 @@ class ModelBuilderTest extends TestCase
         $this->assertSame('Stories', $posts->refresh()->label);
     }
 
+    public function test_the_builder_lists_models_the_person_can_view()
+    {
+        $posts = $this->create('posts', 'Posts');
+        $authors = $this->create('authors', 'Authors');
+        $this->create('secrets', 'Secrets');
+        $this->create('old', 'Old')->update(['status' => SchemaModel::DELETING]);
+
+        // May change Posts, and view the entries of Authors and of Old, which is
+        // being deleted. Secrets they can't view.
+        $builder = $this->member([], ['posts' => [Ability::MODELS_UPDATE], 'authors' => [Ability::ENTRIES_VIEW], 'old' => [Ability::ENTRIES_VIEW]]);
+
+        $this->actingAs($builder)
+            ->get($this->url('admin.models.builder', ['model' => $posts->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('models', 2)
+                ->where('models.0.id', $authors->id)
+                ->where('models.0.label', 'Authors')
+                ->has('models.0.fields', 2)
+                ->has('models.0.fields.0', fn (Assert $field) => $field
+                    ->where('key', 'title')
+                    ->where('type', 'text')
+                    ->hasAll(['uuid', 'label', 'settings'])
+                )
+                // This model is listed whether or not they can view its
+                // entries, with its own fields.
+                ->where('models.1.id', $posts->id)
+                ->has('models.1.fields', 2)
+            );
+    }
+
     /**
      * A member whose role holds $global for every model and $scoped for the
      * models named by slug.
