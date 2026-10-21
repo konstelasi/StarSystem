@@ -12,7 +12,6 @@ use App\Mail\EmailChangeNotice;
 use App\Mail\MailSetup;
 use App\Models\User;
 use App\Sites\CurrentSite;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -36,7 +35,6 @@ class ProfileController extends Controller
     public function edit(Request $request): Response
     {
         return Inertia::render('settings/Profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             // The address a change is waiting on, until its link is opened.
             'pendingEmail' => $request->user()->pending_email,
