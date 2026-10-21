@@ -16,6 +16,7 @@ Route::middleware(['auth', 'site.member', 'verified'])
         Route::get('create', [EntryController::class, 'create'])->middleware($onModel(Ability::ENTRIES_CREATE))->name('create')->whereNumber('model');
         Route::post('/', [EntryController::class, 'store'])->middleware($onModel(Ability::ENTRIES_CREATE))->name('store')->whereNumber('model');
         Route::get('trash', [EntryController::class, 'trash'])->middleware($onModel(Ability::ENTRIES_VIEW))->name('trash')->whereNumber('model');
+        Route::get('lookup', [EntryController::class, 'lookup'])->middleware($onModel(Ability::ENTRIES_VIEW))->name('lookup')->whereNumber('model');
         Route::get('{entry}', [EntryController::class, 'edit'])->middleware($onModel(Ability::ENTRIES_VIEW))->name('edit')->whereNumber(['model', 'entry']);
         Route::put('{entry}', [EntryController::class, 'update'])->middleware($onModel(Ability::ENTRIES_UPDATE))->name('update')->whereNumber(['model', 'entry']);
         Route::delete('{entry}', [EntryController::class, 'destroy'])->middleware($onModel(Ability::ENTRIES_DELETE))->name('destroy')->whereNumber(['model', 'entry']);

@@ -15,6 +15,7 @@ use App\Schema\FieldSpec;
 use App\Schema\FieldTypes\Core\RelationType;
 use App\Schema\ModelSchema;
 use App\Schema\SchemaManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -46,6 +47,45 @@ class EntryController extends Controller
     public function trash(Request $request, SchemaModel $model): Response
     {
         return $this->listing($request, $model, trashed: true);
+    }
+
+    /**
+     * One page of this model's active entries for a relation field's picker,
+     * each named by the field `label` (a field id of this model). `q` narrows
+     * them by the start of that name when `searchable` is true. A model being
+     * deleted has nothing to pick from.
+     */
+    public function lookup(Request $request, SchemaModel $model): JsonResponse
+    {
+        abort_if($model->isDeleting(), 404);
+
+        $input = $request->validate([
+            'label' => ['required', 'string'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'cursor' => ['nullable', 'string'],
+        ]);
+
+        $labelField = $model->fields->first(fn (SchemaField $field) => $field->id === $input['label']
+            && RelationType::canLabel($field->type, $field->settings));
+
+        if ($labelField === null) {
+            throw ValidationException::withMessages(['label' => 'Choose a field of this model that can name its entries.']);
+        }
+
+        try {
+            ['page' => $page, 'searchable' => $searchable] = $this->entries->lookup($model, $labelField, $input['q'] ?? null, $input['cursor'] ?? null);
+        } catch (InvalidCursorException) {
+            abort(404);
+        }
+
+        return response()->json([
+            'data' => array_map(fn (Entry $entry) => [
+                'id' => $entry->id,
+                'label' => EntryLinks::text($entry, $labelField->key),
+            ], $page->rows),
+            'nextCursor' => $page->nextCursor?->opaque,
+            'searchable' => $searchable,
+        ]);
     }
 
     /**

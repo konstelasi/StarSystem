@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Access\Ability;
+use App\Access\SiteAccess;
 use App\Entries\EntryManager;
 use App\Files\FileStore;
+use App\Models\Role;
 use App\Models\SchemaModel;
+use App\Models\SiteUser;
 use App\Models\User;
 use App\Schema\FieldSpec;
 use App\Schema\FieldTypes\Core\RelationType;
@@ -514,6 +518,124 @@ class EntryControllerTest extends TestCase
             });
     }
 
+    public function test_lookup_needs_view_on_that_model()
+    {
+        [$authors] = $this->authorsAndPosts();
+        app(EntryManager::class)->create($authors, ['title' => 'Ada']);
+
+        $blind = $this->member([], ['posts' => [Ability::ENTRIES_VIEW]]);
+        $this->actingAs($blind)->getJson($this->lookupUrl($authors))->assertForbidden();
+
+        $sighted = $this->member([], ['authors' => [Ability::ENTRIES_VIEW]]);
+        $this->actingAs($sighted)->getJson($this->lookupUrl($authors))
+            ->assertOk()
+            ->assertJsonPath('data.0.label', 'Ada')
+            ->assertJsonPath('nextCursor', null);
+    }
+
+    public function test_lookup_of_another_sites_model_is_not_found()
+    {
+        [$authors] = $this->authorsAndPosts();
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+
+        $this->actingAs(User::factory()->create())
+            ->getJson($this->url('admin.models.entries.lookup', ['model' => $authors->id, 'label' => $this->fieldId($authors, 'title')], $other))
+            ->assertNotFound();
+    }
+
+    public function test_lookup_of_a_model_being_deleted_is_not_found()
+    {
+        [$authors] = $this->authorsAndPosts();
+        $authors->update(['status' => SchemaModel::DELETING]);
+
+        $this->actingAs(User::factory()->create())->getJson($this->lookupUrl($authors))->assertNotFound();
+    }
+
+    public function test_lookup_searches_by_prefix_once_indexed()
+    {
+        [$authors] = $this->authorsAndPosts();
+        $ada = app(EntryManager::class)->create($authors, ['title' => 'Ada']);
+        $adele = app(EntryManager::class)->create($authors, ['title' => 'Adele']);
+        app(EntryManager::class)->create($authors, ['title' => 'Grace']);
+        $this->makeFilterable($authors, 'title');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->getJson($this->lookupUrl($authors, 'Ad'))
+            ->assertOk()
+            ->assertJsonPath('searchable', true)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0', ['id' => $adele, 'label' => 'Adele'])
+            ->assertJsonPath('data.1', ['id' => $ada, 'label' => 'Ada']);
+
+        // The start of a name only, and a wildcard is just a character.
+        $this->actingAs($user)->getJson($this->lookupUrl($authors, 'ele'))->assertJsonCount(0, 'data');
+        $this->actingAs($user)->getJson($this->lookupUrl($authors, '%'))->assertJsonCount(0, 'data');
+
+        // Without a search it lists everything, newest first.
+        $this->actingAs($user)->getJson($this->lookupUrl($authors))->assertJsonCount(3, 'data')->assertJsonPath('data.0.label', 'Grace');
+    }
+
+    public function test_lookup_says_when_it_cannot_search()
+    {
+        [$authors] = $this->authorsAndPosts();
+        app(EntryManager::class)->create($authors, ['title' => 'Ada']);
+        app(EntryManager::class)->create($authors, ['title' => 'Grace']);
+
+        // The title isn't filterable, so the search text changes nothing.
+        $this->actingAs(User::factory()->create())->getJson($this->lookupUrl($authors, 'Ad'))
+            ->assertOk()
+            ->assertJsonPath('searchable', false)
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_lookup_leaves_out_trashed_entries()
+    {
+        [$authors] = $this->authorsAndPosts();
+        $ada = app(EntryManager::class)->create($authors, ['title' => 'Ada']);
+        $grace = app(EntryManager::class)->create($authors, ['title' => 'Grace']);
+        app(EntryManager::class)->trash($authors, app(EntryManager::class)->get($authors, $grace));
+        $user = User::factory()->create();
+
+        // Before the trash field is indexed the list is cut down in PHP.
+        $this->actingAs($user)->getJson($this->lookupUrl($authors))
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ada);
+
+        $this->drain();
+
+        $this->actingAs($user)->getJson($this->lookupUrl($authors))
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ada);
+    }
+
+    public function test_lookup_refuses_a_field_that_cannot_name_entries()
+    {
+        [$authors, $posts] = $this->authorsAndPosts();
+        $user = User::factory()->create();
+
+        // A relation can't name entries, another model's field isn't this one's, and the label is required.
+        foreach ([$this->fieldId($posts, 'author'), $this->fieldId($posts, 'title'), (string) Str::uuid()] as $label) {
+            $this->actingAs($user)
+                ->getJson($this->url('admin.models.entries.lookup', ['model' => $authors->id, 'label' => $label]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('label');
+        }
+
+        $this->actingAs($user)
+            ->getJson($this->url('admin.models.entries.lookup', ['model' => $authors->id]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('label');
+    }
+
+    public function test_lookup_cursor_stardust_did_not_issue_is_not_found()
+    {
+        [$authors] = $this->authorsAndPosts();
+
+        $this->actingAs(User::factory()->create())
+            ->getJson($this->url('admin.models.entries.lookup', ['model' => $authors->id, 'label' => $this->fieldId($authors, 'title'), 'cursor' => 'not-a-cursor']))
+            ->assertNotFound();
+    }
+
     /**
      * Authors and Posts, both with a title and a body. A post links to one
      * author (the list shows it) and to several tags, which are authors too.
@@ -537,6 +659,63 @@ class EntryControllerTest extends TestCase
         $this->assertTrue($result->succeeded(), (string) $result->error());
 
         return [$authors, $posts];
+    }
+
+    /**
+     * The lookup of a model's entries, named by its title.
+     */
+    private function lookupUrl(SchemaModel $model, ?string $q = null): string
+    {
+        return $this->url('admin.models.entries.lookup', array_filter([
+            'model' => $model->id,
+            'label' => $this->fieldId($model, 'title'),
+            'q' => $q,
+        ]));
+    }
+
+    private function fieldId(SchemaModel $model, string $key): string
+    {
+        return (string) $model->fields()->where('key', $key)->value('id');
+    }
+
+    /**
+     * Saves the model with that field filterable and lets StarDust index it.
+     */
+    private function makeFilterable(SchemaModel $model, string $key): void
+    {
+        $schema = ModelSchema::fromModel($model);
+        $result = app(SchemaManager::class)->save($model, $schema->withFields(array_map(
+            fn (FieldSpec $spec) => $spec->key === $key
+                ? new FieldSpec($spec->uuid, $spec->key, $spec->label, $spec->type, $spec->settings, $spec->helper, $spec->required, true, $spec->shownInList, $spec->layoutSlot)
+                : $spec,
+            $schema->fields,
+        )));
+        $this->assertTrue($result->succeeded(), (string) $result->error());
+
+        $this->drain();
+    }
+
+    /**
+     * A member whose role holds $global for every model and $scoped for the
+     * models named by slug.
+     *
+     * @param  list<string>  $global
+     * @param  array<string, list<string>>  $scoped
+     */
+    private function member(array $global, array $scoped = []): User
+    {
+        static $n = 0;
+        $role = Role::create(['tenant_id' => $this->site->id, 'name' => 'Custom '.++$n]);
+        $role->syncAbilities($global);
+        $role->syncModelAbilities(collect($scoped)->mapWithKeys(fn (array $abilities, string $slug) => [
+            SchemaModel::query()->where('slug', $slug)->value('id') => $abilities,
+        ])->all());
+
+        $user = User::factory()->create();
+        SiteUser::query()->where('user_id', $user->id)->update(['role_id' => $role->id]);
+        app(SiteAccess::class)->forget();
+
+        return $user;
     }
 
     /**

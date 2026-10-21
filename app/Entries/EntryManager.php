@@ -2,6 +2,7 @@
 
 namespace App\Entries;
 
+use App\Models\SchemaField;
 use App\Models\SchemaModel;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\StarDust\StarDustService;
@@ -198,10 +199,11 @@ class EntryManager
      * then the page is read without that filter and the rows it would have
      * removed are dropped here, so a page can come back short; the cursor
      * still moves on correctly. $createdBy asks for one person's entries.
+     * $match is one more filter the caller already knows StarDust can run.
      *
      * @throws InvalidCursorException when $cursor isn't one StarDust issued
      */
-    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false, ?int $createdBy = null): EntryPage
+    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false, ?int $createdBy = null, ?LeafNode $match = null): EntryPage
     {
         $indexed = $this->trashIndexed($model);
         $authorIndexed = $createdBy === null || $this->createdByIndexed($model);
@@ -209,6 +211,7 @@ class EntryManager
         $filters = array_values(array_filter([
             $indexed ? LeafNode::local(self::TRASH_FIELD, $trashed ? 'gt' : 'eq', 0) : null,
             $createdBy !== null && $authorIndexed ? LeafNode::local(self::CREATED_BY_FIELD, 'eq', $createdBy) : null,
+            $match,
         ]));
 
         $page = $this->stardust->listEntries(
@@ -234,6 +237,27 @@ class EntryManager
             $page->nextCursor,
             $page->pageSize,
         );
+    }
+
+    /**
+     * One page of the model's active entries for a relation field to pick
+     * from, newest first. $q narrows it to the entries whose $labelField
+     * starts with it, which StarDust can do only for text it has indexed, so
+     * `searchable` says whether $q was used at all.
+     *
+     * @return array{page: EntryPage, searchable: bool}
+     *
+     * @throws InvalidCursorException when $cursor isn't one StarDust issued
+     */
+    public function lookup(SchemaModel $model, SchemaField $labelField, ?string $q, ?string $cursor): array
+    {
+        $described = $this->stardust->describeModel($model->stardust_model_id)?->field($labelField->key);
+        $searchable = $described !== null && $described->declaredType === 'string' && $described->isIndexed;
+
+        $q = trim((string) $q);
+        $match = $searchable && $q !== '' ? LeafNode::local($labelField->key, 'prefix', $q) : null;
+
+        return ['page' => $this->page($model, $cursor, match: $match), 'searchable' => $searchable];
     }
 
     /**
