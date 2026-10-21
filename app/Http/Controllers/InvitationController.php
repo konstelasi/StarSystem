@@ -7,6 +7,7 @@ use App\Access\SiteAccess;
 use App\Activity\ActivityAction;
 use App\Activity\ActivityLog;
 use App\Concerns\PasswordValidationRules;
+use App\Mail\MailSetup;
 use App\Models\SiteInvite;
 use App\Models\SiteUser;
 use App\Models\User;
@@ -68,6 +69,8 @@ class InvitationController extends Controller
             // unverified: that account never confirmed its email. other:
             // signed in as someone else, who must sign out first.
             'mode' => $this->mode($account, $user, $invite),
+            // Whether an unconfirmed account can be sent a link to confirm itself.
+            'canConfirm' => MailSetup::configured(),
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]);
     }

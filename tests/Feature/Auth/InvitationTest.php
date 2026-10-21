@@ -249,6 +249,17 @@ class InvitationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_with_working_mail_an_unconfirmed_account_is_offered_the_confirm_page()
+    {
+        config(['mail.default' => 'smtp']);
+        $unverified = $this->notMember(User::factory()->unverified()->create(['email' => 'ana@example.com']));
+        $this->invite();
+
+        $this->actingAs($unverified)
+            ->get(route('invitations.show', self::TOKEN))
+            ->assertInertia(fn (Assert $page) => $page->where('mode', 'unverified')->where('canConfirm', true));
+    }
+
     public function test_an_account_that_never_confirmed_the_email_cannot_take_up_the_invitation()
     {
         $unverified = $this->notMember(User::factory()->unverified()->create(['email' => 'ana@example.com']));
@@ -256,7 +267,7 @@ class InvitationTest extends TestCase
 
         $this->actingAs($unverified)
             ->get(route('invitations.show', self::TOKEN))
-            ->assertInertia(fn (Assert $page) => $page->where('mode', 'unverified'));
+            ->assertInertia(fn (Assert $page) => $page->where('mode', 'unverified')->where('canConfirm', false));
 
         $this->actingAs($unverified)->post(route('invitations.accept', self::TOKEN))->assertForbidden();
 

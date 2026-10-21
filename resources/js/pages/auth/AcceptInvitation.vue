@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { logout } from '@/routes';
 import { accept } from '@/routes/invitations';
+import { notice } from '@/routes/verification';
 
 const props = defineProps<{
     token: string;
@@ -18,6 +19,8 @@ const props = defineProps<{
     invitedBy: string | null;
     /** new: make an account. join: signed in as the invited email. unverified: that account never confirmed its email. other: signed in as someone else. */
     mode: 'new' | 'join' | 'unverified' | 'other';
+    /** Mail works, so an unconfirmed account can be sent a link. */
+    canConfirm: boolean;
     passwordRules: string;
 }>();
 
@@ -102,6 +105,18 @@ setLayoutProps({
                 Join {{ siteName }}
             </Button>
         </Form>
+
+        <div v-else-if="mode === 'unverified' && canConfirm" class="grid gap-4">
+            <p class="text-center text-sm">
+                This account never confirmed {{ email }}. Confirm it first, then
+                open your invitation again.
+            </p>
+            <Button as-child class="w-full">
+                <Link :href="notice()" data-test="confirm-email-link">
+                    Confirm {{ email }}
+                </Link>
+            </Button>
+        </div>
 
         <p v-else-if="mode === 'unverified'" class="text-center text-sm">
             This account never confirmed {{ email }}, so it cannot take up the
