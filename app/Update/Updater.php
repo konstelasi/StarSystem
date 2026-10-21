@@ -7,6 +7,7 @@ use App\StarDust\StarDustService;
 use App\StarDust\TickPause;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
@@ -46,11 +47,23 @@ class Updater
      */
     public const MIN_FREE_BYTES = 250 * 1024 * 1024;
 
+    /**
+     * Bytes asked for per Range request. At the 20 second limit each request
+     * gets, that needs about 200 KB/s.
+     */
+    public const DOWNLOAD_CHUNK = 4 * 1024 * 1024;
+
+    /**
+     * Slice failures in a row that may pass before the update gives up.
+     */
+    public const DOWNLOAD_ATTEMPTS = 3;
+
     public function __construct(
         private readonly string $root,
         private readonly string $work,
         private readonly TickPause $pause,
         private readonly float $sliceSeconds = 10.0,
+        private readonly int $chunkBytes = self::DOWNLOAD_CHUNK,
     ) {}
 
     public function currentVersion(): string
@@ -103,6 +116,9 @@ class Updater
                 'from' => $current,
                 'to' => $release->toArray(),
                 'extracted' => 0,
+                'downloaded' => 0,
+                'download_size' => null,
+                'download_failures' => 0,
                 'units' => [],
                 'added' => [],
                 'batch' => null,
@@ -253,10 +269,19 @@ class Updater
     }
 
     /**
+     * Fetch the release in slices of $chunkBytes with HTTP Range requests,
+     * each appended to release.zip.part once it has fully arrived. The part
+     * file only ever holds the start of the release, so a step the host cut
+     * short loses at most one slice, and the next step carries on from the
+     * file's size. Each request gets 20 seconds, and a step stops asking for
+     * more once $sliceSeconds have passed, so a step usually ends well inside
+     * the 60 seconds some hosts allow.
+     *
      * @param  array<string, mixed>  $state
      */
-    private function download(array $state): bool
+    private function download(array &$state): bool
     {
+        $state['waiting'] = null;
         $release = Release::fromArray($state['to']);
         $zip = $this->zipPath();
 
@@ -264,25 +289,93 @@ class Updater
             return true;
         }
 
-        $free = @disk_free_space($this->work);
+        $part = $zip.'.part';
+        $chunk = $zip.'.chunk';
+        $have = self::fileSize($part);
 
-        if ($free !== false && $free < self::MIN_FREE_BYTES) {
-            throw new UpdateException(sprintf(
-                'There isn\'t enough free disk space to update: %d MB free, %d MB needed.',
-                $free / 1048576, self::MIN_FREE_BYTES / 1048576,
-            ));
+        if ($have === 0) {
+            $free = @disk_free_space($this->work);
+
+            if ($free !== false && $free < self::MIN_FREE_BYTES) {
+                throw new UpdateException(sprintf(
+                    'There isn\'t enough free disk space to update: %d MB free, %d MB needed.',
+                    $free / 1048576, self::MIN_FREE_BYTES / 1048576,
+                ));
+            }
         }
 
-        $part = $zip.'.part';
-        @unlink($part);
+        $size = isset($state['download_size']) ? (int) $state['download_size'] : null;
+        $deadline = microtime(true) + $this->sliceSeconds;
 
         try {
-            Http::timeout(600)->connectTimeout(15)->sink($part)->get($release->zip)->throw();
-        } catch (Throwable $e) {
-            @unlink($part);
+            for ($first = true; $size === null || $have < $size; $first = false) {
+                if (! $first && microtime(true) >= $deadline) {
+                    $state['downloaded'] = $have;
 
-            throw new UpdateException('Couldn\'t download the new version: '.$e->getMessage());
+                    return false;
+                }
+
+                try {
+                    $response = Http::timeout(20)->connectTimeout(15)
+                        ->withHeaders(['Range' => 'bytes='.$have.'-'.($have + $this->chunkBytes - 1)])
+                        ->sink($chunk)
+                        ->get($release->zip);
+                } catch (ConnectionException $e) {
+                    return $this->downloadLater($state, $have, $e->getMessage());
+                } catch (Throwable $e) {
+                    throw new UpdateException('Couldn\'t download the new version: '.$e->getMessage());
+                }
+
+                if ($response->serverError()) {
+                    return $this->downloadLater($state, $have, "the server answered {$response->status()}.");
+                }
+
+                // The part already holds the whole release: a step was cut
+                // after its last slice, before it could save the size.
+                if ($response->status() === 416 && $have > 0 && $size === null) {
+                    break;
+                }
+
+                // A server that ignores Range sends the whole release.
+                if ($response->status() === 200) {
+                    rename($chunk, $part);
+                    $have = self::fileSize($part);
+
+                    break;
+                }
+
+                if ($response->status() !== 206) {
+                    throw new UpdateException("Couldn't download the new version: the server answered {$response->status()}.");
+                }
+
+                $length = self::fileSize($chunk);
+
+                if (preg_match('#^bytes (\d+)-(\d+)/(\d+)$#', $response->header('Content-Range'), $range) !== 1
+                    || (int) $range[1] !== $have
+                    || $length === 0
+                    || $length !== (int) $range[2] - (int) $range[1] + 1
+                    || (int) $range[2] >= (int) $range[3]
+                    || ($size !== null && (int) $range[3] !== $size)) {
+                    throw new UpdateException('The download server sent a different part of the release than StarSystem asked for. Nothing was changed.');
+                }
+
+                $this->append($chunk, $part);
+                $have = self::fileSize($part);
+
+                // A short write, such as a full disk, would leave the next
+                // slice landing in the wrong place.
+                if ($have !== (int) $range[2] + 1) {
+                    throw new UpdateException('Couldn\'t save the download on this server.');
+                }
+
+                $size = $state['download_size'] = (int) $range[3];
+                $state['download_failures'] = 0;
+            }
+        } finally {
+            @unlink($chunk);
         }
+
+        $state['downloaded'] = $have;
 
         if (! hash_equals($release->sha256, (string) hash_file('sha256', $part))) {
             @unlink($part);
@@ -293,6 +386,54 @@ class Updater
         rename($part, $zip);
 
         return true;
+    }
+
+    /**
+     * Leave a slice that failed for a reason that may pass, such as a dropped
+     * connection or a busy server, to the next step, until it has failed
+     * DOWNLOAD_ATTEMPTS times in a row.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function downloadLater(array &$state, int $have, string $reason): bool
+    {
+        $state['download_failures'] = (int) ($state['download_failures'] ?? 0) + 1;
+        $state['downloaded'] = $have;
+
+        if ($state['download_failures'] >= self::DOWNLOAD_ATTEMPTS) {
+            throw new UpdateException('Couldn\'t download the new version: '.$reason);
+        }
+
+        $state['waiting'] = 'download';
+
+        return false;
+    }
+
+    private function append(string $from, string $to): void
+    {
+        $in = @fopen($from, 'rb');
+        $out = @fopen($to, 'ab');
+
+        try {
+            if ($in === false || $out === false || stream_copy_to_stream($in, $out) === false) {
+                throw new UpdateException('Couldn\'t save the download on this server.');
+            }
+        } finally {
+            if (is_resource($in)) {
+                fclose($in);
+            }
+
+            if (is_resource($out)) {
+                fclose($out);
+            }
+        }
+    }
+
+    private static function fileSize(string $path): int
+    {
+        clearstatcache(true, $path);
+
+        return is_file($path) ? (int) filesize($path) : 0;
     }
 
     /**
@@ -482,7 +623,7 @@ class Updater
      */
     private function cleanUp(bool $keepBackup = false): void
     {
-        foreach (['release.zip', 'release.zip.part', 'staging', 'discard', ...($keepBackup ? [] : ['backup'])] as $entry) {
+        foreach (['release.zip', 'release.zip.part', 'release.zip.chunk', 'staging', 'discard', ...($keepBackup ? [] : ['backup'])] as $entry) {
             Files::remove($this->work.'/'.$entry);
         }
     }

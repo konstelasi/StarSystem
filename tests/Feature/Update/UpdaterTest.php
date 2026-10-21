@@ -6,7 +6,9 @@ use App\StarDust\TickPause;
 use App\Update\Release;
 use App\Update\UpdateException;
 use App\Update\Updater;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -20,8 +22,8 @@ use ZipArchive;
  * bootstrap() that in production only runs after the new code has taken
  * over instead runs against this test's own, already-loaded app. That
  * still exercises the state machine, the file swap and the rollback
- * faithfully; it just can't prove the new PHP code itself would have run,
- * which is why the plan for this stream calls for no host trials.
+ * faithfully; it just can't prove the new PHP code itself would have run.
+ * Only an update on a real host shows that.
  */
 class UpdaterTest extends TestCase
 {
@@ -32,6 +34,13 @@ class UpdaterTest extends TestCase
     private string $root;
 
     private string $work;
+
+    /**
+     * The Range header of each request slice() answered.
+     *
+     * @var list<string|null>
+     */
+    private array $asked = [];
 
     protected function setUp(): void
     {
@@ -170,6 +179,149 @@ class UpdaterTest extends TestCase
         $updater->start($this->release('1.2.0'));
     }
 
+    public function test_the_download_comes_in_slices_across_steps(): void
+    {
+        $zip = $this->releaseZip('1.1.0');
+        Http::fake(fn (Request $request) => $this->slice($request, $zip));
+
+        $updater = $this->updater(slice: 0.0, chunk: 256);
+        $updater->start($this->release('1.1.0'));
+        $updater->step();
+
+        $state = $updater->state();
+        $this->assertSame('download', $state['step']);
+        $this->assertSame(256, $state['downloaded']);
+        $this->assertSame(strlen($zip), $state['download_size']);
+        $this->assertSame(256, filesize("{$this->work}/release.zip.part"));
+
+        $this->drive($updater);
+
+        $this->assertSame('done', $updater->state()['status']);
+
+        $expected = [];
+
+        for ($from = 0; $from < strlen($zip); $from += 256) {
+            $expected[] = "bytes={$from}-".($from + 255);
+        }
+
+        $this->assertSame($expected, $this->asked);
+    }
+
+    public function test_a_step_cut_short_carries_on_from_the_part_file(): void
+    {
+        $zip = $this->releaseZip('1.1.0');
+        Http::fake(fn (Request $request) => $this->slice($request, $zip));
+
+        $updater = $this->updater(chunk: 256);
+        $updater->start($this->release('1.1.0'));
+
+        // What a request the host cut short leaves behind.
+        $this->write($this->work, 'release.zip.part', substr($zip, 0, 300));
+
+        $this->drive($updater);
+
+        $this->assertSame('done', $updater->state()['status']);
+        $this->assertSame('bytes=300-555', $this->asked[0]);
+    }
+
+    public function test_a_dropped_connection_is_tried_again(): void
+    {
+        $zip = $this->releaseZip('1.1.0');
+        $calls = 0;
+
+        Http::fake(function (Request $request) use ($zip, &$calls) {
+            return ++$calls === 2 ? Http::failedConnection()($request) : $this->slice($request, $zip);
+        });
+
+        $updater = $this->updater(slice: 0.0, chunk: 256);
+        $updater->start($this->release('1.1.0'));
+        $updater->step();
+        $updater->step();
+
+        $state = $updater->state();
+        $this->assertSame('running', $state['status']);
+        $this->assertSame('download', $state['waiting']);
+        $this->assertSame(1, $state['download_failures']);
+        $this->assertSame(256, $state['downloaded']);
+
+        $this->drive($updater);
+
+        $this->assertSame('done', $updater->state()['status']);
+        $this->assertSame('bytes=256-511', $this->asked[1]);
+    }
+
+    public function test_a_download_that_keeps_failing_ends_the_update(): void
+    {
+        Http::fake(['https://example.com/*' => Http::response('busy', 503)]);
+
+        $updater = $this->updater();
+        $updater->start($this->release('1.1.0'));
+
+        $this->drive($updater);
+
+        $final = $updater->state();
+        $this->assertSame('failed', $final['status']);
+        $this->assertSame('download', $final['failed_step']);
+        $this->assertStringContainsString('503', $final['error']);
+        Http::assertSentCount(3);
+
+        $this->assertFileDoesNotExist("{$this->work}/release.zip.part");
+        $this->assertSame("1.0.0\n", file_get_contents("{$this->root}/VERSION"));
+        $this->assertFalse(app()->isDownForMaintenance());
+        $this->assertFalse(app(TickPause::class)->active());
+    }
+
+    public function test_a_server_that_ignores_range_sends_the_whole_release(): void
+    {
+        $zip = $this->releaseZip('1.1.0');
+        Http::fake(['https://example.com/*' => Http::response($zip)]);
+
+        $updater = $this->updater(chunk: 256);
+        $updater->start($this->release('1.1.0'));
+        $this->write($this->work, 'release.zip.part', substr($zip, 0, 100));
+
+        $this->drive($updater);
+
+        $this->assertSame('done', $updater->state()['status']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_part_that_already_holds_the_whole_release_is_kept(): void
+    {
+        $zip = $this->releaseZip('1.1.0');
+        $len = strlen($zip);
+        Http::fake(fn (Request $request) => $this->slice($request, $zip));
+
+        $updater = $this->updater(chunk: 256);
+        $updater->start($this->release('1.1.0'));
+
+        // A step cut after its last slice, before it could save the size.
+        $this->write($this->work, 'release.zip.part', $zip);
+
+        $this->drive($updater);
+
+        $this->assertSame('done', $updater->state()['status']);
+        $this->assertSame(["bytes={$len}-".($len + 255)], $this->asked);
+    }
+
+    public function test_an_answer_for_another_part_is_refused(): void
+    {
+        $zip = $this->releaseZip('1.1.0');
+        $len = strlen($zip);
+        Http::fake(['https://example.com/*' => Http::response('xx', 206, ['Content-Range' => "bytes 0-1/{$len}"])]);
+
+        $updater = $this->updater();
+        $updater->start($this->release('1.1.0'));
+        $this->write($this->work, 'release.zip.part', substr($zip, 0, 300));
+
+        $this->drive($updater);
+
+        $final = $updater->state();
+        $this->assertSame('failed', $final['status']);
+        $this->assertStringContainsString('different part', $final['error']);
+        $this->assertFileDoesNotExist("{$this->work}/release.zip.part");
+    }
+
     private function drive(Updater $updater, int $max = 50): void
     {
         for ($i = 0; $i < $max; $i++) {
@@ -185,14 +337,39 @@ class UpdaterTest extends TestCase
         $this->fail('The update did not finish within '.$max.' steps.');
     }
 
-    private function updater(): Updater
+    private function updater(float $slice = 30.0, int $chunk = Updater::DOWNLOAD_CHUNK): Updater
     {
-        return new Updater($this->root, $this->work, app(TickPause::class), sliceSeconds: 30.0);
+        return new Updater($this->root, $this->work, app(TickPause::class), sliceSeconds: $slice, chunkBytes: $chunk);
     }
 
     private function release(string $version): Release
     {
         return new Release($version, "https://example.com/starsystem-{$version}.zip", (string) hash('sha256', $this->releaseZip($version)));
+    }
+
+    /**
+     * Answer a request the way GitHub's download servers do: the asked slice
+     * with 206, or 416 past the end.
+     */
+    private function slice(Request $request, string $body): PromiseInterface
+    {
+        $range = $request->header('Range')[0] ?? null;
+        $this->asked[] = $range;
+        $length = strlen($body);
+
+        if ($range === null || preg_match('/^bytes=(\d+)-(\d+)$/', $range, $m) !== 1) {
+            return Http::response($body);
+        }
+
+        $start = (int) $m[1];
+
+        if ($start >= $length) {
+            return Http::response('', 416, ['Content-Range' => "bytes */{$length}"]);
+        }
+
+        $end = min((int) $m[2], $length - 1);
+
+        return Http::response(substr($body, $start, $end - $start + 1), 206, ['Content-Range' => "bytes {$start}-{$end}/{$length}"]);
     }
 
     private function releaseZip(string $version): string
