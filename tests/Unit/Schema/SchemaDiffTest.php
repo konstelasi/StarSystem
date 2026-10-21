@@ -186,6 +186,29 @@ class SchemaDiffTest extends TestCase
         $this->assertSame(['retype', 'promote'], $this->kinds($this->diff($this->current(), $desired)));
     }
 
+    public function test_a_filterable_select_cannot_allow_several_choices_in_the_same_save()
+    {
+        $current = $this->current()->withFields([new FieldSpec(self::TITLE, 'status', 'Status', 'select', ['multiple' => false], filterable: true)]);
+        $result = $this->diff($current, $this->change(self::TITLE, ['filterable' => false, 'settings' => ['multiple' => true]], $current));
+
+        $this->assertRefused($result, self::TITLE, 'Turn off filtering on "Status" first, then allow several values.');
+        $this->assertSame([], $result->operations);
+    }
+
+    public function test_a_select_allows_several_choices_once_filtering_is_off()
+    {
+        $current = $this->current()->withFields([new FieldSpec(self::TITLE, 'status', 'Status', 'select', ['multiple' => false])]);
+
+        $this->assertSame(['metadata'], $this->kinds($this->diff($current, $this->change(self::TITLE, ['settings' => ['multiple' => true]], $current))));
+    }
+
+    public function test_a_type_change_that_ends_filtering_needs_two_saves()
+    {
+        $desired = $this->change(self::TITLE, ['type' => 'textarea', 'settings' => [], 'filterable' => false]);
+
+        $this->assertRefused($this->diff($this->current(), $desired), self::TITLE, 'two separate saves');
+    }
+
     public function test_a_busy_field_refuses_storage_changes_but_takes_metadata()
     {
         foreach (['indexing', 'renaming', 'retyping', 'deleting', 'waiting'] as $state) {

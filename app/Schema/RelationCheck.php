@@ -133,13 +133,6 @@ final class RelationCheck
             return "\"{$name}\": your role can't view {$title} entries, so it can't link to them.";
         }
 
-        // A demote that fails partway would leave a filterable field holding
-        // lists, so filtering goes off in a save of its own first.
-        if ($old !== null && $old->type === 'relation' && $old->filterable
-            && ! ($old->settings['multiple'] ?? false) && ($field->settings['multiple'] ?? false)) {
-            return "Turn off filtering on \"{$name}\" first, then allow several entries.";
-        }
-
         return null;
     }
 

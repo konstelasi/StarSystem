@@ -609,7 +609,7 @@ class SchemaManagerTest extends TestCase
         $several = $this->linkTo($authors, multiple: true);
         $together = $this->change($posts, [self::LINK => ['filterable' => false, 'settings' => $several]]);
 
-        $this->assertError(self::LINK, 'Turn off filtering on "Author" first, then allow several entries.', $this->errorsOf($posts, $together));
+        $this->assertError(self::LINK, 'Turn off filtering on "Author" first, then allow several values.', $this->errorsOf($posts, $together));
 
         $off = $this->save($posts, [self::LINK => ['filterable' => false]]);
         $this->assertSame(SaveResult::DONE, $off->status, (string) $off->error());

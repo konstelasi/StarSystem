@@ -166,6 +166,18 @@ final class SchemaDiff
                 continue;
             }
 
+            // A demote that fails partway would leave a filterable field
+            // holding values StarDust can't coerce, such as lists, so
+            // filtering goes off in a save of its own first.
+            if (! $retyped && $refiltered && ! $field->filterable
+                && $oldType->canFilter($oldSettings) && ! $type->canFilter($settings)) {
+                $fail($field->uuid, $old->type === $field->type
+                    ? "Turn off filtering on \"{$field->label}\" first, then allow several values."
+                    : "Turn off filtering on \"{$field->label}\" and change its type in two separate saves.");
+
+                continue;
+            }
+
             if ($renamed && $keyTaken()) {
                 continue;
             }
