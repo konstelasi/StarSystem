@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureEmailIsVerified;
 use App\Http\Middleware\EnsureSiteMember;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -29,7 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // it carries its own signature.
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'laravel_maintenance']);
 
-        $middleware->alias(['site.member' => EnsureSiteMember::class]);
+        $middleware->alias([
+            'site.member' => EnsureSiteMember::class,
+            'verified' => EnsureEmailIsVerified::class,
+        ]);
 
         $middleware->web(prepend: [
             ResolveSite::class,
