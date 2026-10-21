@@ -166,14 +166,19 @@ class RelationType extends FieldType
         return ['integer', 'min:1'];
     }
 
+    /**
+     * Read the way the `integer` rule reads a value, so an id that passes
+     * validation is the same id here ("+5", or 5.0 from JSON) instead of
+     * turning into no link.
+     */
     private static function wholeNumber(mixed $value): ?int
     {
-        $id = match (true) {
-            is_int($value) => $value,
-            is_string($value) && ctype_digit($value) => (int) $value,
-            default => 0,
-        };
+        if (! is_int($value) && ! is_string($value) && ! is_float($value)) {
+            return null;
+        }
 
-        return $id > 0 ? $id : null;
+        $id = filter_var($value, FILTER_VALIDATE_INT);
+
+        return is_int($id) && $id > 0 ? $id : null;
     }
 }

@@ -392,6 +392,26 @@ class FieldTypesTest extends TestCase
         $this->assertSame([3, 7], RelationType::ids([3, '7', 3, 0, -2, 'x', null, 1.5]));
     }
 
+    public function test_an_id_the_rules_accept_is_read_back_as_the_same_id()
+    {
+        $type = new RelationType;
+        $rules = [];
+        foreach ($type->rules($type->resolveSettings([]), false) as $suffix => $list) {
+            $rules['value'.$suffix] = $list;
+        }
+
+        // The `integer` rule lets these through, so they must not turn into no link.
+        foreach (['+5', 5.0, '5'] as $value) {
+            $this->assertTrue(validator(['value' => $value], $rules)->passes(), var_export($value, true));
+            $this->assertSame(5, $type->normalize($value), var_export($value, true));
+            $this->assertSame([5], RelationType::ids($value), var_export($value, true));
+        }
+
+        $this->assertSame([], RelationType::ids(true));
+        $this->assertSame([], RelationType::ids('5.5'));
+        $this->assertSame([], RelationType::ids('99999999999999999999'));
+    }
+
     /**
      * @param  array<string, mixed>|null  $settings
      */

@@ -59,8 +59,9 @@ final class EntryLinks
 
     /**
      * Whether the entries a form picked can be linked, with one getMany()
-     * per linked model. An id the entry already holds isn't asked about, so
-     * a link to something since deleted doesn't stop other edits.
+     * per linked model. A trashed entry can't be picked, as the picker lists
+     * only active ones. An id the entry already holds isn't asked about, so
+     * a link to something since trashed or deleted doesn't stop other edits.
      *
      * Every failure says the same thing, with the first id that failed, so
      * the answer never shows which ids exist elsewhere.
@@ -100,7 +101,7 @@ final class EntryLinks
 
         foreach ($fresh as $key => [$target, $ids]) {
             foreach ($ids as $id) {
-                if ($target === null || ! isset($found[$target][$id])) {
+                if ($target === null || ! isset($found[$target][$id]) || $this->entries->isTrashed($found[$target][$id])) {
                     $errors["fields.{$key}"] = "Entry {$id} can't be linked. Pick another or clear it.";
 
                     break;

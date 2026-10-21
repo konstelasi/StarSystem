@@ -74,7 +74,7 @@ final class RelationCheck
             }
         }
 
-        return [...$errors, ...$this->removedNamingFields($current, $desired, $saved)];
+        return [...$errors, ...$this->namingFieldProblems($current, $desired, $saved)];
     }
 
     /**
@@ -185,32 +185,43 @@ final class RelationCheck
     }
 
     /**
-     * Saved fields this save removes while another model's relation field
-     * still names its entries by them.
+     * Saved fields this save removes, or turns into something that can't
+     * name entries, while another model's relation field still names its
+     * entries by them.
      *
      * @param  array<string, SchemaField>  $saved
      * @return list<array{field_uuid: ?string, message: string}>
      */
-    private function removedNamingFields(SchemaModel $current, ModelSchema $desired, array $saved): array
+    private function namingFieldProblems(SchemaModel $current, ModelSchema $desired, array $saved): array
     {
-        $removed = array_filter($saved, fn (SchemaField $row) => $desired->field($row->id) === null);
+        $problems = [];
 
-        if ($removed === []) {
+        foreach ($saved as $row) {
+            $now = $desired->field($row->id);
+
+            if ($now === null) {
+                $problems[$row->id] = "can't be removed.";
+            } elseif (RelationType::canLabel($row->type, $row->settings) && ! RelationType::canLabel($now->type, $now->settings)) {
+                $problems[$row->id] = "can't change to a type that can't name entries.";
+            }
+        }
+
+        if ($problems === []) {
             return [];
         }
 
         $others = SchemaField::query()->where('type', 'relation')->where('model_id', '!=', $current->id)->get();
         $errors = [];
 
-        foreach ($removed as $row) {
-            $user = $others->first(fn (SchemaField $other) => RelationType::link($other->settings)['label_field'] === $row->id);
+        foreach ($problems as $uuid => $problem) {
+            $user = $others->first(fn (SchemaField $other) => RelationType::link($other->settings)['label_field'] === $uuid);
 
             if ($user !== null) {
                 $owner = SchemaModel::query()->find($user->model_id)->label ?? 'Another model';
 
                 $errors[] = [
-                    'field_uuid' => $row->id,
-                    'message' => "\"{$row->label}\" can't be removed. {$owner} names its links by it. Change that first.",
+                    'field_uuid' => $uuid,
+                    'message' => "\"{$saved[$uuid]->label}\" {$problem} {$owner} names its links by it. Change that first.",
                 ];
             }
         }

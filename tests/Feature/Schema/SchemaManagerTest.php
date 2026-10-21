@@ -747,6 +747,19 @@ class SchemaManagerTest extends TestCase
         $this->assertSame([], $this->errorsOf($authors, $this->without($authors, self::HANDLE)));
     }
 
+    public function test_a_label_field_changed_to_a_type_that_cannot_name_entries_is_refused()
+    {
+        $authors = $this->authors();
+        $this->posts($this->author($authors));
+
+        $message = '"Name" can\'t change to a type that can\'t name entries. Posts names its links by it. Change that first.';
+        $this->assertError(self::NAME, $message, $this->errorsOf($authors, $this->change($authors, [self::NAME => ['type' => 'rich_text']])));
+
+        // A field nothing names its links by can change, and so can a name to another type that names entries.
+        $this->assertSame([], $this->errorsOf($authors, $this->change($authors, [self::HANDLE => ['type' => 'rich_text']])));
+        $this->assertSame([], $this->errorsOf($authors, $this->change($authors, [self::NAME => ['type' => 'textarea']])));
+    }
+
     public function test_a_self_link_on_a_new_field_passes()
     {
         $authors = $this->authors();

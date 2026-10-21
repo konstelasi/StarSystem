@@ -214,6 +214,33 @@ class EntryRelationTest extends TestCase
             ->assertSessionHasErrors(['fields.author' => "Entry {$ada} can't be linked. Pick another or clear it."]);
     }
 
+    public function test_a_trashed_entry_cannot_be_newly_linked()
+    {
+        $editor = User::factory()->create();
+        $ada = $this->author('Ada Lovelace');
+        $linked = $this->newPost(['author' => $ada]);
+        $other = $this->newPost([]);
+        $entry = app(EntryManager::class)->get($this->authors, $ada);
+        $this->assertNotNull($entry);
+        app(EntryManager::class)->trash($this->authors, $entry);
+
+        // A link made before the author was trashed survives an edit.
+        $this->actingAs($editor)
+            ->put($this->url('admin.models.entries.update', ['model' => $this->posts->id, 'entry' => $linked]), ['fields' => ['title' => 'Changed', 'author' => $ada]])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+        $this->assertSame($ada, $this->stored($linked)['author']);
+
+        // Nothing new can pick it, since the picker lists only active entries.
+        $message = "Entry {$ada} can't be linked. Pick another or clear it.";
+        $this->actingAs($editor)
+            ->put($this->url('admin.models.entries.update', ['model' => $this->posts->id, 'entry' => $other]), ['fields' => ['title' => 'Changed', 'author' => $ada]])
+            ->assertSessionHasErrors(['fields.author' => $message]);
+        $this->actingAs($editor)
+            ->post($this->url('admin.models.entries.store', ['model' => $this->posts->id]), ['fields' => ['title' => 'Hello', 'tags' => [$ada]]])
+            ->assertSessionHasErrors(['fields.tags' => $message]);
+    }
+
     public function test_a_lone_id_is_read_as_a_list_with_several()
     {
         $editor = User::factory()->create();
