@@ -322,6 +322,35 @@ class StarDustService
     }
 
     /**
+     * Several entries of one model by id, keyed by id. An id that doesn't
+     * exist, belongs to another site or model, or is soft-deleted is left
+     * out, as in getEntry().
+     *
+     * It reads one entry per call because StarDust has no batch read by id
+     * yet. Callers come through here, so a batch read replaces the loop in
+     * one place.
+     *
+     * @param  list<int>  $entryIds
+     * @return array<int, Entry>
+     */
+    public function getEntries(int $modelId, array $entryIds): array
+    {
+        $this->owned($modelId);
+
+        $entries = [];
+
+        foreach (array_unique(array_filter($entryIds, fn (int $id) => $id > 0)) as $entryId) {
+            $entry = $this->engine()->get($this->site->tenantId(), $entryId);
+
+            if ($entry !== null && $entry->modelId === $modelId) {
+                $entries[$entryId] = $entry;
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
      * A full replace: any field left out of $fields is cleared from the
      * entry. The caller is responsible for carrying forward whatever it
      * doesn't mean to change.

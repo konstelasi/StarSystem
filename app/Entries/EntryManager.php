@@ -82,6 +82,26 @@ class EntryManager
     }
 
     /**
+     * Several of the model's entries by id, keyed by id. Trashed entries are
+     * returned, and ids that aren't this model's on this site are left out.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, Entry>
+     */
+    public function getMany(SchemaModel $model, array $ids): array
+    {
+        return $this->stardust->getEntries($model->stardust_model_id, $ids);
+    }
+
+    /**
+     * Whether the model holds any entry, trashed ones included.
+     */
+    public function hasEntries(SchemaModel $model): bool
+    {
+        return $this->stardust->listEntries($model->stardust_model_id, pageSize: 1)->rows !== [];
+    }
+
+    /**
      * A full replace, but never of the reserved fields: the trash flag and
      * who made the entry carry forward, since a plain update would otherwise
      * clear them. Who saved it last becomes $userId, or stays as it was.

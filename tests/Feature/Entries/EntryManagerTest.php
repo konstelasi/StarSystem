@@ -6,13 +6,15 @@ use App\Entries\EntryManager;
 use App\Models\SchemaModel;
 use App\Schema\ModelSchema;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use StarDust\Read\Entry;
+use Tests\Concerns\CrossSite;
 use Tests\Concerns\UsesStarDust;
 use Tests\TestCase;
 
 class EntryManagerTest extends TestCase
 {
-    use RefreshDatabase, UsesStarDust;
+    use CrossSite, RefreshDatabase, UsesStarDust;
 
     public function test_create_writes_the_trash_flag_unset()
     {
@@ -247,6 +249,69 @@ class EntryManagerTest extends TestCase
 
         $this->assertSame(12, $this->manager()->createdBy($withText));
         $this->assertNull($this->manager()->updatedBy($withText));
+
+        $this->drain();
+    }
+
+    public function test_get_many_reads_each_id_once()
+    {
+        $model = $this->registerModel('authors');
+        $ada = $this->manager()->create($model, ['name' => 'Ada']);
+        $grace = $this->manager()->create($model, ['name' => 'Grace']);
+
+        $entries = $this->manager()->getMany($model, [$grace, $ada, $grace, 0, -4]);
+
+        $this->assertSame([$grace, $ada], array_keys($entries));
+        $this->assertSame('Grace', $entries[$grace]->fields['name']);
+        $this->assertSame('Ada', $entries[$ada]->fields['name']);
+
+        $this->drain();
+    }
+
+    public function test_get_many_leaves_out_missing_and_other_models_entries()
+    {
+        $authors = $this->registerModel('authors');
+        $posts = $this->registerModel('posts');
+        $ada = $this->manager()->create($authors, ['name' => 'Ada']);
+        $post = $this->manager()->create($posts, ['title' => 'Hello']);
+        $gone = $this->manager()->create($authors, ['name' => 'Gone']);
+        $this->manager()->delete($authors, $this->manager()->get($authors, $gone));
+
+        $entries = $this->manager()->getMany($authors, [$ada, $post, $gone, $post + 1000]);
+
+        $this->assertSame([$ada], array_keys($entries));
+
+        $this->drain();
+    }
+
+    public function test_get_many_leaves_out_another_sites_entries()
+    {
+        $ours = $this->registerModel('authors');
+        $ada = $this->manager()->create($ours, ['name' => 'Ada']);
+
+        $other = $this->makeSite(Str::lower(Str::random(12)).'.test');
+        $this->asSite($other);
+        $theirs = $this->registerModel('authors');
+        $secret = $this->manager()->create($theirs, ['name' => 'Secret']);
+        $this->assertSame([$secret], array_keys($this->manager()->getMany($theirs, [$secret])));
+
+        $this->asSite($this->site);
+
+        $this->assertSame([$ada], array_keys($this->manager()->getMany($ours, [$ada, $secret])));
+
+        $this->drain();
+    }
+
+    public function test_has_entries()
+    {
+        $model = $this->registerModel('authors');
+        $this->assertFalse($this->manager()->hasEntries($model));
+
+        $entryId = $this->manager()->create($model, ['name' => 'Ada']);
+        $this->assertTrue($this->manager()->hasEntries($model));
+
+        $this->manager()->trash($model, $this->manager()->get($model, $entryId));
+        $this->assertTrue($this->manager()->hasEntries($model), 'A trashed entry still counts.');
 
         $this->drain();
     }
