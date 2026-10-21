@@ -4,6 +4,7 @@ namespace App\Schema;
 
 use App\Models\SchemaChange;
 use App\Models\SchemaModel;
+use App\Models\User;
 use App\Schema\Operations\Operation;
 use App\StarDust\StarDustService;
 use Closure;
@@ -30,6 +31,7 @@ class SchemaManager
         private readonly StarDustService $stardust,
         private readonly SchemaDiff $diff,
         private readonly SchemaApplier $applier,
+        private readonly RelationCheck $relations,
     ) {}
 
     /**
@@ -45,6 +47,10 @@ class SchemaManager
 
         if (($taken = $this->slugProblem($schema->slug)) !== null) {
             $plan = $plan->withError(null, $taken);
+        }
+
+        foreach ($this->relations->errors(null, $schema) as $error) {
+            $plan = $plan->withError($error['field_uuid'], $error['message']);
         }
 
         if ($plan->hasErrors()) {
@@ -81,25 +87,28 @@ class SchemaManager
      * model saved since then is an error, because diffing an older schema
      * against the stored one would undo that save.
      *
+     * $by is who is saving. A link to a model they can't view entries of is
+     * an error, and without one that isn't asked.
+     *
      * @return array{operations: list<array<string, mixed>>, errors: list<array{field_uuid: ?string, message: string}>}
      */
-    public function preview(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): array
+    public function preview(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null, ?User $by = null): array
     {
-        return $this->plan($model, $desired, $expectedRev)->toPreview();
+        return $this->plan($model, $desired, $expectedRev, $by)->toPreview();
     }
 
     /**
      * One save per model at a time, so two that arrive together can't both
      * pass the schema_rev check before either has bumped it.
      */
-    public function save(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): SaveResult
+    public function save(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null, ?User $by = null): SaveResult
     {
-        return $this->locked($model, function () use ($model, $desired, $expectedRev) {
+        return $this->locked($model, function () use ($model, $desired, $expectedRev, $by) {
             // A save that finished between loading $model and taking the
             // lock has moved schema_rev on.
             $model->refresh();
 
-            $plan = $this->plan($model, $desired, $expectedRev);
+            $plan = $this->plan($model, $desired, $expectedRev, $by);
 
             if ($plan->hasErrors()) {
                 return new SaveResult(SaveResult::INVALID, $model, $plan->toPreview());
@@ -303,7 +312,7 @@ class SchemaManager
         return $this->createModel($schema);
     }
 
-    private function plan(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null): DiffResult
+    private function plan(SchemaModel $model, ModelSchema $desired, ?int $expectedRev = null, ?User $by = null): DiffResult
     {
         if ($model->isDeleting()) {
             return new DiffResult([], [['field_uuid' => null, 'message' => SchemaException::text('This model is being deleted.')]]);
@@ -346,6 +355,10 @@ class SchemaManager
 
         if ($desired->slug !== $model->slug && ($taken = $this->slugProblem($desired->slug)) !== null) {
             $plan = $plan->withError(null, $taken);
+        }
+
+        foreach ($this->relations->errors($model, $desired, $by) as $error) {
+            $plan = $plan->withError($error['field_uuid'], $error['message']);
         }
 
         return $plan;

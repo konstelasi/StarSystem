@@ -2,9 +2,15 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Access\Ability;
+use App\Access\SiteAccess;
+use App\Models\Role;
 use App\Models\SchemaModel;
+use App\Models\SiteUser;
 use App\Models\User;
 use App\Schema\FieldSpec;
+use App\Schema\FieldTypes\Core\RelationType;
+use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
 use App\Schema\SchemaManager;
@@ -454,6 +460,105 @@ class ModelBuilderTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('saved', true));
 
         $this->assertSame('Second Save', app(SchemaManager::class)->export($model->refresh())['model']['label']);
+    }
+
+    public function test_a_link_to_a_model_the_saver_cannot_view_is_refused()
+    {
+        app(FieldTypeRegistry::class)->register(new RelationType);
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        $schema = app(SchemaManager::class)->export($posts);
+        $schema['fields'][] = $this->relationField($authors);
+        $message = '"Author": your role can\'t view Authors entries, so it can\'t link to them.';
+
+        // May change Posts, but holds nothing on Authors.
+        $builder = $this->member([], ['posts' => [Ability::MODELS_UPDATE, Ability::ENTRIES_VIEW]]);
+
+        $this->actingAs($builder)
+            ->post($this->url('admin.models.builder.preview', ['model' => $posts->id]), ['schema' => $schema, 'rev' => $posts->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page->where('preview.errors.0.message', $message));
+
+        $this->actingAs($builder)
+            ->post($this->url('admin.models.builder.save', ['model' => $posts->id]), ['schema' => $schema, 'rev' => $posts->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('saved', false)
+                ->where('preview.errors.0.message', $message)
+            );
+        $this->assertSame(2, $posts->fields()->count());
+
+        // Someone who can see Authors' entries as well may link to them.
+        $reader = $this->member([], ['posts' => [Ability::MODELS_UPDATE], 'authors' => [Ability::ENTRIES_VIEW]]);
+
+        $this->actingAs($reader)
+            ->post($this->url('admin.models.builder.save', ['model' => $posts->id]), ['schema' => $schema, 'rev' => $posts->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+        $this->assertSame(3, $posts->fields()->count());
+    }
+
+    public function test_a_link_the_saver_cannot_view_does_not_block_other_changes()
+    {
+        app(FieldTypeRegistry::class)->register(new RelationType);
+        $authors = $this->create('authors', 'Authors');
+        $posts = $this->create('posts', 'Posts');
+        $schema = app(SchemaManager::class)->export($posts);
+        $schema['fields'][] = $this->relationField($authors);
+
+        $reader = $this->member([], ['posts' => [Ability::MODELS_UPDATE], 'authors' => [Ability::ENTRIES_VIEW]]);
+        $this->actingAs($reader)
+            ->post($this->url('admin.models.builder.save', ['model' => $posts->id]), ['schema' => $schema, 'rev' => $posts->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+
+        $schema = app(SchemaManager::class)->export($posts->refresh());
+        $schema['model']['label'] = 'Stories';
+
+        $builder = $this->member([], ['posts' => [Ability::MODELS_UPDATE, Ability::ENTRIES_VIEW]]);
+        $this->actingAs($builder)
+            ->post($this->url('admin.models.builder.save', ['model' => $posts->id]), ['schema' => $schema, 'rev' => $posts->schema_rev])
+            ->assertInertia(fn (Assert $page) => $page->where('saved', true));
+        $this->assertSame('Stories', $posts->refresh()->label);
+    }
+
+    /**
+     * A member whose role holds $global for every model and $scoped for the
+     * models named by slug.
+     *
+     * @param  list<string>  $global
+     * @param  array<string, list<string>>  $scoped
+     */
+    private function member(array $global, array $scoped = []): User
+    {
+        static $n = 0;
+        $role = Role::create(['tenant_id' => $this->site->id, 'name' => 'Custom '.++$n]);
+        $role->syncAbilities($global);
+        $role->syncModelAbilities(collect($scoped)->mapWithKeys(fn (array $abilities, string $slug) => [
+            SchemaModel::query()->where('slug', $slug)->value('id') => $abilities,
+        ])->all());
+
+        $user = User::factory()->create();
+        SiteUser::query()->where('user_id', $user->id)->update(['role_id' => $role->id]);
+        app(SiteAccess::class)->forget();
+
+        return $user;
+    }
+
+    /**
+     * A relation field as the builder posts it, naming $target's entries by
+     * its title.
+     *
+     * @return array<string, mixed>
+     */
+    private function relationField(SchemaModel $target): array
+    {
+        return [
+            'uuid' => (string) Str::uuid(),
+            'key' => 'author',
+            'label' => 'Author',
+            'type' => 'relation',
+            'required' => false,
+            'filterable' => false,
+            'layout_slot' => null,
+            'settings' => ['link' => ['model' => $target->id, 'label_field' => $target->fields()->where('key', 'title')->value('id')], 'multiple' => false],
+        ];
     }
 
     /**

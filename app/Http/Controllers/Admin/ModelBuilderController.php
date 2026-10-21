@@ -57,7 +57,7 @@ class ModelBuilderController extends Controller
     public function preview(Request $request, SchemaModel $model): Response
     {
         return Inertia::render('admin/models/Builder', [
-            'preview' => $this->schema->preview($model, $this->desiredSchema($request), $this->openedRev($request)),
+            'preview' => $this->schema->preview($model, $this->desiredSchema($request), $this->openedRev($request), $request->user()),
         ]);
     }
 
@@ -71,7 +71,7 @@ class ModelBuilderController extends Controller
      */
     public function save(Request $request, SchemaModel $model): Response
     {
-        $result = $this->schema->save($model, $this->desiredSchema($request), $this->openedRev($request));
+        $result = $this->schema->save($model, $this->desiredSchema($request), $this->openedRev($request), $request->user());
 
         return Inertia::render('admin/models/Builder', [
             'saved' => $result->succeeded(),

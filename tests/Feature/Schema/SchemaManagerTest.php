@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Schema;
 
+use App\Entries\EntryManager;
 use App\Models\SchemaChange;
 use App\Models\SchemaField;
 use App\Models\SchemaModel;
 use App\Models\Site;
 use App\Schema\FieldSpec;
+use App\Schema\FieldTypes\Core\RelationType;
+use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\Schema\ModelSchema;
 use App\Schema\SaveResult;
 use App\Schema\SchemaException;
@@ -17,6 +20,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Mockery\MockInterface;
 use StarDust\Schema\FieldDescription;
 use Tests\Concerns\CrossSite;
 use Tests\Concerns\UsesStarDust;
@@ -36,6 +40,25 @@ class SchemaManagerTest extends TestCase
     private const EXTRA = '10000000-0000-4000-8000-000000000004';
 
     private const MORE = '10000000-0000-4000-8000-000000000005';
+
+    private const LINK = '10000000-0000-4000-8000-000000000006';
+
+    private const NAME = '10000000-0000-4000-8000-000000000007';
+
+    private const HANDLE = '10000000-0000-4000-8000-000000000008';
+
+    private const BIO = '10000000-0000-4000-8000-000000000009';
+
+    private const HEADLINE = '10000000-0000-4000-8000-00000000000a';
+
+    private const RATING = '10000000-0000-4000-8000-00000000000b';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        app(FieldTypeRegistry::class)->register(new RelationType);
+    }
 
     public function test_creating_a_model_registers_every_field_with_stardust()
     {
@@ -479,6 +502,313 @@ class SchemaManagerTest extends TestCase
         $this->assertSame(SaveResult::DONE, $this->manager()->save($model, $this->change($model, [self::BODY => ['label' => 'Text']]), $current)->status);
     }
 
+    public function test_a_link_to_a_model_is_saved_with_the_model_as_a_number()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts();
+
+        // The builder's select sends the model as text.
+        $settings = ['link' => ['model' => (string) $authors->id, 'label_field' => self::NAME], 'multiple' => false];
+        $result = $this->manager()->save($posts, $this->withField($this->change($posts, []), new FieldSpec(self::LINK, 'author', 'Author', 'relation', $settings)));
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $field = SchemaField::findOrFail(self::LINK);
+        $this->assertSame('relation', $field->type);
+        $this->assertSame($authors->id, $field->settings['link']['model'] ?? null);
+        $this->assertSame('int', $this->stardustState($posts, 'author')['declared_type']);
+
+        $this->drain();
+    }
+
+    public function test_a_relation_without_a_model_is_refused()
+    {
+        $posts = $this->posts();
+        $desired = $this->withField($this->change($posts, []), new FieldSpec(self::LINK, 'author', 'Author', 'relation'));
+
+        $this->assertError(self::LINK, '"Author": choose the model it links to.', $this->errorsOf($posts, $desired));
+    }
+
+    public function test_a_link_to_a_model_this_site_does_not_have_is_refused()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts();
+        $message = '"Author" links to a model or field this site doesn\'t have. Choose them again.';
+
+        $missing = $this->withField($this->change($posts, []), $this->author($authors, model: $authors->id + 1000));
+        $this->assertError(self::LINK, $message, $this->errorsOf($posts, $missing));
+
+        $nameUuid = (string) Str::uuid();
+        $this->asSite($this->makeSite(Str::lower(Str::random(12)).'.test'));
+        $theirs = $this->manager()->createModel(new ModelSchema('authors', 'Authors', fields: [new FieldSpec($nameUuid, 'name', 'Name', 'text')]))->model;
+        $this->assertNotNull($theirs);
+        $this->asSite($this->site);
+
+        $foreign = $this->withField($this->change($posts, []), $this->author($theirs, labelField: $nameUuid));
+        $this->assertError(self::LINK, $message, $this->errorsOf($posts, $foreign));
+    }
+
+    public function test_a_link_to_a_model_being_deleted_is_refused()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts();
+        $this->manager()->deleteModel($authors);
+
+        $desired = $this->withField($this->change($posts, []), $this->author($authors));
+
+        $this->assertError(self::LINK, '"Author" links to Authors, which is being deleted.', $this->errorsOf($posts, $desired));
+
+        $this->drain();
+    }
+
+    public function test_a_link_must_name_the_field_that_names_the_entries()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts();
+
+        $desired = $this->withField($this->change($posts, []), $this->author($authors, labelField: null));
+
+        $this->assertError(self::LINK, '"Author": choose the field that names Authors entries.', $this->errorsOf($posts, $desired));
+    }
+
+    public function test_a_link_to_a_model_with_no_field_that_can_name_entries_is_refused()
+    {
+        $notes = $this->manager()->createModel(new ModelSchema('notes', 'Notes', fields: [
+            new FieldSpec((string) Str::uuid(), 'body', 'Body', 'rich_text'),
+            new FieldSpec((string) Str::uuid(), 'tags', 'Tags', 'checkboxes'),
+        ]))->model;
+        $this->assertNotNull($notes);
+        $posts = $this->posts();
+
+        $desired = $this->withField($this->change($posts, []), $this->author($notes, labelField: null));
+
+        $this->assertError(self::LINK, 'Notes has no field that can name its entries. Add a text field to it first.', $this->errorsOf($posts, $desired));
+    }
+
+    public function test_a_naming_field_the_model_does_not_have_is_refused()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts();
+        $message = '"Author" links to a model or field this site doesn\'t have. Choose them again.';
+
+        $unknown = $this->withField($this->change($posts, []), $this->author($authors, labelField: (string) Str::uuid()));
+        $this->assertError(self::LINK, $message, $this->errorsOf($posts, $unknown));
+
+        // A field of another model of this site isn't one of the authors'.
+        $another = $this->withField($this->change($posts, []), $this->author($authors, labelField: self::HEADLINE));
+        $this->assertError(self::LINK, $message, $this->errorsOf($posts, $another));
+    }
+
+    public function test_a_field_that_cannot_name_entries_is_refused()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts();
+
+        $desired = $this->withField($this->change($posts, []), $this->author($authors, labelField: self::BIO));
+
+        $this->assertError(self::LINK, '"Author": Bio can\'t name entries. Pick a text, number or single choice field.', $this->errorsOf($posts, $desired));
+    }
+
+    public function test_filtering_must_be_off_before_a_link_allows_several()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->author($authors, filterable: true));
+        $this->drain();
+
+        $several = $this->linkTo($authors, multiple: true);
+        $together = $this->change($posts, [self::LINK => ['filterable' => false, 'settings' => $several]]);
+
+        $this->assertError(self::LINK, 'Turn off filtering on "Author" first, then allow several entries.', $this->errorsOf($posts, $together));
+
+        $off = $this->save($posts, [self::LINK => ['filterable' => false]]);
+        $this->assertSame(SaveResult::DONE, $off->status, (string) $off->error());
+
+        $then = $this->save($posts, [self::LINK => ['settings' => $several]]);
+        $this->assertSame(SaveResult::DONE, $then->status, (string) $then->error());
+        $this->assertTrue(SchemaField::findOrFail(self::LINK)->settings['multiple'] ?? null);
+
+        $this->drain();
+    }
+
+    public function test_a_link_to_several_cannot_go_back_to_one_once_there_are_entries()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->author($authors, multiple: true));
+        $this->writeEntry($posts->stardust_model_id, ['headline' => 'Hello']);
+
+        $desired = $this->change($posts, [self::LINK => ['settings' => $this->linkTo($authors)]]);
+
+        $this->assertError(self::LINK, '"Author" already holds several entries, so it can\'t go back to one. Add a new relation field instead.', $this->errorsOf($posts, $desired));
+
+        $this->drain();
+    }
+
+    public function test_a_link_to_several_can_go_back_to_one_while_there_are_no_entries()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->author($authors, multiple: true));
+
+        $result = $this->save($posts, [self::LINK => ['settings' => $this->linkTo($authors)]]);
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertFalse(SchemaField::findOrFail(self::LINK)->settings['multiple'] ?? null);
+    }
+
+    public function test_a_link_cannot_change_its_model_once_there_are_entries()
+    {
+        $authors = $this->authors();
+        $editors = $this->editors();
+        $posts = $this->posts($this->author($authors));
+        $this->writeEntry($posts->stardust_model_id, ['headline' => 'Hello']);
+
+        $desired = $this->change($posts, [self::LINK => ['settings' => $this->linkTo($editors, labelField: $this->nameOf($editors))]]);
+
+        $this->assertError(self::LINK, '"Author" already links to Authors entries, so it can\'t link to another model. Add a new relation field instead.', $this->errorsOf($posts, $desired));
+
+        // Naming the entries by another field of the same model is fine.
+        $renamed = $this->change($posts, [self::LINK => ['settings' => $this->linkTo($authors, labelField: self::HANDLE)]]);
+        $this->assertSame([], $this->errorsOf($posts, $renamed));
+
+        $this->drain();
+    }
+
+    public function test_a_link_can_change_its_model_while_there_are_no_entries()
+    {
+        $authors = $this->authors();
+        $editors = $this->editors();
+        $posts = $this->posts($this->author($authors));
+
+        $result = $this->save($posts, [self::LINK => ['settings' => $this->linkTo($editors, labelField: $this->nameOf($editors))]]);
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertSame($editors->id, SchemaField::findOrFail(self::LINK)->settings['link']['model'] ?? null);
+    }
+
+    public function test_a_field_cannot_switch_to_or_from_a_relation_once_there_are_entries()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->rating(), $this->author($authors));
+        $this->writeEntry($posts->stardust_model_id, ['headline' => 'Hello']);
+
+        $errors = $this->errorsOf($posts, $this->change($posts, [
+            self::RATING => ['type' => 'relation', 'settings' => $this->linkTo($authors)],
+            self::LINK => ['type' => 'number', 'settings' => ['whole' => true]],
+        ]));
+
+        $this->assertError(self::RATING, '"Rating" can\'t switch to or from a relation once Posts has entries. Add a new field instead.', $errors);
+        $this->assertError(self::LINK, '"Author" can\'t switch to or from a relation once Posts has entries. Add a new field instead.', $errors);
+
+        $this->drain();
+    }
+
+    public function test_a_field_can_switch_to_or_from_a_relation_while_there_are_no_entries()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->rating(), $this->author($authors));
+
+        $result = $this->save($posts, [
+            self::RATING => ['type' => 'relation', 'settings' => $this->linkTo($authors)],
+            self::LINK => ['type' => 'number', 'settings' => ['whole' => true]],
+        ]);
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertSame(['relation', 'number'], [SchemaField::findOrFail(self::RATING)->type, SchemaField::findOrFail(self::LINK)->type]);
+
+        $this->drain();
+    }
+
+    public function test_entries_are_looked_for_only_when_a_change_needs_them()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->author($authors));
+        $this->mock(EntryManager::class, fn (MockInterface $mock) => $mock->shouldNotReceive('hasEntries'));
+
+        // A model without relations, and a relation that only changes which field names its entries.
+        $renamed = $this->save($authors, [self::HANDLE => ['label' => 'Username']]);
+        $named = $this->save($posts, [self::LINK => ['settings' => $this->linkTo($authors, labelField: self::HANDLE)]]);
+
+        $this->assertSame([SaveResult::DONE, SaveResult::DONE], [$renamed->status, $named->status]);
+    }
+
+    public function test_entries_are_looked_for_once_however_many_fields_need_them()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->rating(), $this->author($authors));
+        $this->mock(EntryManager::class, fn (MockInterface $mock) => $mock->shouldReceive('hasEntries')->once()->andReturnTrue());
+
+        $errors = $this->errorsOf($posts, $this->change($posts, [
+            self::RATING => ['type' => 'relation', 'settings' => $this->linkTo($authors)],
+            self::LINK => ['type' => 'number', 'settings' => ['whole' => true]],
+        ]));
+
+        $this->assertCount(2, $errors);
+    }
+
+    public function test_a_removed_label_field_is_refused()
+    {
+        $authors = $this->authors();
+        $this->posts($this->author($authors));
+
+        $message = '"Name" can\'t be removed. Posts names its links by it. Change that first.';
+        $this->assertError(self::NAME, $message, $this->errorsOf($authors, $this->without($authors, self::NAME)));
+
+        // A field nothing names its links by can go.
+        $this->assertSame([], $this->errorsOf($authors, $this->without($authors, self::HANDLE)));
+    }
+
+    public function test_a_self_link_on_a_new_field_passes()
+    {
+        $authors = $this->authors();
+        $mentor = new FieldSpec(self::LINK, 'mentor', 'Mentor', 'relation', ['link' => ['model' => $authors->id, 'label_field' => self::NAME]]);
+
+        // Named by a field the same save adds.
+        $nickname = new FieldSpec(self::MORE, 'nickname', 'Nickname', 'text');
+        $buddy = new FieldSpec(self::EXTRA, 'buddy', 'Buddy', 'relation', ['link' => ['model' => $authors->id, 'label_field' => self::MORE]]);
+        $both = $this->withField($this->withField($this->change($authors, []), $nickname), $buddy);
+        $this->assertSame([], $this->errorsOf($authors, $both));
+
+        $result = $this->manager()->save($authors, $this->withField($this->change($authors, []), $mentor));
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertSame($authors->id, SchemaField::findOrFail(self::LINK)->settings['link']['model'] ?? null);
+
+        $this->drain();
+    }
+
+    public function test_a_copy_of_a_self_linking_model_links_to_the_original()
+    {
+        $authors = $this->authors();
+        $mentor = new FieldSpec(self::LINK, 'mentor', 'Mentor', 'relation', ['link' => ['model' => $authors->id, 'label_field' => self::NAME]]);
+        $this->manager()->save($authors, $this->withField($this->change($authors, []), $mentor));
+
+        $copy = $this->manager()->duplicate($authors, 'authors_copy', 'Authors Copy');
+
+        $this->assertSame(SaveResult::DONE, $copy->status, (string) $copy->error());
+        $this->assertNotNull($copy->model);
+        $copied = $copy->model->fields()->where('key', 'mentor')->firstOrFail();
+        $this->assertNotSame(self::LINK, $copied->id);
+        $this->assertSame(['model' => $authors->id, 'label_field' => self::NAME], RelationType::link($copied->settings));
+
+        // It can point at the copy itself while the copy has no entries.
+        $own = $this->change($copy->model, [$copied->id => ['settings' => $this->linkTo($copy->model, labelField: $this->nameOf($copy->model))]]);
+        $this->assertSame(SaveResult::DONE, $this->manager()->save($copy->model, $own)->status);
+
+        $this->drain();
+    }
+
+    public function test_an_import_with_a_foreign_model_id_is_refused()
+    {
+        $authors = $this->authors();
+        $posts = $this->posts($this->author($authors));
+        $exported = $this->manager()->export($posts);
+
+        $this->asSite($this->makeSite(Str::lower(Str::random(12)).'.test'));
+        $result = $this->manager()->import($exported, 'posts_copy');
+
+        $this->assertSame(SaveResult::INVALID, $result->status);
+        $this->assertSame('"Author" links to a model or field this site doesn\'t have. Choose them again.', $result->error());
+        $this->assertNull($result->model);
+    }
+
     /**
      * articles: title (text, filterable), body (rich text), count (text).
      *
@@ -543,6 +873,105 @@ class SchemaManagerTest extends TestCase
     private function withField(ModelSchema $schema, FieldSpec $field): ModelSchema
     {
         return $schema->withFields([...$schema->fields, $field]);
+    }
+
+    /**
+     * authors: name and handle (text), bio (rich text, which can't name
+     * entries). Nothing in it is filterable, so there is nothing to drain.
+     */
+    private function authors(): SchemaModel
+    {
+        $result = $this->manager()->createModel(new ModelSchema('authors', 'Authors', fields: [
+            new FieldSpec(self::NAME, 'name', 'Name', 'text'),
+            new FieldSpec(self::HANDLE, 'handle', 'Handle', 'text'),
+            new FieldSpec(self::BIO, 'bio', 'Bio', 'rich_text'),
+        ]));
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertNotNull($result->model);
+
+        return $result->model;
+    }
+
+    /**
+     * A second model to link to, with fields of its own to name entries by.
+     */
+    private function editors(): SchemaModel
+    {
+        $result = $this->manager()->createModel(new ModelSchema('editors', 'Editors', fields: [
+            new FieldSpec((string) Str::uuid(), 'name', 'Name', 'text'),
+        ]));
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertNotNull($result->model);
+
+        return $result->model;
+    }
+
+    /**
+     * posts: headline (text) and whatever fields are given.
+     */
+    private function posts(FieldSpec ...$fields): SchemaModel
+    {
+        $result = $this->manager()->createModel(new ModelSchema('posts', 'Posts', fields: [
+            new FieldSpec(self::HEADLINE, 'headline', 'Headline', 'text'),
+            ...$fields,
+        ]));
+
+        $this->assertSame(SaveResult::DONE, $result->status, (string) $result->error());
+        $this->assertNotNull($result->model);
+
+        return $result->model;
+    }
+
+    /**
+     * A whole number field, which stores what a relation does.
+     */
+    private function rating(): FieldSpec
+    {
+        return new FieldSpec(self::RATING, 'rating', 'Rating', 'number', ['whole' => true]);
+    }
+
+    /**
+     * A relation field named Author, linking to $target (or to $model, to
+     * point it somewhere that isn't a model).
+     */
+    private function author(SchemaModel $target, bool $multiple = false, ?string $labelField = self::NAME, bool $filterable = false, ?int $model = null): FieldSpec
+    {
+        return new FieldSpec(self::LINK, 'author', 'Author', 'relation', $this->linkTo($target, $multiple, $labelField, $model), filterable: $filterable);
+    }
+
+    /**
+     * The settings of a relation field.
+     *
+     * @return array<string, mixed>
+     */
+    private function linkTo(SchemaModel $target, bool $multiple = false, ?string $labelField = self::NAME, ?int $model = null): array
+    {
+        return ['link' => ['model' => $model ?? $target->id, 'label_field' => $labelField], 'multiple' => $multiple];
+    }
+
+    private function nameOf(SchemaModel $model): string
+    {
+        return (string) $model->fields()->where('key', 'name')->value('id');
+    }
+
+    /**
+     * What stops saving $model as $desired.
+     *
+     * @return list<array{field_uuid: ?string, message: string}>
+     */
+    private function errorsOf(SchemaModel $model, ModelSchema $desired): array
+    {
+        return $this->manager()->preview($model, $desired)['errors'];
+    }
+
+    /**
+     * @param  list<array{field_uuid: ?string, message: string}>  $errors
+     */
+    private function assertError(string $fieldUuid, string $message, array $errors): void
+    {
+        $this->assertContains(['field_uuid' => $fieldUuid, 'message' => $message], $errors, 'Expected the error: '.$message);
     }
 
     private function manager(): SchemaManager
