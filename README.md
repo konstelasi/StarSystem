@@ -8,6 +8,8 @@ Content starts in the **model builder**, a drag-and-drop admin page where you de
 
 Each model then gets its **entries**, the content itself. Editors create and edit them in a form built from the model's fields, and the list pages through them newest first. Deleting an entry moves it to the model's trash, where it can be restored or deleted for good. Anything left in the trash for 30 days is deleted on its own, and `STARSYSTEM_ENTRY_TRASH_DAYS` changes that.
 
+Access is set per site. Each site has its own roles, each made of abilities such as seeing the media library or deleting entries for good, and a person holds one role on each site they belong to. Administrator, Editor and Viewer come built in, and you can add your own. An ability can apply to every model or only to chosen ones, and editing and deleting entries can be limited to a person's own. Administrators invite people by email, pause or remove them, and can require two-factor sign-in for a role. An Activity page records sign-ins, role changes and invitations, and drops rows after 365 days, which `STARSYSTEM_ACTIVITY_KEEP_DAYS` changes.
+
 Around them sit the other parts of the admin.
 
 - The **media library** keeps each site's files in folders, with search and drag-and-drop upload. Other pages reuse its picker, the builder's file field among them.
@@ -30,6 +32,25 @@ composer dev      # serves the app, queue listener and Vite dev server together
 ```
 
 Then open the app in your browser. With no `.env` yet, or one with no `APP_KEY`, every request redirects to `/install`. The installer walks through requirements, database details, migrations and the first administrator, still with no shell.
+
+## Sending mail
+
+Mail is optional. Invitations, password-reset links and email changes use it when it's set up, and a host with no outgoing mail still works. Without it, the invitation dialog shows the link so you can pass it on yourself, and an email change takes effect at once instead of waiting for a confirmation link. StarSystem counts mail as set up once `MAIL_MAILER` is anything other than `log` or `array`.
+
+Set these in `.env` to send through an SMTP server.
+
+```dotenv
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtps
+MAIL_HOST=mail.example.com
+MAIL_PORT=465
+MAIL_USERNAME=hello@example.com
+MAIL_PASSWORD=
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+`MAIL_SCHEME=smtps` goes with port 465, where the connection is encrypted from the first byte. A host on port 587 that upgrades the connection itself takes `MAIL_SCHEME=null`. Use the login address as `MAIL_FROM_ADDRESS`, because many hosts refuse mail sent from any other.
 
 ## Testing and checks
 
