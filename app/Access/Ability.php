@@ -57,6 +57,10 @@ final class Ability
 
     public const MEDIA_DELETE = 'media.delete';
 
+    public const SITE_VIEW = 'site.view';
+
+    public const SITE_UPDATE = 'site.update';
+
     public const USERS_VIEW = 'users.view';
 
     public const USERS_INVITE = 'users.invite';
@@ -129,6 +133,10 @@ final class Ability
                 self::MEDIA_UPLOAD => 'Upload files',
                 self::MEDIA_UPDATE => 'Rename and move files',
                 self::MEDIA_DELETE => 'Delete files',
+            ],
+            'Site' => [
+                self::SITE_VIEW => 'See the site\'s theme and addresses',
+                self::SITE_UPDATE => 'Change the site\'s theme and addresses',
             ],
             'Users' => [
                 self::USERS_VIEW => 'See who has access',

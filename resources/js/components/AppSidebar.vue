@@ -5,6 +5,7 @@ import {
     Blocks,
     Download,
     FileText,
+    Globe,
     Images,
     LayoutGrid,
     Puzzle,
@@ -32,6 +33,7 @@ import { index as models } from '@/routes/admin/models';
 import { index as entries } from '@/routes/admin/models/entries';
 import { index as modules } from '@/routes/admin/modules';
 import { index as roles } from '@/routes/admin/roles';
+import { index as site } from '@/routes/admin/site';
 import { index as users } from '@/routes/admin/users';
 import type { NavGroup, NavItem } from '@/types';
 
@@ -98,6 +100,12 @@ const groups = computed<NavGroup[]>(() => {
                     icon: Blocks,
                     activeWhen: isModelsPage,
                     ability: 'models.view',
+                },
+                {
+                    title: 'Site',
+                    href: site(),
+                    icon: Globe,
+                    ability: 'site.view',
                 },
                 {
                     title: 'Modules',

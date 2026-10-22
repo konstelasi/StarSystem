@@ -32,6 +32,7 @@ final class ActivityDescriber
             ActivityAction::ROLE_UPDATED => self::updated($with),
             ActivityAction::ROLE_DUPLICATED => self::copied($with),
             ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED => self::twoFactor($with),
+            ActivityAction::SITE_UPDATED => self::site($with),
             ActivityAction::SESSIONS_ENDED,
             ActivityAction::USER_SIGNED_OUT => self::devices($with),
             ActivityAction::USER_RESET_LINK => self::resetLink($with),
@@ -39,6 +40,21 @@ final class ActivityDescriber
             ActivityAction::ACCOUNT_EMAIL_REQUESTED => self::account($with),
             default => [],
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $with
+     * @return list<string>
+     */
+    private static function site(array $with): array
+    {
+        $theme = self::string($with, 'theme');
+        $addresses = self::strings($with, 'addresses');
+
+        return [
+            ...($theme === null ? [] : ["theme set to {$theme}"]),
+            ...(array_key_exists('addresses', $with) ? [$addresses === [] ? 'no models published' : 'addresses set to '.implode(', ', $addresses)] : []),
+        ];
     }
 
     /**

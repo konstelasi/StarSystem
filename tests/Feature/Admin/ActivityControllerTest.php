@@ -82,7 +82,7 @@ class ActivityControllerTest extends TestCase
                 ->where('rows.1.label', 'Signed in')
                 ->where('rows.1.ip', '10.0.0.4')
                 ->where('nextCursor', null)
-                ->where('groups', ['Sign-in', 'People', 'Roles', 'Account'])
+                ->where('groups', ['Sign-in', 'People', 'Roles', 'Site', 'Account'])
             );
     }
 

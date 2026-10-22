@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\InviteController;
 use App\Http\Controllers\Admin\OwnershipController;
 use App\Http\Controllers\Admin\PasswordResetLinkController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SiteController;
 use App\Http\Controllers\Admin\TwoFactorRequirementController;
 use App\Http\Controllers\Admin\UpdateController;
 use App\Http\Controllers\Admin\UserBulkController;
@@ -30,6 +31,12 @@ Route::middleware(['auth', 'site.member', 'verified'])->group(function () {
     Route::get('admin/health', HealthController::class)->middleware('can:'.Ability::HEALTH_VIEW)->name('admin.health');
 
     Route::get('admin/activity', ActivityController::class)->middleware('can:'.Ability::ACTIVITY_VIEW)->name('admin.activity');
+
+    // The theme the site shows and which models it publishes, and where.
+    Route::prefix('admin/site')->name('admin.site.')->controller(SiteController::class)->group(function () {
+        Route::get('/', 'index')->middleware('can:'.Ability::SITE_VIEW)->name('index');
+        Route::put('/', 'update')->middleware('can:'.Ability::SITE_UPDATE)->name('update');
+    });
 
     // Who can use the site and as what. Changing it asks for the password
     // again, like modules and updates.

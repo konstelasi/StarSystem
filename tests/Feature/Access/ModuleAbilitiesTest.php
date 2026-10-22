@@ -130,11 +130,11 @@ class ModuleAbilitiesTest extends TestCase
         $this->actingConfirmed($admin)
             ->get(route('admin.roles.create'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('areas.6.name', 'Forms')
-                ->where('areas.6.abilities.0.key', 'forms.view')
-                ->where('areas.6.abilities.0.label', 'See form submissions')
-                ->where('areas.6.abilities.0.held', true)
-                ->where('areas.6.abilities.1.key', 'forms.export')
+                ->where('areas.7.name', 'Forms')
+                ->where('areas.7.abilities.0.key', 'forms.view')
+                ->where('areas.7.abilities.0.label', 'See form submissions')
+                ->where('areas.7.abilities.0.held', true)
+                ->where('areas.7.abilities.1.key', 'forms.export')
             );
     }
 

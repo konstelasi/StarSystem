@@ -61,6 +61,8 @@ final class ActivityAction
 
     public const TWO_FACTOR_REQUIREMENT_CHANGED = 'role.two_factor_changed';
 
+    public const SITE_UPDATED = 'site.updated';
+
     public const ACCOUNT_UPDATED = 'account.updated';
 
     public const ACCOUNT_EMAIL_REQUESTED = 'account.email_requested';
@@ -105,6 +107,9 @@ final class ActivityAction
                 self::ROLE_DELETED => 'Deleted a role',
                 self::ROLE_DUPLICATED => 'Copied a role',
                 self::TWO_FACTOR_REQUIREMENT_CHANGED => 'Changed which roles must use two-factor sign-in',
+            ],
+            'Site' => [
+                self::SITE_UPDATED => 'Changed the site\'s theme or addresses',
             ],
             'Account' => [
                 self::ACCOUNT_UPDATED => 'Changed their profile',

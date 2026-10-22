@@ -66,6 +66,15 @@ class ActivityDescriberTest extends TestCase
         $this->assertSame(['no role has to use it now'], $this->details(ActivityAction::TWO_FACTOR_REQUIREMENT_CHANGED, ['roles' => []]));
     }
 
+    public function test_a_site_change_names_the_theme_and_the_addresses_that_changed()
+    {
+        $this->assertSame(['theme set to studio'], $this->details(ActivityAction::SITE_UPDATED, ['theme' => 'studio']));
+        $this->assertSame(['addresses set to /, /blog'], $this->details(ActivityAction::SITE_UPDATED, ['addresses' => ['/', '/blog']]));
+        $this->assertSame(['no models published'], $this->details(ActivityAction::SITE_UPDATED, ['addresses' => []]));
+        $this->assertSame(['theme set to studio', 'addresses set to /blog'], $this->details(ActivityAction::SITE_UPDATED, ['theme' => 'studio', 'addresses' => ['/blog']]));
+        $this->assertSame([], $this->details(ActivityAction::SITE_UPDATED, []));
+    }
+
     public function test_signing_out_devices_counts_them_and_a_reset_link_says_how_it_went()
     {
         $this->assertSame(['2 devices'], $this->details(ActivityAction::USER_SIGNED_OUT, ['count' => 2]));
