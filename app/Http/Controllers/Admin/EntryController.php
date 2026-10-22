@@ -7,6 +7,7 @@ use App\Access\SiteAccess;
 use App\Entries\EntryLinks;
 use App\Entries\EntryManager;
 use App\Files\File;
+use App\Frontend\FrontendSlugs;
 use App\Http\Controllers\Controller;
 use App\Models\SchemaField;
 use App\Models\SchemaModel;
@@ -37,6 +38,7 @@ class EntryController extends Controller
         private readonly SchemaManager $schema,
         private readonly SiteAccess $access,
         private readonly EntryLinks $links,
+        private readonly FrontendSlugs $slugs,
     ) {}
 
     public function index(Request $request, SchemaModel $model): Response
@@ -120,6 +122,15 @@ class EntryController extends Controller
         $this->authorize($request, $model, Ability::ENTRIES_RESTORE, $found);
 
         if ($this->entries->isTrashed($found)) {
+            // Its address may have been given to another entry since.
+            $problems = $this->slugs->problems($model, $found->fields, $found);
+
+            if ($problems !== []) {
+                Inertia::flash('toast', ['type' => 'error', 'message' => "Can't restore it. ".array_values($problems)[0][0]]);
+
+                return back(fallback: route('admin.models.entries.trash', $model));
+            }
+
             $this->entries->restore($model, $found);
         }
 
@@ -421,7 +432,7 @@ class EntryController extends Controller
             }
         }
 
-        $errors = $this->links->check($model, $fields, $stored);
+        $errors = array_merge_recursive($this->links->check($model, $fields, $stored), $this->slugs->problems($model, $fields, $stored));
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
