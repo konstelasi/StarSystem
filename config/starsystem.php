@@ -67,7 +67,7 @@ return [
     */
 
     'updates' => [
-        'feed' => env('STARSYSTEM_UPDATE_FEED', 'https://github.com/damarbob/StarSystem/releases/latest/download/release.json'),
+        'feed' => env('STARSYSTEM_UPDATE_FEED', 'https://github.com/konstelasi/StarSystem/releases/latest/download/release.json'),
         'public_key' => env('STARSYSTEM_UPDATE_KEY', FeedSignature::PUBLIC_KEY),
     ],
 
