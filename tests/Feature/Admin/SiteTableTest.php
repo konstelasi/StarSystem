@@ -89,7 +89,8 @@ class SiteTableTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertInertiaFlash('toast.message', 'Site saved.');
 
-        $this->assertSame([$row], $this->site->refresh()->settings['frontend']['routes']);
+        // MySQL 8 re-sorts the keys of a JSON column, so compare without key order.
+        $this->assertEquals([$row], $this->site->refresh()->settings['frontend']['routes']);
         $this->assertSame(['addresses' => ['/blog']], Activity::query()->where('action', ActivityAction::SITE_UPDATED)->latest('id')->firstOrFail()->properties);
 
         $this->get($this->url('admin.site.index'))->assertInertia(fn (Assert $page) => $page->where('routes.0.path', 'blog')->where('routes.0.label', 'Journal'));
