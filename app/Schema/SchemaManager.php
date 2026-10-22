@@ -34,6 +34,7 @@ class SchemaManager
         private readonly SchemaDiff $diff,
         private readonly SchemaApplier $applier,
         private readonly RelationCheck $relations,
+        private readonly FrontendCheck $frontend,
     ) {}
 
     /**
@@ -257,6 +258,10 @@ class SchemaManager
             throw new SchemaException(SchemaException::text('This model is already being deleted.'));
         }
 
+        if (($published = $this->frontend->deleteProblem($model)) !== null) {
+            throw new SchemaException(SchemaException::text($published));
+        }
+
         try {
             $this->stardust->deleteModel($model->stardust_model_id);
         } catch (Throwable $e) {
@@ -400,7 +405,7 @@ class SchemaManager
             $plan = $plan->withError(null, $taken);
         }
 
-        foreach ($this->relations->errors($model, $desired, $by) as $error) {
+        foreach ([...$this->relations->errors($model, $desired, $by), ...$this->frontend->errors($model, $desired)] as $error) {
             $plan = $plan->withError($error['field_uuid'], $error['message']);
         }
 
