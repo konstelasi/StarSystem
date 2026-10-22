@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\User;
 use App\StarDust\TickPause;
+use App\Update\ReleaseFeed;
 use App\Update\Updater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -108,6 +109,7 @@ class UpdateControllerTest extends TestCase
                 ->where('available', true)
                 ->where('latest.release.version', '1.1.0')
                 ->where('latest.error', null)
+                ->where('latest.warning', null)
                 ->where('state', null)
             );
     }
@@ -125,6 +127,39 @@ class UpdateControllerTest extends TestCase
                 ->where('latest.release', null)
                 ->has('latest.error')
             );
+    }
+
+    public function test_the_page_and_start_offer_the_newest_release_seen_when_the_feed_goes_back(): void
+    {
+        $feed = fn (string $version) => $this->signedFeed([
+            'version' => $version,
+            'zip' => "https://feed.example/starsystem-{$version}.zip",
+            'sha256' => str_repeat('a', 64),
+        ]);
+        Http::fake(['https://feed.example/release.json' => Http::sequence()->push($feed('1.2.0'))->push($feed('1.1.0'))]);
+        config(['starsystem.updates.feed' => 'https://feed.example/release.json']);
+
+        app(ReleaseFeed::class)->latest();
+        app(ReleaseFeed::class)->latest(fresh: true);
+
+        $this->asConfirmedUser()
+            ->get(route('admin.updates'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('available', true)
+                ->where('latest.release.version', '1.2.0')
+                ->where('latest.warning', fn (string $warning) => str_contains($warning, '1.1.0') && str_contains($warning, '1.2.0'))
+            );
+
+        $this->asConfirmedUser()
+            ->post(route('admin.updates.start'), ['version' => '1.1.0'])
+            ->assertSessionHasErrors('update');
+
+        $this->asConfirmedUser()
+            ->post(route('admin.updates.start'), ['version' => '1.2.0'])
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame('1.2.0', app(Updater::class)->state()['to']['version']);
     }
 
     public function test_the_page_refuses_a_feed_that_is_not_signed(): void

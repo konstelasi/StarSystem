@@ -70,6 +70,8 @@ DB_PORT=33080 php artisan test  # the same suite against MySQL
 
 The `release.json` is signed with an Ed25519 key, and an install refuses a feed that isn't, so someone who replaces the feed can't hand it a different zip. The public half of the key is `FeedSignature::PUBLIC_KEY` in `app/Update/FeedSignature.php`. The secret half is the repository secret `STARSYSTEM_RELEASE_KEY`, which the release workflow passes to `build/release.php`, and the build stops without it. The build keeps the secret from `composer install`, so no dependency's script can read it. `--unsigned` makes a local test build that no install will accept.
 
+A signature shows who made a feed, not that it is current. Each install keeps the newest signed release it has seen in `storage/app/update-feed-seen.json`. When the feed later offers an older release, the Updates page keeps offering the newer one and warns that the feed looks out of date. For this to work, never delete a published release to withdraw it, because every install that saw it would then warn for good. Publish a newer release instead, and publish releases in version order. The release workflow leaves GitHub's default for the "latest" address, which weighs the version number as well as the date, so an older line's backport should not take over. If one is ever needed, add `--latest=false` to `gh release create` in `release.yml` first.
+
 To make a new key pair, run this from the repository root. It prints the secret and then the public key.
 
 ```sh

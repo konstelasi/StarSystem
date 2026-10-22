@@ -40,6 +40,7 @@ const props = defineProps<{
     latest: {
         release: { version: string; published_at: string | null } | null;
         error: string | null;
+        warning: string | null;
         checkedAt: string | null;
     };
     available: boolean;
@@ -371,6 +372,11 @@ const updateError = computed(
                 </CardDescription>
             </CardHeader>
             <CardContent class="flex flex-col gap-4">
+                <Alert v-if="latest.warning" data-test="feed-warning">
+                    <AlertTriangle />
+                    <AlertTitle>The update feed looks out of date</AlertTitle>
+                    <AlertDescription>{{ latest.warning }}</AlertDescription>
+                </Alert>
                 <p v-if="available" class="text-sm text-muted-foreground">
                     Back up your database before updating. If a step fails,
                     StarSystem puts the current version back by itself, but a

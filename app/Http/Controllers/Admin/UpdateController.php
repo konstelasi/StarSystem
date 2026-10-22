@@ -39,6 +39,7 @@ class UpdateController extends Controller
             'latest' => [
                 'release' => $latest['release'] ? Arr::only($latest['release']->toArray(), ['version', 'published_at']) : null,
                 'error' => $latest['error'],
+                'warning' => $latest['warning'],
                 'checkedAt' => $latest['checkedAt'],
             ],
             'available' => $latest['release']?->newerThan($current) ?? false,
