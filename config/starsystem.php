@@ -37,6 +37,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Themes
+    |--------------------------------------------------------------------------
+    |
+    | A theme is a folder of templates, styles and a theme.json, and decides
+    | how a site's public pages look. Each lives in its own folder here, and
+    | a site shows the one it chose, else the default theme named below.
+    | Themes are PHP, so they are copied in over FTP and never installed
+    | from a request.
+    |
+    */
+
+    'themes' => [
+        'path' => env('STARSYSTEM_THEMES_PATH', base_path('themes')),
+        'default' => 'default',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Activity log
     |--------------------------------------------------------------------------
     |

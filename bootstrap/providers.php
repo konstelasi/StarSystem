@@ -3,6 +3,7 @@
 use App\Access\AccessServiceProvider;
 use App\Activity\ActivityServiceProvider;
 use App\Files\FilesServiceProvider;
+use App\Frontend\FrontendServiceProvider;
 use App\Hooks\HooksServiceProvider;
 use App\Modules\ModulesServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -26,4 +27,5 @@ return [
     DistributionServiceProvider::class,
     BuilderServiceProvider::class,
     EntriesServiceProvider::class,
+    FrontendServiceProvider::class,
 ];
