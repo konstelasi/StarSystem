@@ -7,6 +7,8 @@ use App\Models\SchemaModel;
 use App\Schema\FieldTypes\FieldTypeRegistry;
 use App\StarDust\StarDustService;
 use Carbon\CarbonImmutable;
+use StarDust\Exception\FieldNotFilterableException;
+use StarDust\Exception\FieldNotIndexedException;
 use StarDust\Exception\InvalidCursorException;
 use StarDust\Filter\Ast\AndNode;
 use StarDust\Filter\Ast\LeafNode;
@@ -199,11 +201,16 @@ class EntryManager
      * then the page is read without that filter and the rows it would have
      * removed are dropped here, so a page can come back short; the cursor
      * still moves on correctly. $createdBy asks for one person's entries.
-     * $match is one more filter the caller already knows StarDust can run.
+     * $match is more filters the caller already knows StarDust can run, all
+     * of which must hold. $pageSize defaults to PAGE_SIZE.
+     *
+     * @param  LeafNode|list<LeafNode>|null  $match
      *
      * @throws InvalidCursorException when $cursor isn't one StarDust issued
+     * @throws FieldNotFilterableException when $match names a field that has no slot yet
+     * @throws FieldNotIndexedException when $match names a field that is still filling its slot
      */
-    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false, ?int $createdBy = null, ?LeafNode $match = null): EntryPage
+    public function page(SchemaModel $model, ?string $cursor = null, bool $trashed = false, ?int $createdBy = null, LeafNode|array|null $match = null, ?int $pageSize = null): EntryPage
     {
         $indexed = $this->trashIndexed($model);
         $authorIndexed = $createdBy === null || $this->createdByIndexed($model);
@@ -211,7 +218,7 @@ class EntryManager
         $filters = array_values(array_filter([
             $indexed ? LeafNode::local(self::TRASH_FIELD, $trashed ? 'gt' : 'eq', 0) : null,
             $createdBy !== null && $authorIndexed ? LeafNode::local(self::CREATED_BY_FIELD, 'eq', $createdBy) : null,
-            $match,
+            ...(is_array($match) ? $match : [$match]),
         ]));
 
         $page = $this->stardust->listEntries(
@@ -222,7 +229,7 @@ class EntryManager
                 default => new AndNode($filters),
             },
             sort: SortSpec::byId(SortDirection::Desc),
-            pageSize: self::PAGE_SIZE,
+            pageSize: $pageSize ?? self::PAGE_SIZE,
             cursor: $cursor === null ? null : new Cursor($cursor),
         );
 
