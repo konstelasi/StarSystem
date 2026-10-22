@@ -15,4 +15,11 @@ class FrontendServiceProvider extends ServiceProvider
             config()->string('starsystem.themes.default'),
         ));
     }
+
+    public function boot(): void
+    {
+        // Registered before routes/web.php, so a catch-all page route there
+        // can never shadow /_themes.
+        $this->loadRoutesFrom(base_path('routes/frontend.php'));
+    }
 }
