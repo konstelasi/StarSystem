@@ -105,6 +105,18 @@ class UpdaterTest extends TestCase
         $this->assertDirectoryDoesNotExist("{$this->work}/staging");
     }
 
+    public function test_starting_an_update_leaves_the_feed_record_beside_the_work_folder(): void
+    {
+        mkdir($this->work, 0775, true);
+        file_put_contents("{$this->work}/left-by-an-earlier-update", 'x');
+        file_put_contents("{$this->base}/update-feed-seen.json", '{}');
+
+        $this->updater()->start($this->release('1.1.0'));
+
+        $this->assertFileDoesNotExist("{$this->work}/left-by-an-earlier-update");
+        $this->assertFileExists("{$this->base}/update-feed-seen.json");
+    }
+
     public function test_a_download_that_fails_its_checksum_changes_nothing(): void
     {
         Http::fake(['https://example.com/starsystem-1.1.0.zip' => Http::response('not the real zip')]);
