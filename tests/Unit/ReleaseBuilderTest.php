@@ -117,7 +117,7 @@ class ReleaseBuilderTest extends TestCase
             'public/index.php', 'public/.htaccess', 'public/build/manifest.json', 'public/build/assets/app.js',
             'vendor/autoload.php', 'bootstrap/app.php', 'bootstrap/cache/.gitignore',
             'resources/views/app.blade.php', 'routes/install.php', 'app/Install/Installer.php',
-            'storage/framework/views/.gitignore', 'storage/logs/.gitignore',
+            'storage/framework/views/.gitignore', 'storage/logs/.gitignore', 'themes/.gitkeep',
         ] as $path) {
             $this->assertContains('starsystem/'.$path, self::$entries, "Missing {$path}");
         }

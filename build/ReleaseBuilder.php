@@ -37,7 +37,7 @@ final class ReleaseBuilder
     public const SHIP = [
         '.env.example', '.htaccess', 'VERSION', 'app', 'artisan', 'bootstrap', 'composer.json',
         'composer.lock', 'config', 'database', 'index.php', 'modules', 'public', 'resources', 'routes',
-        'storage',
+        'storage', 'themes',
     ];
 
     /**
