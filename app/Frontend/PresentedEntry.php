@@ -128,11 +128,15 @@ final class PresentedEntry
             return '';
         }
 
-        try {
-            return $date->settings(['locale' => $this->locale])->translatedFormat($format);
-        } catch (Throwable) {
-            return $date->format($format);
-        }
+        return $this->write($date, $format);
+    }
+
+    /**
+     * The day the entry was made, written like date().
+     */
+    public function created(string $format = 'j F Y'): string
+    {
+        return $this->write($this->createdAt, $format);
     }
 
     public function file(string $key): ?PresentedFile
@@ -192,5 +196,14 @@ final class PresentedEntry
         }
 
         return $list;
+    }
+
+    private function write(CarbonImmutable $date, string $format): string
+    {
+        try {
+            return $date->settings(['locale' => $this->locale])->translatedFormat($format);
+        } catch (Throwable) {
+            return $date->format($format);
+        }
     }
 }

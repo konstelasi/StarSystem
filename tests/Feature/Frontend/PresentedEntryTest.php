@@ -143,6 +143,13 @@ class PresentedEntryTest extends TestCase
         $this->assertSame('22 Oktober 2026', $entry->date('when'));
     }
 
+    public function test_created_writes_the_day_the_entry_was_made_in_the_language_of_the_site()
+    {
+        $this->assertSame('22 October 2026', $this->entry([])->created());
+        $this->assertSame('2026-10-22', $this->entry([])->created('Y-m-d'));
+        $this->assertSame('22 Oktober 2026', $this->entry([], locale: 'id')->created());
+    }
+
     public function test_date_with_a_locale_nobody_knows_still_gives_a_date()
     {
         $entry = $this->entry(['when' => $this->field('datetime', '2026-10-22 17:30:00')], locale: 'zz-nowhere');
