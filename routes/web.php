@@ -14,15 +14,8 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\UserSessionController;
 use App\Http\Controllers\Admin\UserSuspensionController;
 use App\Http\Controllers\InvitationController;
-use App\Sites\CurrentSite;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-
-// What visitors see until the site has a public front end.
-Route::get('/', fn (CurrentSite $site) => Inertia::render('Home', [
-    'siteName' => $site->get()->name,
-]))->name('home');
 
 // An invitation link. Open to anyone who holds it, so it is throttled, and
 // outside `site.member` because the person is not a member yet.

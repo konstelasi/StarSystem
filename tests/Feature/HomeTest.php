@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class HomeTest extends TestCase
@@ -15,11 +14,16 @@ class HomeTest extends TestCase
     {
         $site = Site::query()->findOrFail(config()->integer('starsystem.default_site'));
 
-        $this->get(route('home'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Home')
-                ->where('siteName', $site->name)
-            );
+        $response = $this->get(route('home'));
+
+        $response->assertOk()
+            ->assertSee('<h1>'.e($site->name).'</h1>', false)
+            ->assertSee('Nothing has been published here yet.');
+
+        // Plain HTML from the default theme, not an Inertia page.
+        $this->assertStringStartsWith('text/html', (string) $response->headers->get('Content-Type'));
+        $response->assertDontSee('data-page=', false);
+        $response->assertDontSee('id="app"', false);
+        $this->assertSame([], $response->headers->getCookies());
     }
 }

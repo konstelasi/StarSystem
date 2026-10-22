@@ -34,6 +34,14 @@ class FrontendRouter
     {
         $routes = $this->settings->routes();
 
+        return $this->lookup($routes, $path, $cursor)->withRoutes($routes);
+    }
+
+    /**
+     * @param  list<FrontendRoute>  $routes
+     */
+    private function lookup(array $routes, string $path, ?string $cursor): FrontendMatch
+    {
         if ($routes === []) {
             return $this->isHome($path) ? new FrontendMatch(FrontendMatch::HOME) : FrontendMatch::none();
         }

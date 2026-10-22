@@ -32,11 +32,17 @@ class AddressConflicts
             return false;
         }
 
-        if (in_array(strtolower($path), self::RESERVED, true)) {
-            return true;
-        }
+        return $this->reserved($path) || $this->routed('/'.$path) || $this->routed('/'.$path.'/x');
+    }
 
-        return $this->routed('/'.$path) || $this->routed('/'.$path.'/x');
+    /**
+     * Whether the address starts with one of the folders or prefixes that
+     * StarSystem keeps for itself, such as "admin" or "files". The front end
+     * answers these with the framework's plain 404 and never its own page.
+     */
+    public function reserved(string $path): bool
+    {
+        return in_array(strtolower(explode('/', trim($path, '/'))[0]), self::RESERVED, true);
     }
 
     /**

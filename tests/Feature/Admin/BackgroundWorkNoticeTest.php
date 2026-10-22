@@ -52,7 +52,7 @@ class BackgroundWorkNoticeTest extends TestCase
 
     public function test_guests_never_get_it()
     {
-        $this->get(route('home'))
+        $this->get(route('login'))
             ->assertInertia(fn (Assert $page) => $page->where('backgroundWork', null));
     }
 }

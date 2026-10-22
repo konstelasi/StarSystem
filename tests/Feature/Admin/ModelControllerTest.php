@@ -90,7 +90,7 @@ class ModelControllerTest extends TestCase
     {
         $this->create('articles', 'Articles');
 
-        $this->get($this->url('home'))
+        $this->get($this->url('login'))
             ->assertInertia(fn (Assert $assert) => $assert->where('navModels', []));
     }
 
