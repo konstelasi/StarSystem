@@ -1,0 +1,9 @@
+{
+    "name": "Default",
+    "version": "1.0.0",
+    "description": "A plain starter theme.",
+    "author": "Konstelasi",
+    "requires": {
+        "starsystem": "^0.1"
+    }
+}

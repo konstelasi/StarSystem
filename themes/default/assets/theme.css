@@ -1,0 +1,252 @@
+/*
+ * The default theme. A plain page to start from: one column, system fonts,
+ * and the browser's own light or dark setting. Copy the folder, rename it
+ * and change what you like.
+ */
+
+:root {
+    color-scheme: light dark;
+    --bg: #fbfaf7;
+    --text: #1d1d1b;
+    --muted: #5d5b55;
+    --line: #dcd9d0;
+    --link: #0b5c6b;
+    --block: #f0eee7;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #161615;
+        --text: #ecebe6;
+        --muted: #a9a79f;
+        --line: #34332f;
+        --link: #7cc4d1;
+        --block: #232321;
+    }
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font:
+        1.0625rem/1.65 system-ui,
+        -apple-system,
+        'Segoe UI',
+        Roboto,
+        sans-serif;
+    overflow-wrap: break-word;
+}
+
+a {
+    color: var(--link);
+    text-underline-offset: 0.15em;
+}
+
+:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
+}
+
+.skip {
+    position: absolute;
+    left: 1rem;
+    top: -4rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+}
+
+.skip:focus {
+    top: 0.5rem;
+}
+
+.site-header,
+main,
+.site-footer {
+    width: min(42rem, 100% - 2rem);
+    margin-inline: auto;
+}
+
+.site-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 1.5rem;
+    padding-block: 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.site-name {
+    color: var(--text);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.site-header ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.site-header nav a[aria-current='page'] {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration-thickness: 2px;
+}
+
+main {
+    padding-block: 2rem 3rem;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    line-height: 1.25;
+    margin: 2rem 0 0.75rem;
+}
+
+h1 {
+    margin-top: 0;
+    font-size: 1.9rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+}
+
+h3 {
+    font-size: 1.15rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+pre,
+table,
+figure {
+    margin: 0 0 1rem;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 1rem;
+}
+
+blockquote {
+    padding-left: 1rem;
+    border-left: 3px solid var(--line);
+    color: var(--muted);
+}
+
+pre,
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+}
+
+pre {
+    padding: 0.75rem 1rem;
+    background: var(--block);
+    overflow-x: auto;
+}
+
+hr {
+    margin: 2rem 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
+
+table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--line);
+    text-align: left;
+}
+
+.field {
+    margin-bottom: 1.5rem;
+}
+
+.field > p {
+    margin-bottom: 0.25rem;
+}
+
+.field-label {
+    margin-bottom: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.field--rich_text > :last-child {
+    margin-bottom: 0;
+}
+
+.multiline {
+    white-space: pre-line;
+}
+
+.number {
+    font-variant-numeric: tabular-nums;
+}
+
+.swatch {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: 0.4em;
+    vertical-align: -0.15em;
+    border: 1px solid var(--line);
+}
+
+.entry-list {
+    padding: 0;
+    list-style: none;
+}
+
+.entry-list li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 1.5rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--line);
+}
+
+.entry-list time {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.pager {
+    margin-top: 1.5rem;
+}
+
+.site-footer {
+    padding-block: 1rem 2rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.9rem;
+}
