@@ -9,11 +9,18 @@ namespace App\Update;
  * half new. Every method works out what is left to do from what is on
  * disk, so a request that died halfway is finished by running it again.
  *
- * Only what the release ships is touched: storage/ never, and public/ one
- * entry at a time, so files the host or owner put there stay.
+ * Only what the release ships is touched: storage/ never, and public/,
+ * modules/ and themes/ one entry at a time, so files the host or owner put
+ * there, and modules and themes they installed, stay.
  */
 class FileSwap
 {
+    /**
+     * Top-level folders that hold things the owner adds. A release replaces
+     * what it ships inside them, never the whole folder.
+     */
+    private const MERGED = ['public', 'modules', 'themes'];
+
     public function __construct(
         private readonly string $root,
         private readonly string $staging,
@@ -35,9 +42,9 @@ class FileSwap
                 continue;
             }
 
-            if ($entry === 'public') {
-                foreach (self::entries($staging.'/public') as $public) {
-                    $units[] = 'public/'.$public;
+            if (in_array($entry, self::MERGED, true)) {
+                foreach (self::entries($staging.'/'.$entry) as $child) {
+                    $units[] = $entry.'/'.$child;
                 }
 
                 continue;

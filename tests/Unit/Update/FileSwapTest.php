@@ -4,6 +4,7 @@ namespace Tests\Unit\Update;
 
 use App\Update\FileSwap;
 use App\Update\UpdateException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -54,6 +55,54 @@ class FileSwapTest extends TestCase
         $units = FileSwap::units($this->staging);
 
         $this->assertSame(['app', 'public/build', 'public/index.php', 'vendor'], $units);
+    }
+
+    #[DataProvider('mergedFolders')]
+    public function test_units_split_a_merged_folder_into_one_unit_per_child(string $folder): void
+    {
+        $this->write($this->staging, "{$folder}/.gitkeep", '');
+        $this->write($this->staging, "{$folder}/Example/file.txt", 'x');
+
+        $this->assertSame(["{$folder}/.gitkeep", "{$folder}/Example"], FileSwap::units($this->staging));
+    }
+
+    #[DataProvider('mergedFolders')]
+    public function test_apply_keeps_an_installed_child_the_release_does_not_ship(string $folder): void
+    {
+        $this->write($this->root, "{$folder}/Custom/file.txt", 'kept');
+        $this->write($this->staging, "{$folder}/.gitkeep", '');
+
+        (new FileSwap($this->root, $this->staging, $this->backup, $this->discard))
+            ->apply(FileSwap::units($this->staging));
+
+        $this->assertSame('kept', file_get_contents("{$this->root}/{$folder}/Custom/file.txt"));
+        $this->assertFileExists("{$this->root}/{$folder}/.gitkeep");
+    }
+
+    #[DataProvider('mergedFolders')]
+    public function test_apply_replaces_a_child_the_release_ships_and_restore_brings_it_back(string $folder): void
+    {
+        $this->write($this->root, "{$folder}/Example/file.txt", 'old');
+        $this->write($this->staging, "{$folder}/Example/file.txt", 'new');
+
+        $swap = new FileSwap($this->root, $this->staging, $this->backup, $this->discard);
+        $units = FileSwap::units($this->staging);
+
+        $swap->apply($units);
+
+        $this->assertSame('new', file_get_contents("{$this->root}/{$folder}/Example/file.txt"));
+
+        $swap->restore($units);
+
+        $this->assertSame('old', file_get_contents("{$this->root}/{$folder}/Example/file.txt"));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function mergedFolders(): array
+    {
+        return ['modules' => ['modules'], 'themes' => ['themes']];
     }
 
     public function test_apply_replaces_live_files_and_keeps_a_backup(): void
