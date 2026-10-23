@@ -162,7 +162,7 @@ class SchemaApplier
      *
      * StarDust reserves an unmapped filterable field's slot only two ways:
      * the promote/retype lifecycle's own synchronous (or deferred)
-     * reservation, or the ADR 0007 exhaustion fallback a write enqueues.
+     * reservation, or the exhaustion fallback a write enqueues.
      * defineField()'s own `isFilterable` flag does neither — it only sets
      * the registry flag, so a field created filterable in one call would
      * sit in "indexing" forever on a model with no entries yet, with
