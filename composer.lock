@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7e2c1a313dc8aa1da509b95188bcfb1a",
+    "content-hash": "5d28b88bad974061fa5242e5fcaee756",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -201,12 +201,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/damarbob/StarDust.git",
-                "reference": "5b1bbdd1184b8a83c11f074dff12eed89637d40c"
+                "reference": "f9b1c1f83fcf960bc61afde3c892bb283de71208"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/damarbob/StarDust/zipball/5b1bbdd1184b8a83c11f074dff12eed89637d40c",
-                "reference": "5b1bbdd1184b8a83c11f074dff12eed89637d40c",
+                "url": "https://api.github.com/repos/damarbob/StarDust/zipball/f9b1c1f83fcf960bc61afde3c892bb283de71208",
+                "reference": "f9b1c1f83fcf960bc61afde3c892bb283de71208",
                 "shasum": ""
             },
             "require": {
@@ -241,21 +241,28 @@
                     "email": "ibn.damr@gmail.com"
                 }
             ],
-            "description": "MySQL & MariaDB-native, framework-neutral Vertical Schema Partitioning engine for dynamic data models. Zero runtime framework dependencies.",
+            "description": "Filterable user-defined fields for PHP on MySQL and MariaDB. Records are stored as JSON, and filterable fields are mirrored into indexed columns.",
+            "homepage": "https://stardust.konstelasi.co.id",
             "keywords": [
+                "custom-fields",
                 "dynamic-fields",
+                "eav",
                 "json",
                 "mariadb",
+                "multi-tenant",
                 "mysql",
-                "schema-partitioning",
+                "saas",
                 "stardust",
+                "user-defined-fields",
                 "vertical-partitioning"
             ],
             "support": {
+                "docs": "https://stardust.konstelasi.co.id/docs/",
                 "issues": "https://github.com/damarbob/StarDust/issues",
-                "source": "https://github.com/damarbob/StarDust/tree/main"
+                "source": "https://github.com/damarbob/StarDust"
             },
-            "time": "2026-10-14T08:13:27+00:00"
+            "time": "2026-11-08T13:03:30+00:00",
+            "published-time": "2026-11-08T13:05:31+00:00"
         },
         {
             "name": "dasprid/enum",
@@ -10727,5 +10734,5 @@
     "platform-overrides": {
         "php": "8.3.0"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.11.0"
 }
